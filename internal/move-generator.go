@@ -16,7 +16,7 @@ const (
 	DownRight = 9
 )
 
-func (p Position) SliderPseudoLegalMoves(pieceIdx int8) ([]int8, []int8) {
+func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	var (
 		directions    []int
 		moves         []int8
@@ -73,6 +73,59 @@ func (p Position) SliderPseudoLegalMoves(pieceIdx int8) ([]int8, []int8) {
 			}
 
 			// add to the list
+			moves = append(moves, targetIdx)
+		}
+	}
+
+	return moves, capturesMoves
+}
+
+func KnightPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
+	var (
+		moves         []int8
+		capturesMoves []int8
+	)
+	offsets := []int8{-17, -15, -10, -6, 6, 10, 15, 17}
+	piece := p.PieceAt(pieceIdx)
+	pieceFile := pieceIdx % 8
+	pieceRank := pieceIdx / 8
+	for _, offset := range offsets {
+		targetIdx := pieceIdx + offset
+		if targetIdx < 0 || targetIdx > 63 {
+			continue
+		}
+
+		targetFile := targetIdx % 8
+		targetRank := targetIdx / 8
+
+		var (
+			rankDiff int8
+			fileDiff int8
+		)
+		if pieceRank > targetRank {
+			rankDiff = pieceRank - targetRank
+		} else {
+			rankDiff = targetRank - pieceRank
+		}
+
+		if pieceFile > targetFile {
+			fileDiff = pieceFile - targetFile
+		} else {
+			fileDiff = targetFile - pieceFile
+		}
+
+		combinedDiff := fileDiff + rankDiff
+		if combinedDiff != -3 && combinedDiff != 3 {
+			continue
+		}
+
+		target := p.PieceAt(targetIdx)
+		if target != NoPiece {
+			if target.Color() != piece.Color() {
+				moves = append(moves, targetIdx)
+				capturesMoves = append(capturesMoves, targetIdx)
+			}
+		} else {
 			moves = append(moves, targetIdx)
 		}
 	}
