@@ -132,3 +132,57 @@ func KnightPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 
 	return moves, capturesMoves
 }
+
+func PawnPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
+	var (
+		moves         []int8
+		capturesMoves []int8
+	)
+
+	piece := p.PieceAt(pieceIdx)
+	pieceColor := piece.Color()
+
+	direction := int8(1)
+	if pieceColor == Black {
+		direction = -1
+	}
+
+	rank, file := RankAndFile(pieceIdx)
+
+	// 1 forward
+	target1Idx := pieceIdx + (8 * direction)
+	target1 := p.PieceAt(target1Idx)
+	if target1 == NoPiece {
+		moves = append(moves, target1Idx)
+	}
+
+	// 2 forward
+	if ((pieceColor == White && rank == 1) || (pieceColor == Black && rank == 6)) && target1 == NoPiece {
+		target2Idx := pieceIdx + (16 * direction)
+		target2 := p.PieceAt(target2Idx)
+		if target2 == NoPiece {
+			moves = append(moves, target2Idx)
+		}
+	}
+
+	// capture
+	if file > 0 {
+		leftTargetIdx := pieceIdx + (8 * direction) - 1
+		leftTarget := p.PieceAt(leftTargetIdx)
+		if (leftTarget != NoPiece && leftTarget.Color() != pieceColor) || leftTargetIdx == p.enPassantIdx {
+			moves = append(moves, leftTargetIdx)
+			capturesMoves = append(capturesMoves, leftTargetIdx)
+		}
+	}
+
+	if file < 7 {
+		rightTargetIdx := pieceIdx + (8 * direction) + 1
+		rightTarget := p.PieceAt(rightTargetIdx)
+		if rightTarget != NoPiece && rightTarget.Color() != pieceColor || rightTargetIdx == p.enPassantIdx {
+			moves = append(moves, rightTargetIdx)
+			capturesMoves = append(capturesMoves, rightTargetIdx)
+		}
+	}
+
+	return moves, capturesMoves
+}

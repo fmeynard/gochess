@@ -18,7 +18,7 @@ type Position struct {
 	activeColor       int8
 	whiteCastleRights int8
 	blackCastleRights int8
-	enPassantSquares  int8
+	enPassantIdx      int8
 }
 
 func NewPosition() Position {
@@ -36,7 +36,7 @@ func NewPosition() Position {
 		activeColor:       White,
 		whiteCastleRights: KingSideCastle | QueenSideCastle,
 		blackCastleRights: KingSideCastle | QueenSideCastle,
-		enPassantSquares:  NoEnPassant,
+		enPassantIdx:      NoEnPassant,
 	}
 }
 
@@ -122,9 +122,9 @@ func NewPositionFromFEN(fen string) (Position, error) {
 	}
 
 	// En passant
-	pos.enPassantSquares = NoEnPassant
+	pos.enPassantIdx = NoEnPassant
 	if parts[3] != "-" {
-		pos.enPassantSquares = SquareToIdx(parts[3])
+		pos.enPassantIdx = SquareToIdx(parts[3])
 	}
 
 	// Half move clock

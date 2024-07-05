@@ -51,3 +51,11 @@ func SquaresToIndexes(squares []string) []int8 {
 
 	return indexes
 }
+
+func RankAndFile(idx int8) (int8, int8) {
+	if idx < 0 || idx > 63 {
+		panic("idx out of range")
+	}
+
+	return idx / 8, idx % 8
+}

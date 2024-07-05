@@ -70,6 +70,75 @@ func TestPosition_KnightPseudoLegalMoves(t *testing.T) {
 
 	execMovesCheck(t, data, KnightPseudoLegalMoves)
 }
+
+func Test_PawnPseudoLegalMoves(t *testing.T) {
+	data := CheckData{
+		"start pos white": {
+			fenString: "8/8/8/8/8/8/P7/8 w - - 0 1",
+			piecePos:  A2,
+			moves:     []int8{A3, A4},
+		},
+		"start pos black": {
+			fenString: "8/p7/8/8/8/8/8/8 w - - 0 1",
+			piecePos:  A7,
+			moves:     []int8{A6, A5},
+		},
+		"no capture left white": {
+			fenString:     "8/8/8/pp5p/P7/8/8/8 w - - 0 1",
+			piecePos:      A4,
+			moves:         []int8{B5},
+			capturesMoves: []int8{B5},
+		},
+		"no capture left black": {
+			fenString:     "8/8/8/p7/1P5P/8/8/8 b - - 0 1",
+			piecePos:      A5,
+			moves:         []int8{A4, B4},
+			capturesMoves: []int8{B4},
+		},
+		"both capture white": {
+			fenString:     "8/8/8/8/8/ppp4p/1P6/8 b - - 0 1",
+			piecePos:      B2,
+			moves:         []int8{A3, C3},
+			capturesMoves: []int8{A3, C3},
+		},
+		"both capture black": {
+			fenString:     "8/8/8/8/3PPP2/3PpP2/PPPPPPPP/8 w - - 0 1",
+			piecePos:      E3,
+			moves:         []int8{D2, F2},
+			capturesMoves: []int8{D2, F2},
+		},
+		"enPassant left white": {
+			fenString:     "8/8/1p6/pPp5/8/8/8/8 w - a6 0 1",
+			piecePos:      B5,
+			moves:         []int8{A6},
+			capturesMoves: []int8{A6},
+		},
+		"enPassant right white": {
+			fenString:     "8/8/1p6/pPp5/8/8/8/8 w - c6 0 1",
+			piecePos:      B5,
+			moves:         []int8{C6},
+			capturesMoves: []int8{C6},
+		},
+		"no enPassant white": {
+			fenString: "8/8/1p6/pPp5/8/8/8/8 w - - 0 1",
+			piecePos:  B5,
+		},
+		"enPassant left black": {
+			fenString:     "8/8/8/8/PpP5/1P6/8/8 b - a3 0 1",
+			piecePos:      B4,
+			moves:         []int8{A3},
+			capturesMoves: []int8{A3},
+		},
+		"No-EnPassant cross-board black": {
+			fenString: "8/8/8/8/PpP4p/1P6/8/8 b - a3 0 1",
+			piecePos:  H4,
+			moves:     []int8{H3},
+		},
+	}
+
+	execMovesCheck(t, data, PawnPseudoLegalMoves)
+}
+
 func execMovesCheck(t *testing.T, data CheckData, generator generatorFn) {
 	for tName, d := range data {
 		t.Run(tName, func(t *testing.T) {
