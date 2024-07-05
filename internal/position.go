@@ -14,19 +14,22 @@ const (
 )
 
 type Position struct {
-	board             map[int]Piece
+	board             map[int8]Piece
 	activeColor       int8
 	whiteCastleRights int8
 	blackCastleRights int8
-	enPassantSquares  int
-	Yolo              int
+	enPassantSquares  int8
 }
 
 func NewPosition() Position {
-	board := make(map[int]Piece, 64)
-	for i := 0; i < 64; i++ {
+	board := make(map[int8]Piece, 64)
+	for i := range board {
 		board[i] = NoPiece
 	}
+
+	//for i := 0; i < 64; i++ {
+	//	board[i] = NoPiece
+	//}
 
 	return Position{
 		board:             board,
@@ -73,7 +76,7 @@ func NewPositionFromFEN(fen string) (Position, error) {
 			continue
 		}
 
-		idx := rank*8 + file
+		idx := int8(rank*8 + file)
 
 		if char >= '1' && char <= '8' {
 			file += int(char - '0')
@@ -131,15 +134,15 @@ func NewPositionFromFEN(fen string) (Position, error) {
 	return pos, nil
 }
 
-func (p Position) PieceAt(idx int) Piece {
+func (p Position) PieceAt(idx int8) Piece {
 	return p.board[idx]
 }
 
 func (p Position) CanCastle(clr int8, castleRight int8) bool {
 	var (
-		kingPos      int
-		rookPos      int
-		emptyIdx     []int
+		kingPos      int8
+		rookPos      int8
+		emptyIdx     []int8
 		castleRights int8
 	)
 
@@ -149,10 +152,10 @@ func (p Position) CanCastle(clr int8, castleRight int8) bool {
 		switch castleRight {
 		case QueenSideCastle:
 			rookPos = 0
-			emptyIdx = []int{1, 2}
+			emptyIdx = []int8{1, 2}
 		case KingSideCastle:
 			rookPos = 7
-			emptyIdx = []int{5, 6}
+			emptyIdx = []int8{5, 6}
 		}
 	} else {
 		castleRights = p.blackCastleRights
@@ -160,10 +163,10 @@ func (p Position) CanCastle(clr int8, castleRight int8) bool {
 		switch castleRight {
 		case QueenSideCastle:
 			rookPos = 56
-			emptyIdx = []int{57, 58}
+			emptyIdx = []int8{57, 58}
 		case KingSideCastle:
 			rookPos = 63
-			emptyIdx = []int{61, 62}
+			emptyIdx = []int8{61, 62}
 		}
 	}
 

@@ -8,7 +8,7 @@ import (
 func Test_SquareToIdx(t *testing.T) {
 	data := []struct {
 		strIdentifier string
-		expectedIdx   int
+		expectedIdx   int8
 	}{
 		{"a1", 0},
 		{"h1", 7},
@@ -25,7 +25,7 @@ func Test_SquareToIdx(t *testing.T) {
 
 func Test_IdxToSquare(t *testing.T) {
 	data := []struct {
-		idx           int
+		idx           int8
 		strIdentifier string
 	}{
 		{0, "a1"},

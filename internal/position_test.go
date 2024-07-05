@@ -8,9 +8,8 @@ import (
 func Test_NewPositionFromFEN(t *testing.T) {
 
 	type Check struct {
-		squareStr string
-		piece     Piece
-		squareIdx int
+		square int8
+		piece  Piece
 	}
 
 	data := []struct {
@@ -20,16 +19,16 @@ func Test_NewPositionFromFEN(t *testing.T) {
 		{
 			fenPos: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
 			checks: []Check{
-				{squareStr: "a1", piece: Piece(Rook | White), squareIdx: 0},
-				{squareStr: "a8", piece: Piece(Rook | Black), squareIdx: 56},
-				{squareStr: "a4", piece: NoPiece, squareIdx: 24},
+				{A1, Piece(Rook | White)},
+				{A8, Piece(Rook | Black)},
+				{A4, NoPiece},
 			},
 		},
 		{
 			fenPos: "1k6/8/8/8/3Q4/8/8/K7 w KQkq - 0 1",
 			checks: []Check{
-				{squareStr: "b8", piece: Piece(King | Black), squareIdx: 57},
-				{squareStr: "a1", piece: Piece(King | White), squareIdx: 0},
+				{B8, Piece(King | Black)},
+				{A1, Piece(King | White)},
 			},
 		},
 	}
@@ -41,9 +40,7 @@ func Test_NewPositionFromFEN(t *testing.T) {
 		}
 
 		for _, check := range d.checks {
-			squareIdx := SquareToIdx(check.squareStr)
-			assert.Equal(t, check.squareIdx, squareIdx)
-			assert.Equal(t, check.piece, pos.PieceAt(squareIdx))
+			assert.Equal(t, check.piece, pos.PieceAt(check.square))
 		}
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func SquareToIdx(square string) int {
+func SquareToIdx(square string) int8 {
 	if len(square) != 2 {
 		panic(fmt.Sprintf("invalid square identifier: %s", square))
 	}
@@ -20,10 +20,10 @@ func SquareToIdx(square string) int {
 		panic(fmt.Sprintf("invalid rank identifier: %s", string(square[1])))
 	}
 
-	return int(rank*8 + file)
+	return int8(rank*8 + file)
 }
 
-func IdxToSquare(idx int) string {
+func IdxToSquare(idx int8) string {
 	if idx < 0 || idx > 63 {
 		panic("idx out of range")
 	}
@@ -34,7 +34,7 @@ func IdxToSquare(idx int) string {
 	return fmt.Sprintf("%c%d", 'a'+file, rank+1)
 }
 
-func IndexesToSquares(indexes []int) []string {
+func IndexesToSquares(indexes []int8) []string {
 	squares := make([]string, len(indexes))
 	for i, idx := range indexes {
 		squares[i] = IdxToSquare(idx)
@@ -43,8 +43,8 @@ func IndexesToSquares(indexes []int) []string {
 	return squares
 }
 
-func SquaresToIndexes(squares []string) []int {
-	indexes := make([]int, len(squares))
+func SquaresToIndexes(squares []string) []int8 {
+	indexes := make([]int8, len(squares))
 	for i, square := range squares {
 		indexes[i] = SquareToIdx(square)
 	}

@@ -16,11 +16,11 @@ const (
 	DownRight = 9
 )
 
-func (p Position) SliderPseudoLegalMoves(pieceIdx int) ([]int, []int) {
+func (p Position) SliderPseudoLegalMoves(pieceIdx int8) ([]int8, []int8) {
 	var (
 		directions    []int
-		moves         []int
-		capturesMoves []int
+		moves         []int8
+		capturesMoves []int8
 	)
 
 	piece := p.PieceAt(pieceIdx)
@@ -42,7 +42,7 @@ func (p Position) SliderPseudoLegalMoves(pieceIdx int) ([]int, []int) {
 
 	for _, direction := range directions {
 		for i := 1; i < 8; i++ { // start at 1 because 0 is current square
-			targetIdx := pieceIdx + direction*i
+			targetIdx := pieceIdx + int8(direction*i)
 
 			// current move+direction is out of the board
 			// handle UP and DOWN
