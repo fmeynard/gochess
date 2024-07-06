@@ -6,21 +6,22 @@ import (
 
 // direction offsets
 const (
-	LEFT      = -1
-	RIGHT     = 1
-	UP        = -8
-	DOWN      = 8
-	UpLeft    = -9
-	UpRight   = -7
-	DownLeft  = 7
-	DownRight = 9
+	LEFT      int8 = -1
+	RIGHT     int8 = 1
+	UP        int8 = -8
+	DOWN      int8 = 8
+	UpLeft    int8 = -9
+	UpRight   int8 = -7
+	DownLeft  int8 = 7
+	DownRight int8 = 9
 )
 
 func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	var (
-		directions    []int
+		directions    []int8
 		moves         []int8
 		capturesMoves []int8
+		maxMoves      int8
 	)
 
 	piece := p.PieceAt(pieceIdx)
@@ -29,20 +30,26 @@ func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	}
 
 	pieceColor := piece.Color()
+	pieceType := piece.Type()
 
-	if piece.IsType(Bishop) {
-		directions = []int{UpLeft, UpRight, DownLeft, DownRight}
-	} else if piece.IsType(Rook) {
-		directions = []int{UP, DOWN, LEFT, RIGHT}
-	} else if piece.IsType(Queen) {
-		directions = []int{LEFT, RIGHT, UP, DOWN, UpLeft, UpRight, DownLeft, DownRight}
+	maxMoves = 7
+	if pieceType == Bishop {
+		directions = []int8{UpLeft, UpRight, DownLeft, DownRight}
+	} else if pieceType == Rook {
+		directions = []int8{UP, DOWN, LEFT, RIGHT}
+	} else if pieceType == Queen || pieceType == King {
+		directions = []int8{LEFT, RIGHT, UP, DOWN, UpLeft, UpRight, DownLeft, DownRight}
 	} else {
 		panic(fmt.Sprintf("PieceType is not a slider : %d", piece))
 	}
 
+	if pieceType == King {
+		maxMoves = 1
+	}
+
 	for _, direction := range directions {
-		for i := 1; i < 8; i++ { // start at 1 because 0 is current square
-			targetIdx := pieceIdx + int8(direction*i)
+		for i := int8(1); i <= maxMoves; i++ { // start at 1 because 0 is current square
+			targetIdx := pieceIdx + direction*i
 
 			// current move+direction is out of the board
 			// handle UP and DOWN
@@ -95,8 +102,7 @@ func KnightPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 			continue
 		}
 
-		targetFile := targetIdx % 8
-		targetRank := targetIdx / 8
+		targetRank, targetFile := RankAndFile(targetIdx)
 
 		var (
 			rankDiff int8

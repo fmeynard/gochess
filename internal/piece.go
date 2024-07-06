@@ -96,7 +96,6 @@ func (p Piece) Color() int8 {
 	return Black
 }
 
-func (p Piece) IsType(pieceType int8) bool {
-	// & 7 : Mask out color bits
-	return (int8(p) & 7) == pieceType
+func (p Piece) Type() int8 {
+	return int8(p) & 7
 }
