@@ -13,6 +13,8 @@ const (
 	NoEnPassant     = -1
 )
 
+const FenStartPos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
 type Position struct {
 	board             map[int8]Piece
 	activeColor       int8

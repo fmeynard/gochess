@@ -139,6 +139,76 @@ func KnightPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	return moves, capturesMoves
 }
 
+func KingPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
+	moves, capturesMoves := SliderPseudoLegalMoves(p, pieceIdx)
+
+	piece := p.PieceAt(pieceIdx)
+	pieceColor := piece.Color()
+
+	var (
+		castleRights int8
+		kingStartIdx int8
+	)
+	if pieceColor == White {
+		castleRights = p.whiteCastleRights
+		kingStartIdx = E1
+	} else {
+		castleRights = p.blackCastleRights
+		kingStartIdx = E8
+	}
+
+	// early exit no castle
+	if pieceIdx != kingStartIdx || castleRights == NoCastle {
+		return moves, capturesMoves
+	}
+
+	// queen side
+	var (
+		queenPathIsClear bool
+		queenRookIdx     int8
+		queenCastleIdx   int8
+	)
+	if (castleRights & QueenSideCastle) != 0 {
+		if piece.Color() == White {
+			queenRookIdx = A1
+			queenCastleIdx = B1
+			queenPathIsClear = (p.PieceAt(B1) == NoPiece) && (p.PieceAt(C1) == NoPiece) && (p.PieceAt(D1) == NoPiece)
+		} else {
+			queenRookIdx = A8
+			queenCastleIdx = B8
+			queenPathIsClear = (p.PieceAt(B8) == NoPiece) && (p.PieceAt(C8) == NoPiece) && (p.PieceAt(D8) == NoPiece)
+		}
+
+		if queenPathIsClear && p.PieceAt(queenRookIdx).Type() == Rook {
+			moves = append(moves, queenCastleIdx)
+		}
+	}
+
+	// king side
+	var (
+		kingPathIsClear bool
+		kingRookIdx     int8
+		kingCastleIdx   int8
+	)
+	if (castleRights & KingSideCastle) != 0 {
+		if piece.Color() == White {
+			kingRookIdx = H1
+			kingCastleIdx = G1
+			kingPathIsClear = (p.PieceAt(G1) == NoPiece) && (p.PieceAt(F1) == NoPiece)
+		} else {
+			kingRookIdx = H8
+			kingCastleIdx = G8
+			kingPathIsClear = (p.PieceAt(G8) == NoPiece) && (p.PieceAt(F8) == NoPiece)
+		}
+
+		if kingPathIsClear && p.PieceAt(kingRookIdx).Type() == Rook {
+			moves = append(moves, kingCastleIdx)
+		}
+	}
+
+	return moves, capturesMoves
+}
+
 func PawnPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	var (
 		moves         []int8

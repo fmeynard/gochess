@@ -71,6 +71,62 @@ func TestPosition_KnightPseudoLegalMoves(t *testing.T) {
 	execMovesCheck(t, data, KnightPseudoLegalMoves)
 }
 
+func Test_KingPseudoLegalMoves(t *testing.T) {
+	data := CheckData{
+		"Start pos no moves white": {
+			fenString: FenStartPos,
+			piecePos:  E1,
+		},
+		"All directions white - no capture": {
+			fenString: "8/8/8/8/8/8/2k5/8 w - - 0 1",
+			piecePos:  C2,
+			moves:     []int8{B1, C1, D1, B2, D2, B3, C3, D3},
+		},
+		"All directions capture": {
+			fenString:     "8/1QRB4/1PkP4/1BRQ4/8/8/8/8 b - - 0 1",
+			piecePos:      C6,
+			moves:         []int8{B7, C7, D7, B6, D6, B5, C5, D5},
+			capturesMoves: []int8{B7, C7, D7, B6, D6, B5, C5, D5},
+		},
+		"All directions no capture same color": {
+			fenString: "8/1QRB4/1PKP4/1BRQ4/8/8/8/8 b - - 0 1",
+			piecePos:  C6,
+		},
+		"QueenSide castle white": {
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR b KQkq - 0 1",
+			piecePos:  E1,
+			moves:     []int8{B1, D1},
+		},
+		"QueenSide castle white - Only kingSide allowed": {
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR b Kkq - 0 1",
+			piecePos:  E1,
+			moves:     []int8{D1},
+		},
+		"QueenSide castle white - no rights": {
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR b kq - 0 1",
+			piecePos:  E1,
+			moves:     []int8{D1},
+		},
+		"KingSide castle black": {
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+			piecePos:  E8,
+			moves:     []int8{F8, G8},
+		},
+		"KingSide castle black - Only queen allowed": {
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR w KQq - 0 1",
+			piecePos:  E8,
+			moves:     []int8{F8},
+		},
+		"KingSide castle black - ro rights": {
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+			piecePos:  E8,
+			moves:     []int8{F8},
+		},
+	}
+
+	execMovesCheck(t, data, KingPseudoLegalMoves)
+}
+
 func Test_PawnPseudoLegalMoves(t *testing.T) {
 	data := CheckData{
 		"start pos white": {
