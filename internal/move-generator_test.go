@@ -95,7 +95,7 @@ func Test_KingPseudoLegalMoves(t *testing.T) {
 		"QueenSide castle white": {
 			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR b KQkq - 0 1",
 			piecePos:  E1,
-			moves:     []int8{B1, D1},
+			moves:     []int8{C1, D1},
 		},
 		"QueenSide castle white - Only kingSide allowed": {
 			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR b Kkq - 0 1",

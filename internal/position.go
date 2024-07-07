@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	NoCastle        = 0
-	KingSideCastle  = 1
-	QueenSideCastle = 2
-	NoEnPassant     = -1
+	NoCastle             = 0
+	KingSideCastle       = 1
+	QueenSideCastle      = 2
+	NoEnPassant     int8 = -1
 )
 
 const FenStartPos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -21,6 +21,8 @@ type Position struct {
 	whiteCastleRights int8
 	blackCastleRights int8
 	enPassantIdx      int8
+	blackKingIdx      int8
+	whiteKingIdx      int8
 }
 
 func NewPosition() Position {
@@ -28,10 +30,6 @@ func NewPosition() Position {
 	for i := range board {
 		board[i] = NoPiece
 	}
-
-	//for i := 0; i < 64; i++ {
-	//	board[i] = NoPiece
-	//}
 
 	return Position{
 		board:             board,
@@ -90,6 +88,13 @@ func NewPositionFromFEN(fen string) (Position, error) {
 			return pos, errors.New(fmt.Sprintf("invalid FEN: invalid char '%c' at position %d", char, i))
 		}
 		pos.board[idx] = piece
+		if piece.Type() == King {
+			if piece.Color() == White {
+				pos.whiteKingIdx = idx
+			} else {
+				pos.blackKingIdx = idx
+			}
+		}
 		file++
 	}
 
@@ -187,5 +192,108 @@ func (p Position) CanCastle(clr int8, castleRight int8) bool {
 	}
 
 	return true
-	// black
+}
+
+func (p Position) PositionAfterMove(move Move) Position {
+	newPos := p
+	startPieceIdx := move.StartIdx()
+	endPieceIdx := move.EndIdx()
+	startPiece := p.PieceAt(move.StartIdx())
+	startPieceType := startPiece.Type()
+
+	// update position
+	newPos.board[startPieceIdx] = NoPiece
+	newPos.board[endPieceIdx] = startPiece
+
+	// King move -> update king pos and castleRights
+	if startPieceType == King {
+		if p.activeColor == White {
+			newPos.whiteKingIdx = endPieceIdx
+			newPos.whiteCastleRights = NoCastle
+
+			if startPieceIdx == E1 {
+				if endPieceIdx == G1 {
+					newPos.board[H1] = NoPiece
+					newPos.board[F1] = Piece(White | Rook)
+				} else if endPieceIdx == C1 {
+					newPos.board[A1] = NoPiece
+					newPos.board[D1] = Piece(White | Rook)
+				}
+			}
+
+		} else {
+			newPos.blackKingIdx = endPieceIdx
+			newPos.blackCastleRights = NoCastle
+
+			if startPieceIdx == E8 {
+				if endPieceIdx == G8 {
+					newPos.board[H8] = NoPiece
+					newPos.board[F8] = Piece(Black | Rook)
+				} else if endPieceIdx == C8 {
+					newPos.board[A8] = NoPiece
+					newPos.board[D8] = Piece(Black | Rook)
+				}
+			}
+		}
+	}
+
+	// en passant
+	if startPieceType == Pawn {
+		if endPieceIdx == p.enPassantIdx {
+			var capturesPawnIdx int8
+			if startPiece.Color() == White {
+				capturesPawnIdx = p.enPassantIdx - 8
+			} else {
+				capturesPawnIdx = p.enPassantIdx + 8
+			}
+			newPos.board[capturesPawnIdx] = NoPiece
+		}
+
+		diffIdx := endPieceIdx - startPieceIdx
+		if p.activeColor == White && diffIdx == 16 {
+			newPos.enPassantIdx = startPieceIdx + 8
+		} else if p.activeColor == Black && diffIdx == -16 {
+			newPos.enPassantIdx = startPieceIdx - 8
+		} else {
+			newPos.enPassantIdx = NoEnPassant
+		}
+	}
+
+	// knight
+	if startPieceType == Rook {
+		if p.activeColor == White {
+			if startPieceIdx == A1 {
+				newPos.whiteCastleRights = newPos.whiteCastleRights &^ QueenSideCastle
+			} else if startPieceIdx == H1 {
+				newPos.whiteCastleRights = newPos.whiteCastleRights &^ KingSideCastle
+			}
+		} else {
+			if startPieceIdx == A8 {
+				newPos.blackCastleRights = newPos.blackCastleRights &^ QueenSideCastle
+			} else if startPieceIdx == H8 {
+				newPos.blackCastleRights = newPos.blackCastleRights &^ KingSideCastle
+			}
+		}
+	}
+
+	// change side ( important to do it last for previous updates )
+	if p.activeColor == White {
+		newPos.activeColor = Black
+	} else {
+		newPos.activeColor = White
+	}
+
+	return newPos
+}
+
+func (p Position) ActivePlayerPieces() []Piece {
+	var pieces []Piece
+
+	for _, piece := range p.board {
+		if piece.Color() == p.activeColor {
+			pieces = append(pieces, piece)
+		}
+	}
+
+	return pieces
 }

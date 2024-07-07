@@ -155,11 +155,11 @@ func KingPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	if (castleRights & QueenSideCastle) != 0 {
 		if piece.Color() == White {
 			queenRookIdx = A1
-			queenCastleIdx = B1
+			queenCastleIdx = C1
 			queenPathIsClear = (p.PieceAt(B1) == NoPiece) && (p.PieceAt(C1) == NoPiece) && (p.PieceAt(D1) == NoPiece)
 		} else {
 			queenRookIdx = A8
-			queenCastleIdx = B8
+			queenCastleIdx = C8
 			queenPathIsClear = (p.PieceAt(B8) == NoPiece) && (p.PieceAt(C8) == NoPiece) && (p.PieceAt(D8) == NoPiece)
 		}
 
@@ -245,4 +245,28 @@ func PawnPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	}
 
 	return moves, capturesMoves
+}
+
+func (p Position) IsCheck() bool {
+	var (
+		kingIdx int8
+	)
+
+	if p.activeColor == White {
+		kingIdx = p.whiteKingIdx
+	} else {
+		kingIdx = p.blackKingIdx
+	}
+
+	_, queenCapturesMoves := generateSliderPseudoLegalMoves(p, kingIdx, Piece(Queen|p.activeColor))
+	if queenCapturesMoves != nil || len(queenCapturesMoves) != 0 {
+		return true
+	}
+
+	_, knightCapturesMoves := generateSliderPseudoLegalMoves(p, kingIdx, Piece(Knight|p.activeColor))
+	if knightCapturesMoves != nil || len(knightCapturesMoves) != 0 {
+		return true
+	}
+
+	return false
 }
