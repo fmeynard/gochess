@@ -1,9 +1,5 @@
 package internal
 
-import (
-	"fmt"
-)
-
 // direction offsets
 const (
 	LEFT      int8 = -1
@@ -17,35 +13,21 @@ const (
 )
 
 func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
-	var (
-		directions    []int8
-		moves         []int8
-		capturesMoves []int8
-		maxMoves      int8
-	)
-
 	piece := p.PieceAt(pieceIdx)
 	if piece == NoPiece {
 		return nil, nil
 	}
 
-	pieceColor := piece.Color()
-	pieceType := piece.Type()
+	return generateSliderPseudoLegalMoves(p, pieceIdx, piece)
+}
 
-	maxMoves = 7
-	if pieceType == Bishop {
-		directions = []int8{UpLeft, UpRight, DownLeft, DownRight}
-	} else if pieceType == Rook {
-		directions = []int8{UP, DOWN, LEFT, RIGHT}
-	} else if pieceType == Queen || pieceType == King {
-		directions = []int8{LEFT, RIGHT, UP, DOWN, UpLeft, UpRight, DownLeft, DownRight}
-	} else {
-		panic(fmt.Sprintf("PieceType is not a slider : %d", piece))
-	}
+func generateSliderPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]int8, []int8) {
+	var (
+		moves         []int8
+		capturesMoves []int8
+	)
 
-	if pieceType == King {
-		maxMoves = 1
-	}
+	directions, maxMoves := piece.PossibleDirectionsAndMaxMoves()
 
 	for _, direction := range directions {
 		for i := int8(1); i <= maxMoves; i++ { // start at 1 because 0 is current square
@@ -70,7 +52,7 @@ func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 			// target square is not empty -> stop
 			target := p.PieceAt(targetIdx)
 			if target != NoPiece {
-				if target.Color() == pieceColor {
+				if target.Color() == piece.Color() {
 					break
 				}
 
@@ -88,14 +70,16 @@ func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 }
 
 func KnightPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
+	return generateKnightPseudoLegalMoves(p, pieceIdx, p.PieceAt(pieceIdx))
+}
+
+func generateKnightPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]int8, []int8) {
 	var (
 		moves         []int8
 		capturesMoves []int8
 	)
 	offsets := []int8{-17, -15, -10, -6, 6, 10, 15, 17}
-	piece := p.PieceAt(pieceIdx)
-	pieceFile := pieceIdx % 8
-	pieceRank := pieceIdx / 8
+	pieceRank, pieceFile := RankAndFile(pieceIdx)
 	for _, offset := range offsets {
 		targetIdx := pieceIdx + offset
 		if targetIdx < 0 || targetIdx > 63 {
