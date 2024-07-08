@@ -270,5 +270,75 @@ func Test_PositionAfterMoveActiveColorUpdate(t *testing.T) {
 	assert.Equal(t, Black, newPos.activeColor)
 	newPos2 := newPos.PositionAfterMove(NewMove(Piece(Pawn|Black), G7, G6, NormalMove))
 	assert.Equal(t, White, newPos2.activeColor)
+}
 
+func TestPosition_IsCheck(t *testing.T) {
+	data := map[string]struct {
+		fenPos  string
+		isCheck bool
+	}{
+		"startPos white no check": {
+			fenPos:  FenStartPos,
+			isCheck: false,
+		},
+		"Check By Queen": {
+			fenPos:  "rnb1kbnr/ppppqppp/8/5p2/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1",
+			isCheck: true,
+		},
+		"Black NOT inCheck (white is)": {
+			fenPos:  "rnb1kbnr/ppppqppp/8/5p2/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+			isCheck: false,
+		},
+		"Check by Knight": {
+			fenPos:  "rnb1kb1r/ppppqppp/8/3n1p2/5K2/8/PPPP1PPP/RNBQ1BNR w KQkq - 0 1",
+			isCheck: true,
+		},
+		"Check by pawn": {
+			fenPos:  "rnb1kb1r/ppppqppp/8/3n1p2/4K3/8/PPPP1PPP/RNBQ1BNR w KQkq - 0 1",
+			isCheck: true,
+		},
+		"NOT Check by pawns": {
+			fenPos:  "8/8/8/4p3/3pK3/8/8/8 w - - 0 1",
+			isCheck: false,
+		},
+		"NOT Check by bishop same file": {
+			fenPos:  "4b3/8/8/8/4K3/8/8/8 w - - 0 1",
+			isCheck: false,
+		},
+		"NOT Check by bishop same rank": {
+			fenPos:  "8/8/8/8/b3K3/8/8/8 w - - 0 1",
+			isCheck: false,
+		},
+		"NOT Check by black pawn, pawnRank < king rank": {
+			fenPos:  "8/8/8/8/4K3/3p4/8/8 w - - 0 1",
+			isCheck: false,
+		},
+		"NOT Check by white pawn, pawnRank > king rank": {
+			fenPos:  "8/8/8/3P4/4k3/8/8/8 b - - 0 1",
+			isCheck: false,
+		},
+		"NOT Check by pawn same rank": {
+			fenPos:  "rnb1k2r/ppppbppp/8/3np2q/4K3/8/PPPP1PPP/RNBQ1BNR w KQkq - 0 1",
+			isCheck: false,
+		},
+		"Check By Rook same file": {
+			fenPos:  "4r3/8/8/8/4K3/8/8/8 w - - 0 1",
+			isCheck: true,
+		},
+		"Check By Rook same rank": {
+			fenPos:  "8/8/8/8/R3k3/8/8/8 b - - 0 1",
+			isCheck: true,
+		},
+		"NOT Check By Rook in diagonal": {
+			fenPos:  "R7/8/8/8/4k3/8/8/8 b - - 0 1",
+			isCheck: false,
+		},
+	}
+
+	for name, d := range data {
+		t.Run(name, func(t *testing.T) {
+			pos, _ := NewPositionFromFEN(d.fenPos)
+			assert.Equal(t, d.isCheck, pos.IsCheck())
+		})
+	}
 }

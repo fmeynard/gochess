@@ -247,6 +247,10 @@ func PawnPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	return moves, capturesMoves
 }
 
+// IsCheck
+// Generate all captures moves from current king pos, but using opponent knight & queen
+// if a captureMove is found it means that the current king is visible from these squares,
+// so additional checks are required to verify if a capture is really possible
 func (p Position) IsCheck() bool {
 	var (
 		kingIdx int8
@@ -258,15 +262,58 @@ func (p Position) IsCheck() bool {
 		kingIdx = p.blackKingIdx
 	}
 
+	kingRank, kingFile := RankAndFile(kingIdx)
+
 	_, queenCapturesMoves := generateSliderPseudoLegalMoves(p, kingIdx, Piece(Queen|p.activeColor))
-	if queenCapturesMoves != nil || len(queenCapturesMoves) != 0 {
-		return true
+	for _, captureMove := range queenCapturesMoves {
+		piece := p.PieceAt(captureMove)
+		pieceType := piece.Type()
+
+		if pieceType == Queen {
+			return true
+		}
+
+		pieceRank, pieceFile := RankAndFile(captureMove)
+
+		if pieceType == Rook && (pieceRank == kingRank || pieceFile == kingFile) {
+			return true
+		}
+
+		if pieceType == Bishop && pieceRank != kingRank && pieceFile != kingFile {
+			return true
+		}
+
+		fileDiff := kingFile - pieceFile
+		if pieceType == Pawn && (fileDiff == 1 || fileDiff == -1) {
+			rankDiff := kingRank - pieceRank
+			pieceColor := piece.Color()
+			if (rankDiff == -1 && pieceColor == Black) || (rankDiff == 1 && pieceColor == White) {
+				return true
+			}
+
+		}
 	}
 
-	_, knightCapturesMoves := generateSliderPseudoLegalMoves(p, kingIdx, Piece(Knight|p.activeColor))
-	if knightCapturesMoves != nil || len(knightCapturesMoves) != 0 {
-		return true
+	_, knightCapturesMoves := generateKnightPseudoLegalMoves(p, kingIdx, Piece(Knight|p.activeColor))
+	for _, captureMove := range knightCapturesMoves {
+		if p.PieceAt(captureMove).Type() == Knight {
+			return true
+		}
 	}
 
 	return false
 }
+
+//func MoveGenerationTest(depth int) int {
+//	if depth == 0 {
+//		return 1
+//	}
+//
+//	posCount := 0
+//	for move := range pos.LegalMoves() {
+//		newPos := PositionAfterMove(pos, move)
+//		posCount += MoveGenerationTest(depth - 1)
+//	}
+//
+//	return posCount
+//}
