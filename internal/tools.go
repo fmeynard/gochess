@@ -12,11 +12,11 @@ func SquareToIdx(square string) int8 {
 	file := square[0] - 'a'
 	rank := square[1] - '1'
 
-	if file < 0 || file > 8 {
+	if file < 0 || file > 7 {
 		panic(fmt.Sprintf("invalid file identifier: %s", string(square[0])))
 	}
 
-	if rank < 0 || rank > 8 {
+	if rank < 0 || rank > 7 {
 		panic(fmt.Sprintf("invalid rank identifier: %s", string(square[1])))
 	}
 
@@ -34,28 +34,18 @@ func IdxToSquare(idx int8) string {
 	return fmt.Sprintf("%c%d", 'a'+file, rank+1)
 }
 
-func IndexesToSquares(indexes []int8) []string {
-	squares := make([]string, len(indexes))
-	for i, idx := range indexes {
-		squares[i] = IdxToSquare(idx)
-	}
-
-	return squares
-}
-
-func SquaresToIndexes(squares []string) []int8 {
-	indexes := make([]int8, len(squares))
-	for i, square := range squares {
-		indexes[i] = SquareToIdx(square)
-	}
-
-	return indexes
-}
-
 func RankAndFile(idx int8) (int8, int8) {
 	if idx < 0 || idx > 63 {
 		panic("idx out of range")
 	}
 
-	return idx / 8, idx % 8
+	return RankFromIdx(idx), FileFromIdx(idx)
+}
+
+func RankFromIdx(idx int8) int8 {
+	return idx / 8
+}
+
+func FileFromIdx(idx int8) int8 {
+	return idx % 8
 }
