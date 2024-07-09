@@ -27,7 +27,11 @@ type Position struct {
 
 func NewPosition() Position {
 	board := make(map[int8]Piece, 64)
-	for i := range board {
+	//for i := range board {
+	//	board[i] = NoPiece
+	//}
+
+	for i := int8(0); i < 64; i++ {
 		board[i] = NoPiece
 	}
 
@@ -195,7 +199,16 @@ func (p Position) CanCastle(clr int8, castleRight int8) bool {
 }
 
 func (p Position) PositionAfterMove(move Move) Position {
+	newBoard := make(map[int8]Piece, 64)
+	for i := int8(0); i < 64; i++ {
+		p2, _ := p.board[i]
+
+		newBoard[i] = p2
+	}
+
 	newPos := p
+	newPos.board = newBoard
+
 	startPieceIdx := move.StartIdx()
 	endPieceIdx := move.EndIdx()
 	startPiece := p.PieceAt(move.StartIdx())
@@ -286,12 +299,12 @@ func (p Position) PositionAfterMove(move Move) Position {
 	return newPos
 }
 
-func (p Position) ActivePlayerPieces() []Piece {
-	var pieces []Piece
+func (p Position) ActivePlayerPieces() map[int8]Piece {
+	pieces := make(map[int8]Piece)
 
-	for _, piece := range p.board {
+	for idx, piece := range p.board {
 		if piece.Color() == p.activeColor {
-			pieces = append(pieces, piece)
+			pieces[idx] = piece
 		}
 	}
 
