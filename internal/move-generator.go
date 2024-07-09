@@ -29,7 +29,15 @@ func generateSliderPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]i
 
 	directions, maxMoves := piece.PossibleDirectionsAndMaxMoves()
 
+	pieceFile := FileFromIdx(pieceIdx)
 	for _, direction := range directions {
+
+		// startPiece is on the edge -> skip related directions with horizontal moves
+		if (pieceFile == 7 && (direction == RIGHT || direction == UpRight || direction == DownRight)) ||
+			(pieceFile == 0 && (direction == LEFT || direction == UpLeft || direction == DownLeft)) {
+			continue
+		}
+
 		for i := int8(1); i <= maxMoves; i++ { // start at 1 because 0 is current square
 			targetIdx := pieceIdx + direction*i
 
@@ -39,17 +47,7 @@ func generateSliderPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]i
 				break
 			}
 
-			// horizontal+diagonal checks
-			file := pieceIdx % 8
-			if file == 7 && (direction == RIGHT || direction == UpRight || direction == DownRight) {
-				break
-			}
-
-			if file == 0 && (direction == LEFT || direction == UpLeft || direction == DownLeft) {
-				break
-			}
-
-			// target square is not empty -> stop
+			// target square is not empty -> stop current direction
 			target := p.PieceAt(targetIdx)
 			if target != NoPiece {
 				if target.Color() == piece.Color() {
@@ -63,6 +61,16 @@ func generateSliderPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]i
 
 			// add to the list
 			moves = append(moves, targetIdx)
+
+			// target is on the edge -> no more moves in that direction
+			targetFile := FileFromIdx(targetIdx)
+			if targetFile == 7 && (direction == RIGHT || direction == UpRight || direction == DownRight) {
+				break
+			}
+
+			if targetFile == 0 && (direction == LEFT || direction == UpLeft || direction == DownLeft) {
+				break
+			}
 		}
 	}
 

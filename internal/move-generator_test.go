@@ -43,6 +43,67 @@ func TestPosition_SliderPseudoLegalMovesRookNoCastle(t *testing.T) {
 	execMovesCheck(t, data, SliderPseudoLegalMoves)
 }
 
+func TestPosition_SliderPseudoLegalMovesBishop(t *testing.T) {
+	data := CheckData{
+		"From middle empty board": {
+			fenString: "8/8/8/8/3B4/8/8/8 w - - 0 1",
+			piecePos:  D4,
+			moves:     []int8{A1, B2, C3, E5, F6, G7, H8, G1, F2, E3, C5, B6, A7},
+		},
+		"From corner": {
+			fenString: "b7/8/8/8/8/8/8/8 b - - 0 1",
+			piecePos:  A8,
+			moves:     []int8{B7, C6, D5, E4, F3, G2, H1},
+		},
+		"Blocked all directions": {
+			fenString: "8/8/8/2pPp3/2PbP3/2pPp3/8/8 w - - 0 1",
+		},
+		"Captures all directions": {
+			fenString:     "8/8/1P3P2/2P1P3/3b4/2P1P3/1P3P2/8 b - - 0 1",
+			piecePos:      D4,
+			moves:         []int8{C3, C5, E3, E5},
+			capturesMoves: []int8{C3, C5, E3, E5},
+		},
+	}
+
+	execMovesCheck(t, data, SliderPseudoLegalMoves)
+}
+
+func TestPosition_SliderPseudoLegalMovesQueen(t *testing.T) {
+	data := CheckData{
+		"From middle empty board": {
+			fenString: "8/8/8/3Q4/8/8/8/8 b - - 0 1",
+			piecePos:  D5,
+			moves: []int8{
+				A8, B7, C6, E4, F3, G2, H1, // diagonal top left -> bottom right
+				A2, B3, C4, E6, F7, G8, // diagonal bottom left -> top right
+				A5, B5, C5, E5, F5, G5, H5, // horizontal
+				D1, D2, D3, D4, D6, D7, D8, // vertical
+			},
+		},
+		"From corner": {
+			fenString: "8/8/8/8/8/8/8/7Q b - - 0 1",
+			piecePos:  H1,
+			moves: []int8{
+				A1, B1, C1, D1, E1, F1, G1, // horizontal
+				H2, H3, H4, H5, H6, H7, H8, // vertical
+				G2, F3, E4, D5, C6, B7, A8, // diagonal
+			},
+		},
+		"Blocked all directions": {
+			fenString: "8/8/2ppppp1/2pPPPp1/2pPQPp1/2pPPPp1/2ppppp1/8 w - - 0 1",
+		},
+		"Captures all directions": {
+			fenString:     "8/8/2PPPPP1/2PPPPP1/2PPqPP1/2PPPPP1/2PPPPP1/8 w - - 0 1",
+			piecePos:      E4,
+			moves:         []int8{D3, D4, D5, E3, E5, F3, F4, F5},
+			capturesMoves: []int8{D3, D4, D5, E3, E5, F3, F4, F5},
+		},
+	}
+
+	execMovesCheck(t, data, SliderPseudoLegalMoves)
+}
+
 func TestPosition_KnightPseudoLegalMoves(t *testing.T) {
 	data := CheckData{
 		"All Directions - No Captures": {
