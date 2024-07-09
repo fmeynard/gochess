@@ -66,6 +66,11 @@ func TestPosition_KnightPseudoLegalMoves(t *testing.T) {
 			piecePos:  G8,
 			moves:     []int8{E7, H6, F6},
 		},
+		"No cross-board capture": {
+			fenString: "8/p7/8/7N/8/8/8/8 w - - 0 1",
+			piecePos:  H5,
+			moves:     []int8{G7, F6, F4, G3},
+		},
 	}
 
 	execMovesCheck(t, data, KnightPseudoLegalMoves)
