@@ -46,10 +46,13 @@ func FileFromIdx(idx int8) int8 {
 	return idx & 7
 }
 
-func IsSameRank(idx1, idx2 int8) bool {
-	return RankFromIdx(idx1) == RankFromIdx(idx2)
+func absInt8(x int8) int8 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
-func IsSameFile(idx1, idx2 int8) bool {
-	return FileFromIdx(idx1) == FileFromIdx(idx2)
+func IsSameDiagonal(pieceRank, pieceFile, targetRank, targetFile int8) bool {
+	return absInt8(pieceFile-targetFile) == absInt8(pieceRank-targetRank)
 }

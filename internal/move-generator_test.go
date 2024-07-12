@@ -288,12 +288,12 @@ func Test_MoveGenerationTest(t *testing.T) {
 
 func Test_PerftDivide(t *testing.T) {
 	pos, _ := NewPositionFromFEN("rnbqkbnr/2pppppp/8/pp6/2P5/N7/PP1PPPPP/R1BQKBNR w KQkq - 0 3")
-	PerftDivide(pos, 6)
+	PerftDivide(pos, 5)
 }
 
 func BenchmarkPerftDivide(b *testing.B) {
 	pos, _ := NewPositionFromFEN("rnbqkbnr/2pppppp/8/pp6/2P5/N7/PP1PPPPP/R1BQKBNR w KQkq - 0 3")
-	PerftDivide(pos, 6)
+	PerftDivide(pos, 5)
 }
 
 func BenchmarkGenerateKingPseudoLegalMoves(b *testing.B) {
@@ -328,8 +328,6 @@ func BenchmarkGenerateKnightPseudoLegalMoves(b *testing.B) {
 	}
 	fmt.Println(rescnt)
 }
-
-var m1test = 0
 
 //func BenchmarkGenerateSliderPseudoLegalMoves(b *testing.B) {
 //

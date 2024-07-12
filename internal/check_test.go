@@ -153,94 +153,81 @@ func TestIsSquareAttackedByKnight(t *testing.T) {
 
 func TestIsSquareAttackedBySlidingPiece(t *testing.T) {
 	data := map[string]struct {
-		fenPos     string
-		kingIdx    int8
-		kingColor  int8
-		sliderType int
-		result     bool
+		fenPos    string
+		kingIdx   int8
+		kingColor int8
+		result    bool
 	}{
 		"startPos rook directions no check": {
 			FenStartPos,
 			E1,
 			White,
-			RookSlider,
 			false,
 		},
 		"startPos bishop directions no check": {
 			FenStartPos,
 			E1,
 			White,
-			RookSlider,
 			false,
 		},
 		"Queen/Bishop blocked no check": {
 			"8/3q4/3n4/8/qP1K4/8/5n2/6b1 w - - 0 1",
 			D4,
 			White,
-			BishopSlider,
 			false,
 		},
 		"Queen/Rook blocked no check": {
 			"8/3r4/3n4/8/rP1K2Nq/8/8/8 w - - 0 1",
 			D4,
 			White,
-			RookSlider,
 			false,
 		},
 		"Diagonals misses no check": {
 			"bbbb1bbb/b6b/7b/bK5b/7b/b6b/b6b/bbbbb1bb w - - 0 1",
 			B5,
 			White,
-			BishopSlider,
 			false,
 		},
 		"Vertical misses no check": {
 			"R7/R7/R7/R7/R7/R7/4k3/1RRR1RRR w - - 0 1",
 			E2,
 			Black,
-			RookSlider,
 			false,
 		},
 		"Bishop diagonal check": {
 			"8/8/8/8/3K4/8/8/b7 w - - 0 1",
 			D4,
 			White,
-			BishopSlider,
 			true,
 		},
 		"Queen diagonal check": {
 			"7q/8/8/8/3K4/8/8/8 w - - 0 1",
 			D4,
 			White,
-			BishopSlider,
 			true,
 		},
 		"Rook vertical check": {
 			"8/8/8/8/3K4/8/8/3r4 w - - 0 1",
 			D4,
 			White,
-			RookSlider,
 			true,
 		},
 		"Queen horizontal check": {
 			"8/8/8/8/3K4/8/8/3q4 w - - 0 1",
 			D4,
 			White,
-			RookSlider,
 			true,
 		},
 		"Rook horizontal check": {
 			"8/8/8/8/r2K4/8/8/8 w - - 0 1",
 			D4,
 			White,
-			RookSlider,
 			true,
 		},
 		"Queen lateral check": {
 			"8/8/8/8/q2K4/8/8/8 w - - 0 1",
 			D4,
 			White,
-			RookSlider,
 			true,
 		},
 	}
@@ -251,7 +238,7 @@ func TestIsSquareAttackedBySlidingPiece(t *testing.T) {
 			assert.Equal(
 				t,
 				d.result,
-				isSquareAttackedBySlidingPiece(pos, d.kingIdx, d.sliderType, d.kingColor),
+				isSquareAttackedBySlidingPiece(pos, d.kingIdx, d.kingColor),
 			)
 		})
 	}

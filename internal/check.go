@@ -1,10 +1,9 @@
 package internal
 
 var (
-	bishopDirections = [4][2]int8{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
-	rookDirections   = [4][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}
-	knightMoves2     = [8][2]int8{{2, 1}, {1, 2}, {-1, 2}, {-2, 1}, {-2, -1}, {-1, -2}, {1, -2}, {2, -1}}
-	kingMoves2       = [8][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
+	queenDirections = [8]int8{8, -8, 1, -1, 9, -9, 7, -7}
+	knightMoves2    = [8][2]int8{{2, 1}, {1, 2}, {-1, 2}, {-2, 1}, {-2, -1}, {-1, -2}, {1, -2}, {2, -1}}
+	kingMoves2      = [8][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
 )
 
 const (
@@ -59,44 +58,39 @@ func isSquareAttackedByKnight(pos Position, idx int8, kingColor int8) bool {
 	return false
 }
 
-func sliderDirections(sliderType int) [4][2]int8 {
-	if sliderType == BishopSlider {
-		return bishopDirections
-	}
+func isSquareAttackedBySlidingPiece(pos Position, pieceIdx int8, kingColor int8) bool {
+	pieceRank, pieceFile := RankAndFile(pieceIdx)
 
-	if sliderType == RookSlider {
-		return rookDirections
-	}
-
-	panic("invalid slider type")
-}
-
-// verify if the square is attacked by sliding piece (bishop, rook, queen)
-func isSquareAttackedBySlidingPiece(pos Position, idx int8, sliderType int, kingColor int8) bool {
-	rank, file := RankAndFile(idx)
-	for _, direction := range sliderDirections(sliderType) {
-		for step := int8(1); step < 8; step++ {
-			newFile := file + direction[0]*step
-			newRank := rank + direction[1]*step
-			if !isOnBoard(newFile, newRank) {
+	for _, dir := range queenDirections {
+		for targetIdx := pieceIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
+			targetRank, targetFile := RankAndFile(targetIdx)
+			if (dir == LEFT || dir == RIGHT) && targetRank != pieceRank {
 				break
 			}
 
-			endIdx := newRank*8 + newFile
-			piece := pos.board[endIdx]
-
-			if piece == NoPiece {
-				continue
-			}
-
-			if piece.Color() == kingColor {
+			if (dir == DOWN || dir == UP) && targetFile != pieceFile {
 				break
 			}
 
-			if piece.IsSlider(sliderType) {
-				return true
+			isDiagonal := dir == DownRight || dir == UpLeft || dir == DownLeft || dir == UpRight
+			if isDiagonal && !IsSameDiagonal(pieceRank, pieceFile, targetRank, targetFile) {
+				break
 			}
-			break
+
+			targetPiece := pos.board[targetIdx]
+			if targetPiece != NoPiece {
+				if targetPiece.Color() != kingColor {
+					targetPieceType := targetPiece.Type()
+
+					if !isDiagonal && (targetPieceType == Rook || targetPieceType == Queen) {
+						return true
+					}
+					if isDiagonal && (targetPieceType == Bishop || targetPieceType == Queen) {
+						return true
+					}
+				}
+				break
+			}
 		}
 	}
 	return false
@@ -131,8 +125,7 @@ func IsKingInCheck(pos Position, kingColor int8) bool {
 
 	if isSquareAttackedByPawn(pos, kingIdx, kingColor) ||
 		isSquareAttackedByKnight(pos, kingIdx, kingColor) ||
-		isSquareAttackedBySlidingPiece(pos, kingIdx, BishopSlider, kingColor) ||
-		isSquareAttackedBySlidingPiece(pos, kingIdx, RookSlider, kingColor) ||
+		isSquareAttackedBySlidingPiece(pos, kingIdx, kingColor) ||
 		isSquareAttackedByKing(pos, kingIdx) {
 		return true
 	}
