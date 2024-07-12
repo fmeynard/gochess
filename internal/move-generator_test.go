@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -112,7 +113,7 @@ func TestPosition_KnightPseudoLegalMoves(t *testing.T) {
 			moves:     []int8{11, 13, 18, 22, 34, 38, 43, 45},
 		},
 		"Captures All Directions": {
-			fenString:     "8/8/3P1P2/2P3P1/4n3/2P3P1/3P1P2/8 w - - 0 1",
+			fenString:     "8/8/3P1P2/2P3P1/4n3/2P3P1/3P1P2/8 b - - 0 1",
 			piecePos:      E4,
 			capturesMoves: []int8{C3, C5, D2, D6, F2, F6, G3, G5},
 			moves:         []int8{C3, C5, D2, D6, F2, F6, G3, G5},
@@ -155,36 +156,36 @@ func Test_KingPseudoLegalMoves(t *testing.T) {
 			capturesMoves: []int8{B7, C7, D7, B6, D6, B5, C5, D5},
 		},
 		"All directions no capture same color": {
-			fenString: "8/1QRB4/1PKP4/1BRQ4/8/8/8/8 b - - 0 1",
+			fenString: "8/1QRB4/1PKP4/1BRQ4/8/8/8/8 w - - 0 1",
 			piecePos:  C6,
 		},
 		"QueenSide castle white": {
-			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR b KQkq - 0 1",
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR w KQkq - 0 1",
 			piecePos:  E1,
 			moves:     []int8{C1, D1},
 		},
 		"QueenSide castle white - Only kingSide allowed": {
-			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR b Kkq - 0 1",
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR w Kkq - 0 1",
 			piecePos:  E1,
 			moves:     []int8{D1},
 		},
 		"QueenSide castle white - no rights": {
-			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR b kq - 0 1",
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR w kq - 0 1",
 			piecePos:  E1,
 			moves:     []int8{D1},
 		},
 		"KingSide castle black": {
-			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
 			piecePos:  E8,
 			moves:     []int8{F8, G8},
 		},
 		"KingSide castle black - Only queen allowed": {
-			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR w KQq - 0 1",
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR b KQq - 0 1",
 			piecePos:  E8,
 			moves:     []int8{F8},
 		},
 		"KingSide castle black - ro rights": {
-			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1",
 			piecePos:  E8,
 			moves:     []int8{F8},
 		},
@@ -256,6 +257,10 @@ func Test_PawnPseudoLegalMoves(t *testing.T) {
 			piecePos:  H4,
 			moves:     []int8{H3},
 		},
+		"Knight blocking double pawn move": {
+			fenString: "8/8/8/8/8/5N2/5P2/8 w - - 0 1",
+			piecePos:  F2,
+		},
 	}
 
 	execMovesCheck(t, data, PawnPseudoLegalMoves)
@@ -275,3 +280,70 @@ func execMovesCheck(t *testing.T, data CheckData, generator generatorFn) {
 		})
 	}
 }
+
+func Test_MoveGenerationTest(t *testing.T) {
+	pos, _ := NewPositionFromFEN(FenStartPos)
+	assert.Equal(t, 20, MoveGenerationTest(pos, 2))
+}
+
+func Test_PerftDivide(t *testing.T) {
+	pos, _ := NewPositionFromFEN("rnbqkbnr/2pppppp/8/pp6/2P5/N7/PP1PPPPP/R1BQKBNR w KQkq - 0 3")
+	PerftDivide(pos, 6)
+}
+
+func BenchmarkPerftDivide(b *testing.B) {
+	pos, _ := NewPositionFromFEN("rnbqkbnr/2pppppp/8/pp6/2P5/N7/PP1PPPPP/R1BQKBNR w KQkq - 0 3")
+	PerftDivide(pos, 6)
+}
+
+func BenchmarkGenerateKingPseudoLegalMoves(b *testing.B) {
+	pos, _ := NewPositionFromFEN("rnbqkbnr/pppppppp/8/8/8/8/8/R3K2R w KQkq - 0 1")
+
+	b.ResetTimer()
+
+	rescnt := 0
+	//piece := Piece(Knight | Rook)
+	for i := 0; i < 10000000; i++ {
+		//for i := 0; i < 1000000; i++ {
+		r, _ := KingPseudoLegalMoves(pos, E1)
+		//r, _ := generateKnightPseudoLegalMoves(pos, D4, piece)
+		if r != nil {
+			rescnt++
+		}
+	}
+	fmt.Println(rescnt)
+}
+
+func BenchmarkGenerateKnightPseudoLegalMoves(b *testing.B) {
+	pos, _ := NewPositionFromFEN("8/8/8/8/3N4/8/8/8 w - - 0 1")
+
+	b.ResetTimer()
+
+	rescnt := 0
+	for i := 0; i < 10000000; i++ {
+		r, _ := generateKnightPseudoLegalMoves(pos, D4, White)
+		if r != nil {
+			rescnt++
+		}
+	}
+	fmt.Println(rescnt)
+}
+
+var m1test = 0
+
+//func BenchmarkGenerateSliderPseudoLegalMoves(b *testing.B) {
+//
+//	pos, _ := NewPositionFromFEN("8/8/8/8/3Q4/8/8/8 w - - 0 1")
+//	//piece := Piece(White | Queen)
+//
+//	//res := 0
+//	for i := 0; i < 100000; i++ {
+//		//LegalMoves(pos)
+//		//m1, _ := generateSliderPseudoLegalMoves(pos, D4, piece)
+//		//m1test += len(LegalMoves(pos))
+//
+//		LegalMoves(pos)
+//	}
+//
+//	fmt.Println(m1test)
+//}

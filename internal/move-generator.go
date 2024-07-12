@@ -1,5 +1,10 @@
 package internal
 
+import (
+	"fmt"
+	"sort"
+)
+
 // direction offsets
 const (
 	LEFT      int8 = -1
@@ -10,6 +15,12 @@ const (
 	UpRight   int8 = -7
 	DownLeft  int8 = 7
 	DownRight int8 = 9
+)
+
+var (
+	QueenDirections  = []int8{LEFT, RIGHT, UP, DOWN, UpLeft, UpRight, DownLeft, DownRight}
+	RookDirections   = []int8{UP, DOWN, LEFT, RIGHT}
+	BishopDirections = []int8{UpLeft, UpRight, DownLeft, DownRight}
 )
 
 func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
@@ -23,12 +34,26 @@ func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 
 func generateSliderPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]int8, []int8) {
 	var (
-		moves         []int8
-		capturesMoves []int8
+		moves         = [45]int8{}
+		capturesMoves = [45]int8{}
 	)
 
-	directions, maxMoves := piece.PossibleDirectionsAndMaxMoves()
+	pieceType := piece.Type()
+	pieceColor := piece.Color()
 
+	var directions []int8
+	if pieceType == Queen {
+		directions = QueenDirections
+	} else if pieceType == Bishop {
+		directions = BishopDirections
+	} else if pieceType == Rook {
+		directions = RookDirections
+	} else {
+		panic("Invalid PieceType")
+	}
+
+	x := 0
+	y := 0
 	pieceFile := FileFromIdx(pieceIdx)
 	for _, direction := range directions {
 
@@ -38,7 +63,7 @@ func generateSliderPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]i
 			continue
 		}
 
-		for i := int8(1); i <= maxMoves; i++ { // start at 1 because 0 is current square
+		for i := int8(1); i < 8; i++ { // start at 1 because 0 is current square
 			targetIdx := pieceIdx + direction*i
 
 			// current move+direction is out of the board
@@ -50,17 +75,20 @@ func generateSliderPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]i
 			// target square is not empty -> stop current direction
 			target := p.PieceAt(targetIdx)
 			if target != NoPiece {
-				if target.Color() == piece.Color() {
+				if target.Color() == pieceColor {
 					break
 				}
 
-				capturesMoves = append(capturesMoves, targetIdx)
-				moves = append(moves, targetIdx)
+				capturesMoves[y] = targetIdx
+				y++
+				moves[x] = targetIdx
+				x++
 				break
 			}
 
 			// add to the list
-			moves = append(moves, targetIdx)
+			moves[x] = targetIdx
+			x++
 
 			// target is on the edge -> no more moves in that direction
 			targetFile := FileFromIdx(targetIdx)
@@ -74,74 +102,90 @@ func generateSliderPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]i
 		}
 	}
 
-	return moves, capturesMoves
+	return moves[:x], capturesMoves[:y]
 }
 
 func KnightPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
-	return generateKnightPseudoLegalMoves(p, pieceIdx, p.PieceAt(pieceIdx))
+	return generateKnightPseudoLegalMoves(p, pieceIdx, p.activeColor)
 }
 
-func generateKnightPseudoLegalMoves(p Position, pieceIdx int8, piece Piece) ([]int8, []int8) {
+var knightMoves = [8][2]int8{
+	{2, 1}, {1, 2}, {-1, 2}, {-2, 1},
+	{-2, -1}, {-1, -2}, {1, -2}, {2, -1},
+}
+
+func generateKnightPseudoLegalMoves(p Position, startIdx int8, color int8) ([]int8, []int8) {
 	var (
-		moves         []int8
-		capturesMoves []int8
+		moves         = make([]int8, 0, 8)
+		capturesMoves = make([]int8, 0, 8)
 	)
-	offsets := []int8{-17, -15, -10, -6, 6, 10, 15, 17}
-	pieceRank, pieceFile := RankAndFile(pieceIdx)
-	for _, offset := range offsets {
-		targetIdx := pieceIdx + offset
-		if targetIdx < 0 || targetIdx > 63 {
+
+	startRank, startFile := RankAndFile(startIdx)
+
+	for _, move := range knightMoves {
+		newFile := startFile + move[0]
+		if !(newFile >= 0 && newFile < 8) {
 			continue
 		}
 
-		targetRank, targetFile := RankAndFile(targetIdx)
-
-		var (
-			rankDiff int8
-			fileDiff int8
-		)
-		if pieceRank > targetRank {
-			rankDiff = pieceRank - targetRank
-		} else {
-			rankDiff = targetRank - pieceRank
-		}
-
-		if pieceFile > targetFile {
-			fileDiff = pieceFile - targetFile
-		} else {
-			fileDiff = targetFile - pieceFile
-		}
-
-		combinedDiff := fileDiff + rankDiff
-		if combinedDiff != -3 && combinedDiff != 3 {
+		newRank := startRank + move[1]
+		if !(newRank >= 0 && newRank < 8) {
 			continue
 		}
 
-		target := p.PieceAt(targetIdx)
-		if target != NoPiece {
-			if target.Color() != piece.Color() {
-				moves = append(moves, targetIdx)
-				capturesMoves = append(capturesMoves, targetIdx)
-			}
-		} else {
-			moves = append(moves, targetIdx)
+		endIdx := newRank*8 + newFile
+		targetPiece := p.board[endIdx]
+
+		if targetPiece == NoPiece {
+			moves = append(moves, endIdx)
+		} else if targetPiece.Color() != color {
+			moves = append(moves, endIdx)
+			capturesMoves = append(capturesMoves, endIdx)
 		}
 	}
 
 	return moves, capturesMoves
 }
 
-func KingPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
-	moves, capturesMoves := SliderPseudoLegalMoves(p, pieceIdx)
+var kingMoves = [8][2]int8{
+	{0, 1}, {1, 0}, {0, -1}, {-1, 0},
+	{1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+}
 
-	piece := p.PieceAt(pieceIdx)
-	pieceColor := piece.Color()
+func KingPseudoLegalMoves(p Position, startIdx int8) ([]int8, []int8) {
+	var (
+		moves         = make([]int8, 0, 8)
+		capturesMoves = make([]int8, 0, 8)
+	)
+
+	startRank, startFile := RankAndFile(startIdx)
+
+	for _, move := range kingMoves {
+		newFile := startFile + move[0]
+		if !(newFile >= 0 && newFile < 8) {
+			continue
+		}
+
+		newRank := startRank + move[1]
+		if !(newRank >= 0 && newRank < 8) {
+			continue
+		}
+
+		endIdx := newRank*8 + newFile
+		targetPiece := p.board[endIdx]
+		if targetPiece == NoPiece {
+			moves = append(moves, endIdx)
+		} else if targetPiece.Color() != p.activeColor {
+			moves = append(moves, endIdx)
+			capturesMoves = append(capturesMoves, endIdx)
+		}
+	}
 
 	var (
 		castleRights int8
 		kingStartIdx int8
 	)
-	if pieceColor == White {
+	if p.activeColor == White {
 		castleRights = p.whiteCastleRights
 		kingStartIdx = E1
 	} else {
@@ -150,7 +194,7 @@ func KingPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	}
 
 	// early exit no castle
-	if pieceIdx != kingStartIdx || castleRights == NoCastle {
+	if startIdx != kingStartIdx || castleRights == NoCastle {
 		return moves, capturesMoves
 	}
 
@@ -161,7 +205,7 @@ func KingPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 		queenCastleIdx   int8
 	)
 	if (castleRights & QueenSideCastle) != 0 {
-		if piece.Color() == White {
+		if p.activeColor == White {
 			queenRookIdx = A1
 			queenCastleIdx = C1
 			queenPathIsClear = (p.PieceAt(B1) == NoPiece) && (p.PieceAt(C1) == NoPiece) && (p.PieceAt(D1) == NoPiece)
@@ -183,7 +227,7 @@ func KingPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 		kingCastleIdx   int8
 	)
 	if (castleRights & KingSideCastle) != 0 {
-		if piece.Color() == White {
+		if p.activeColor == White {
 			kingRookIdx = H1
 			kingCastleIdx = G1
 			kingPathIsClear = (p.PieceAt(G1) == NoPiece) && (p.PieceAt(F1) == NoPiece)
@@ -222,14 +266,14 @@ func PawnPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	target1 := p.PieceAt(target1Idx)
 	if target1 == NoPiece {
 		moves = append(moves, target1Idx)
-	}
 
-	// 2 forward
-	if ((pieceColor == White && rank == 1) || (pieceColor == Black && rank == 6)) && target1 == NoPiece {
-		target2Idx := pieceIdx + (16 * direction)
-		target2 := p.PieceAt(target2Idx)
-		if target2 == NoPiece {
-			moves = append(moves, target2Idx)
+		// 2 forward
+		if (pieceColor == White && rank == 1) || (pieceColor == Black && rank == 6) {
+			target2Idx := pieceIdx + (16 * direction)
+			target2 := p.PieceAt(target2Idx)
+			if target2 == NoPiece {
+				moves = append(moves, target2Idx)
+			}
 		}
 	}
 
@@ -260,68 +304,99 @@ func PawnPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 // if a captureMove is found it means that the current king is visible from these squares,
 // so additional checks are required to verify if a capture is really possible
 func (p Position) IsCheck() bool {
-	var (
-		kingIdx int8
-	)
-
-	if p.activeColor == White {
-		kingIdx = p.whiteKingIdx
-	} else {
-		kingIdx = p.blackKingIdx
-	}
-
-	kingRank, kingFile := RankAndFile(kingIdx)
-
-	_, queenCapturesMoves := generateSliderPseudoLegalMoves(p, kingIdx, Piece(Queen|p.activeColor))
-	for _, captureMove := range queenCapturesMoves {
-		piece := p.PieceAt(captureMove)
-		pieceType := piece.Type()
-
-		if pieceType == Queen {
-			return true
-		}
-
-		pieceRank, pieceFile := RankAndFile(captureMove)
-
-		if pieceType == Rook && (pieceRank == kingRank || pieceFile == kingFile) {
-			return true
-		}
-
-		if pieceType == Bishop && pieceRank != kingRank && pieceFile != kingFile {
-			return true
-		}
-
-		fileDiff := kingFile - pieceFile
-		if pieceType == Pawn && (fileDiff == 1 || fileDiff == -1) {
-			rankDiff := kingRank - pieceRank
-			pieceColor := piece.Color()
-			if (rankDiff == -1 && pieceColor == Black) || (rankDiff == 1 && pieceColor == White) {
-				return true
-			}
-
-		}
-	}
-
-	_, knightCapturesMoves := generateKnightPseudoLegalMoves(p, kingIdx, Piece(Knight|p.activeColor))
-	for _, captureMove := range knightCapturesMoves {
-		if p.PieceAt(captureMove).Type() == Knight {
-			return true
-		}
-	}
-
-	return false
+	return IsKingInCheck(p, p.activeColor)
 }
 
-//func MoveGenerationTest(depth int) int {
-//	if depth == 0 {
-//		return 1
-//	}
-//
-//	posCount := 0
-//	for move := range pos.LegalMoves() {
-//		newPos := PositionAfterMove(pos, move)
-//		posCount += MoveGenerationTest(depth - 1)
-//	}
-//
-//	return posCount
-//}
+func LegalMoves(pos Position) []Move {
+	var moves []Move
+
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece.Color() != pos.activeColor {
+			continue
+		}
+
+		var pseudoLegalMoves []int8
+
+		//fmt.Println("--- Piece legal moves ---")
+		switch piece.Type() {
+		case Pawn:
+			pseudoLegalMoves, _ = PawnPseudoLegalMoves(pos, idx)
+		case Rook:
+			pseudoLegalMoves, _ = SliderPseudoLegalMoves(pos, idx)
+		case Bishop:
+			pseudoLegalMoves, _ = SliderPseudoLegalMoves(pos, idx)
+		case Knight:
+			pseudoLegalMoves, _ = KnightPseudoLegalMoves(pos, idx)
+		case Queen:
+			pseudoLegalMoves, _ = SliderPseudoLegalMoves(pos, idx)
+		case King:
+			pseudoLegalMoves, _ = KingPseudoLegalMoves(pos, idx)
+		}
+
+		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
+			pseudoLegalMove := NewMove(piece, idx, pseudoLegalMoveIdx, NormalMove)
+			newPos := pos.PositionAfterMove(pseudoLegalMove)
+			if !IsKingInCheck(newPos, pos.activeColor) { // check is the new position that the initial color is not in check
+				moves = append(moves, pseudoLegalMove)
+			}
+		}
+	}
+
+	return moves
+}
+
+func MoveGenerationTest(pos Position, depth int) int {
+	if depth == 1 {
+		return 1
+	}
+
+	posCount := 0
+
+	legalMoves := LegalMoves(pos)
+
+	//if depth != 2 {
+	//	fmt.Println("Legal moves:", legalMoves)
+	//}
+
+	for _, move := range legalMoves {
+		//if depth == 3 && !(move.piece.Type() == Knight && move.StartIdx() == B1) {
+		//	continue
+		//}
+		newPos := pos.PositionAfterMove(move)
+		nextDepth := depth - 1
+		nextDepthResult := MoveGenerationTest(newPos, nextDepth)
+
+		//if nextDepthResult != 20 && nextDepthResult != 1 {
+		//	uciMove := move.UCI()
+		//	fmt.Println(uciMove)
+		//	panic("hello")
+		//}
+
+		posCount += nextDepthResult
+	}
+
+	return posCount
+}
+
+func PerftDivide(pos Position, depth int) {
+	res := make(map[string]int)
+	total := 0
+
+	for _, move := range LegalMoves(pos) {
+		res[move.UCI()] = MoveGenerationTest(pos.PositionAfterMove(move), depth)
+		total += res[move.UCI()]
+	}
+
+	keys := make([]string, 0, len(res))
+	for k := range res {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		fmt.Println(k, res[k])
+	}
+
+	fmt.Println("Nodes searched", total)
+}

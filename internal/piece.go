@@ -1,7 +1,5 @@
 package internal
 
-import "fmt"
-
 type Piece int8
 type PieceColor int8
 
@@ -102,17 +100,15 @@ func (p Piece) Type() int8 {
 	return int8(p) & 7
 }
 
-func (p Piece) PossibleDirectionsAndMaxMoves() ([]int8, int8) {
-	switch p.Type() {
-	case King:
-		return []int8{LEFT, RIGHT, UP, DOWN, UpLeft, UpRight, DownLeft, DownRight}, 1
-	case Queen:
-		return []int8{LEFT, RIGHT, UP, DOWN, UpLeft, UpRight, DownLeft, DownRight}, 7
-	case Rook:
-		return []int8{UP, DOWN, LEFT, RIGHT}, 7
-	case Bishop:
-		return []int8{UpLeft, UpRight, DownLeft, DownRight}, 7
+func (p Piece) IsSlider(sliderType int) bool {
+	pieceType := p.Type()
+	if sliderType == BishopSlider && (pieceType == Bishop || pieceType == Queen) {
+		return true
 	}
 
-	panic(fmt.Sprintf("PieceType is not a slider : %d", p))
+	if sliderType == RookSlider && (pieceType == Rook || pieceType == Queen) {
+		return true
+	}
+
+	return false
 }

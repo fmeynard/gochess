@@ -16,7 +16,7 @@ const (
 const FenStartPos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 type Position struct {
-	board             map[int8]Piece
+	board             [64]Piece
 	activeColor       int8
 	whiteCastleRights int8
 	blackCastleRights int8
@@ -26,10 +26,7 @@ type Position struct {
 }
 
 func NewPosition() Position {
-	board := make(map[int8]Piece, 64)
-	//for i := range board {
-	//	board[i] = NoPiece
-	//}
+	board := [64]Piece{}
 
 	for i := int8(0); i < 64; i++ {
 		board[i] = NoPiece
@@ -198,16 +195,14 @@ func (p Position) CanCastle(clr int8, castleRight int8) bool {
 	return true
 }
 
+func updatePieceOnBoard(p *Position, piece Piece, oldIdx int8, newIdx int8) {
+	p.board[oldIdx] = NoPiece
+	p.board[newIdx] = piece
+
+}
+
 func (p Position) PositionAfterMove(move Move) Position {
-	newBoard := make(map[int8]Piece, 64)
-	for i := int8(0); i < 64; i++ {
-		p2, _ := p.board[i]
-
-		newBoard[i] = p2
-	}
-
 	newPos := p
-	newPos.board = newBoard
 
 	startPieceIdx := move.StartIdx()
 	endPieceIdx := move.EndIdx()
@@ -217,6 +212,7 @@ func (p Position) PositionAfterMove(move Move) Position {
 	// update position
 	newPos.board[startPieceIdx] = NoPiece
 	newPos.board[endPieceIdx] = startPiece
+	//updatePieceOnBoard(&newPos, startPiece, startPieceIdx, endPieceIdx)
 
 	// King move -> update king pos and castleRights
 	if startPieceType == King {
@@ -297,16 +293,4 @@ func (p Position) PositionAfterMove(move Move) Position {
 	}
 
 	return newPos
-}
-
-func (p Position) ActivePlayerPieces() map[int8]Piece {
-	pieces := make(map[int8]Piece)
-
-	for idx, piece := range p.board {
-		if piece.Color() == p.activeColor {
-			pieces[idx] = piece
-		}
-	}
-
-	return pieces
 }

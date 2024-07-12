@@ -1,5 +1,7 @@
 package internal
 
+import "fmt"
+
 // Move
 // for later
 // [ 8bits chunks]
@@ -43,4 +45,17 @@ func (m Move) EndIdx() int8 {
 
 func (m Move) Flag() int8 {
 	return m.flag
+}
+
+func (m Move) UCI() string {
+	startRank, startFile := RankAndFile(m.StartIdx())
+	endRank, endFile := RankAndFile(m.EndIdx())
+
+	return fmt.Sprintf(
+		"%c%d%c%d",
+		'a'+startFile,
+		startRank+1,
+		'a'+endFile,
+		endRank+1,
+	)
 }
