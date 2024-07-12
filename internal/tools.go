@@ -35,17 +35,21 @@ func IdxToSquare(idx int8) string {
 }
 
 func RankAndFile(idx int8) (int8, int8) {
-	if idx < 0 || idx > 63 {
-		panic("idx out of range")
-	}
-
 	return RankFromIdx(idx), FileFromIdx(idx)
 }
 
 func RankFromIdx(idx int8) int8 {
-	return idx / 8
+	return idx >> 3
 }
 
 func FileFromIdx(idx int8) int8 {
-	return idx % 8
+	return idx & 7
+}
+
+func IsSameRank(idx1, idx2 int8) bool {
+	return RankFromIdx(idx1) == RankFromIdx(idx2)
+}
+
+func IsSameFile(idx1, idx2 int8) bool {
+	return FileFromIdx(idx1) == FileFromIdx(idx2)
 }

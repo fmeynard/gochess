@@ -102,7 +102,4 @@ func Test_RankAndFile(t *testing.T) {
 		assert.Equal(t, d.rank, rank)
 		assert.Equal(t, d.file, file)
 	}
-
-	assert.Panics(t, func() { RankAndFile(-1) })
-	assert.Panics(t, func() { RankAndFile(64) })
 }
