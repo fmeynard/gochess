@@ -1,11 +1,5 @@
 package internal
 
-var (
-	queenDirections = [8]int8{8, -8, 1, -1, 9, -9, 7, -7}
-	knightMoves2    = [8][2]int8{{2, 1}, {1, 2}, {-1, 2}, {-2, 1}, {-2, -1}, {-1, -2}, {1, -2}, {2, -1}}
-	kingMoves2      = [8][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
-)
-
 const (
 	NoSlider     = 0
 	BishopSlider = 1
@@ -44,7 +38,7 @@ func isSquareAttackedByPawn(pos Position, idx int8, kingColor int8) bool {
 // verify if the square is attacked by knight
 func isSquareAttackedByKnight(pos Position, idx int8, kingColor int8) bool {
 	rank, file := RankAndFile(idx)
-	for _, move := range knightMoves2 {
+	for _, move := range knightMoves {
 		newFile := file + move[0]
 		newRank := rank + move[1]
 		if isOnBoard(newFile, newRank) {
@@ -100,7 +94,7 @@ func isSquareAttackedBySlidingPiece(pos Position, pieceIdx int8, kingColor int8)
 func isSquareAttackedByKing(pos Position, idx int8) bool {
 	rank, file := RankAndFile(idx)
 
-	for _, move := range kingMoves2 {
+	for _, move := range kingMoves {
 		newFile := file + move[0]
 		newRank := rank + move[1]
 		if isOnBoard(newFile, newRank) {

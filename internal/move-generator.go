@@ -23,6 +23,20 @@ var (
 	BishopDirections = []int8{UpLeft, UpRight, DownLeft, DownRight}
 )
 
+var kingMoves2 = []int8{
+	-9, -8, -7, -1, 1, 7, 8, 9,
+}
+
+var knightMoves2 = []int8{
+	-17, -15, -10, -6,
+	6, 10, 15, 17,
+}
+
+var (
+	queenDirections = [8]int8{8, -8, 1, -1, 9, -9, 7, -7}
+	kingMoves       = [8][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
+)
+
 func SliderPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 	piece := p.PieceAt(pieceIdx)
 	if piece == NoPiece {
@@ -145,11 +159,6 @@ func generateKnightPseudoLegalMoves(p Position, startIdx int8, color int8) ([]in
 	}
 
 	return moves, capturesMoves
-}
-
-var kingMoves = [8][2]int8{
-	{0, 1}, {1, 0}, {0, -1}, {-1, 0},
-	{1, 1}, {1, -1}, {-1, 1}, {-1, -1},
 }
 
 func KingPseudoLegalMoves(p Position, startIdx int8) ([]int8, []int8) {
@@ -304,7 +313,7 @@ func PawnPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 // if a captureMove is found it means that the current king is visible from these squares,
 // so additional checks are required to verify if a capture is really possible
 func (p Position) IsCheck() bool {
-	return IsKingInCheck(p, p.activeColor)
+	return isKingInCheckByVector(p, p.activeColor)
 }
 
 func LegalMoves(pos Position) []Move {
@@ -337,7 +346,7 @@ func LegalMoves(pos Position) []Move {
 		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
 			pseudoLegalMove := NewMove(piece, idx, pseudoLegalMoveIdx, NormalMove)
 			newPos := pos.PositionAfterMove(pseudoLegalMove)
-			if !IsKingInCheck(newPos, pos.activeColor) { // check is the new position that the initial color is not in check
+			if !isKingInCheckByVector(newPos, pos.activeColor) { // check is the new position that the initial color is not in check
 				moves = append(moves, pseudoLegalMove)
 			}
 		}

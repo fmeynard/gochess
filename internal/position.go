@@ -23,6 +23,8 @@ type Position struct {
 	enPassantIdx      int8
 	blackKingIdx      int8
 	whiteKingIdx      int8
+	whiteAttacks      uint64
+	blackAttacks      uint64
 }
 
 func NewPosition() Position {
@@ -138,6 +140,8 @@ func NewPositionFromFEN(fen string) (Position, error) {
 	// Half move clock
 
 	// full move number
+
+	updateAttackVectors(&pos)
 
 	return pos, nil
 }
@@ -291,6 +295,8 @@ func (p Position) PositionAfterMove(move Move) Position {
 	} else {
 		newPos.activeColor = White
 	}
+
+	updateAttackVectors(&newPos)
 
 	return newPos
 }
