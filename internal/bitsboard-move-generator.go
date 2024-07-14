@@ -308,14 +308,14 @@ func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos Position, idx int8) 
 	var moves = make([]int8, 0, 8)
 
 	pieceColor := pos.board[idx].Color()
-	for _, currentOffset := range g.knightOffsets {
-		targetIdx := idx + currentOffset
-		if targetIdx < 0 || targetIdx > 63 || g.knightMasks[idx]&(1<<targetIdx) == 0 {
-			continue
-		}
+	knightMask := g.knightMasks[idx]
 
-		target := pos.board[targetIdx]
-		if target == NoPiece || target.Color() != pieceColor {
+	for knightMask != 0 {
+		targetIdx := leastSignificantOne(knightMask)
+		knightMask &= knightMask - 1
+
+		targetPiece := pos.board[targetIdx]
+		if targetPiece == NoPiece || targetPiece.Color() != pieceColor {
 			moves = append(moves, targetIdx)
 		}
 	}
