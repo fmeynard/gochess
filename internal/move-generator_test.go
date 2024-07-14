@@ -315,28 +315,25 @@ func BenchmarkGenerateKingPseudoLegalMoves(b *testing.B) {
 }
 
 func BenchmarkGenerateKnightPseudoLegalMoves(b *testing.B) {
-	pos, _ := NewPositionFromFEN("8/8/8/8/3N4/8/8/8 w - - 0 1")
+	pos, _ := NewPositionFromFEN("8/8/8/8/4N3/2P5/3p4/8 w - - 0 1")
 
 	b.ResetTimer()
 
-	rescnt := 0
-	for i := 0; i < 10000000; i++ {
-		r, _ := generateKnightPseudoLegalMoves(pos, D4, White)
-		if r != nil {
-			rescnt++
-		}
+	for i := 0; i < 100000000; i++ {
+		generateKnightPseudoLegalMoves(pos, E4, White)
 	}
-	fmt.Println(rescnt)
 }
 
 func BenchmarkGenerateSliderPseudoLegalMoves(b *testing.B) {
 
-	pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
+	//pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
 	//piece := Piece(White | Queen)
 
-	for i := 0; i < 1000000; i++ {
+	pos, _ := NewPositionFromFEN("3p4/8/8/8/3R3P/3p4/8/8 w - - 0 1")
+
+	for i := 0; i < 100000000; i++ {
 		//LegalMoves(pos)
-		generateSliderPseudoLegalMoves(pos, D4, Piece(Queen|Black))
+		generateSliderPseudoLegalMoves(pos, D4, Piece(Rook|White))
 	}
 
 }

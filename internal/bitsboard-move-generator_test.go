@@ -97,13 +97,80 @@ func TestSliderPseudoLegalMoves(t *testing.T) {
 	}
 }
 
+func TestKnightPseudoLegalMoves(t *testing.T) {
+	data := map[string]struct {
+		fenString string
+		piecePos  int8
+		moves     []int8
+	}{
+		"All Directions - No Captures": {
+			fenString: "8/8/8/8/4N3/8/8/8 w - - 0 1",
+			piecePos:  E4,
+			moves:     []int8{11, 13, 18, 22, 34, 38, 43, 45},
+		},
+		"Captures All Directions": {
+			fenString: "8/8/3P1P2/2P3P1/4n3/2P3P1/3P1P2/8 b - - 0 1",
+			piecePos:  E4,
+			moves:     []int8{C3, C5, D2, D6, F2, F6, G3, G5},
+		},
+		"B1 : Edges check": {
+			fenString: "8/8/8/8/8/8/8/1N6 w - - 0 1",
+			piecePos:  B1,
+			moves:     []int8{A3, C3, D2},
+		},
+		"G8 : Edges check": {
+			fenString: "8/8/8/8/4N3/8/8/8 w - - 0 1",
+			piecePos:  G8,
+			moves:     []int8{E7, H6, F6},
+		},
+		"No cross-board capture": {
+			fenString: "8/p7/8/7N/8/8/8/8 w - - 0 1",
+			piecePos:  H5,
+			moves:     []int8{G7, F6, F4, G3},
+		},
+	}
+
+	generator := NewBitsBoardMoveGenerator()
+
+	draw(generator.knightMasks[E4])
+
+	fmt.Println("--")
+	draw(generator.knightMasks[E4] & (1 << D2))
+
+	for tName, d := range data {
+		t.Run(tName, func(t *testing.T) {
+			pos, err := NewPositionFromFEN(d.fenString)
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+
+			moves := generator.KnightPseudoLegalMoves(pos, d.piecePos)
+			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
+		})
+	}
+}
+
 func BenchmarkSliderPseudoLegalMoves(b *testing.B) {
-	pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
+	// queen
+	//pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
+	// rook
+	pos, _ := NewPositionFromFEN("3p4/8/8/8/3R3P/3p4/8/8 w - - 0 1")
 	generator := NewBitsBoardMoveGenerator()
 
 	b.ResetTimer()
 
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < 100000000; i++ {
 		generator.SliderPseudoLegalMoves(pos, D4)
+	}
+}
+
+func BenchmarkKnightPseudoLegalMoves(b *testing.B) {
+	pos, _ := NewPositionFromFEN("8/8/8/8/4N3/2P5/3p4/8 w - - 0 1")
+	generator := NewBitsBoardMoveGenerator()
+
+	b.ResetTimer()
+
+	for i := 0; i < 100000000; i++ {
+		generator.KnightPseudoLegalMoves(pos, E4)
 	}
 }

@@ -3,13 +3,17 @@ package internal
 type BitsBoardMoveGenerator struct {
 	bishopMasks [64]uint64
 	rookMasks   [64]uint64
+	knightMasks [64]uint64
 
 	rookDirections   []int8
 	bishopDirections []int8
+	knightOffsets    []int8
 }
 
 func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
-	bitsBoardMoveGenerator := &BitsBoardMoveGenerator{}
+	bitsBoardMoveGenerator := &BitsBoardMoveGenerator{
+		knightOffsets: []int8{-17, -15, -10, -6, 6, 10, 15, 17},
+	}
 	bitsBoardMoveGenerator.initMasks()
 
 	return bitsBoardMoveGenerator
@@ -61,7 +65,38 @@ func (g *BitsBoardMoveGenerator) initMasks() {
 			}
 			g.rookMasks[squareIdx] |= mask
 		}
+
+		for _, offset := range g.knightOffsets {
+			targetIdx := squareIdx + offset
+			if targetIdx >= 0 && targetIdx < 64 {
+				targetRank, targetFile := RankAndFile(targetIdx)
+				fileDiff := absInt8(squareFile - targetFile)
+				rankDiff := absInt8(squareRank - targetRank)
+				if fileDiff <= 2 && rankDiff <= 2 {
+					g.knightMasks[squareIdx] |= 1 << targetIdx
+				}
+			}
+		}
 	}
+}
+
+func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos Position, idx int8) []int8 {
+	var moves = make([]int8, 0, 8)
+
+	pieceColor := pos.board[idx].Color()
+	for _, currentOffset := range g.knightOffsets {
+		targetIdx := idx + currentOffset
+		if targetIdx < 0 || targetIdx > 63 || g.knightMasks[idx]&(1<<targetIdx) == 0 {
+			continue
+		}
+
+		target := pos.board[targetIdx]
+		if target == NoPiece || target.Color() != pieceColor {
+			moves = append(moves, targetIdx)
+		}
+	}
+
+	return moves
 }
 
 func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos Position, idx int8) []int8 {
