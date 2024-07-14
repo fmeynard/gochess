@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"math/bits"
 )
 
 func SquareToIdx(square string) int8 {
@@ -55,4 +56,11 @@ func absInt8(x int8) int8 {
 
 func IsSameDiagonal(pieceRank, pieceFile, targetRank, targetFile int8) bool {
 	return absInt8(pieceFile-targetFile) == absInt8(pieceRank-targetRank)
+}
+
+func leastSignificantOne(bb uint64) int8 {
+	if bb == 0 {
+		return -1
+	}
+	return int8(bits.TrailingZeros64(bb))
 }

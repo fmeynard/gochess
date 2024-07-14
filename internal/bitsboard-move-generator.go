@@ -1,10 +1,14 @@
 package internal
 
 type BitsBoardMoveGenerator struct {
-	bishopMasks [64]uint64
-	rookMasks   [64]uint64
-	knightMasks [64]uint64
-	kingMasks   [64]uint64
+	bishopMasks            [64]uint64
+	rookMasks              [64]uint64
+	knightMasks            [64]uint64
+	kingMasks              [64]uint64
+	whitePawnMovesMasks    [64]uint64
+	blackPawnMovesMasks    [64]uint64
+	whitePawnCapturesMasks [64]uint64
+	blackPawnCapturesMasks [64]uint64
 
 	rookDirections   []int8
 	bishopDirections []int8
@@ -31,6 +35,46 @@ func (g *BitsBoardMoveGenerator) initMasks() {
 		g.initRookMaskForSquare(squareIdx)
 		g.initKnightMaskForSquare(squareIdx)
 		g.initKingMaskForSquare(squareIdx)
+		g.initPawnMasksForSquare(squareIdx)
+	}
+}
+
+// initPawnMasksForSquare
+// Pawns only moves forward and their capture patterns are different from their move patterns
+// En Passant needs to be checked separately as its tight to the position
+func (g *BitsBoardMoveGenerator) initPawnMasksForSquare(squareIdx int8) {
+	squareRank, squareFile := RankAndFile(squareIdx)
+
+	// White pawn single move
+	if squareRank < 7 {
+		g.whitePawnMovesMasks[squareIdx] |= 1 << (squareIdx + 8)
+	}
+	// White pawn double move
+	if squareRank == 1 {
+		g.whitePawnMovesMasks[squareIdx] |= 1 << (squareIdx + 16)
+	}
+	// White pawn captures
+	if squareRank < 7 && squareFile > 0 {
+		g.whitePawnCapturesMasks[squareIdx] |= 1 << (squareIdx + 7)
+	}
+	if squareRank < 7 && squareFile < 7 {
+		g.whitePawnCapturesMasks[squareIdx] |= 1 << (squareIdx + 9)
+	}
+
+	// Black pawn single move
+	if squareRank > 0 {
+		g.blackPawnMovesMasks[squareIdx] |= 1 << (squareIdx - 8)
+	}
+	// Black pawn double move
+	if squareRank == 6 {
+		g.blackPawnMovesMasks[squareIdx] |= 1 << (squareIdx - 16)
+	}
+	// Black pawn captures
+	if squareRank > 0 && squareFile > 0 {
+		g.blackPawnCapturesMasks[squareIdx] |= 1 << (squareIdx - 9)
+	}
+	if squareRank > 0 && squareFile < 7 {
+		g.blackPawnCapturesMasks[squareIdx] |= 1 << (squareIdx - 7)
 	}
 }
 
@@ -108,6 +152,76 @@ func (g *BitsBoardMoveGenerator) initKingMaskForSquare(squareIdx int8) {
 			}
 		}
 	}
+}
+
+// PawnPseudoLegalMoves Generate pawn moves using bitboards
+func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos Position, idx int8) ([]int8, int8) {
+	moves := make([]int8, 0, 4)
+	promotionIdx := int8(-1)
+
+	pieceColor := pos.board[idx].Color()
+	isWhite := pieceColor == White
+
+	var moveMask, captureMask uint64
+	if isWhite {
+		moveMask = g.whitePawnMovesMasks[idx]
+		captureMask = g.whitePawnCapturesMasks[idx]
+	} else {
+		moveMask = g.blackPawnMovesMasks[idx]
+		captureMask = g.blackPawnCapturesMasks[idx]
+	}
+
+	// Generate moves
+
+	for moveMask != 0 {
+		targetIdx := leastSignificantOne(moveMask)
+		moveMask &= moveMask - 1
+
+		if pos.board[targetIdx] == NoPiece {
+			targetRank := RankFromIdx(targetIdx)
+			if (isWhite && targetIdx/8 == 7) || (!isWhite && targetIdx/8 == 0) {
+				// Handle promotion
+				promotionIdx = targetIdx
+			} else {
+				if targetRank == 3 && pieceColor == White && targetIdx-idx == 16 && pos.board[idx+8] != NoPiece {
+					continue
+				}
+
+				if targetRank == 4 && pieceColor == Black && idx-targetIdx == 16 && pos.board[idx-8] != NoPiece {
+					continue
+				}
+				moves = append(moves, targetIdx)
+			}
+		}
+	}
+
+	// Handle en passant
+	// check first as next part is modifying the captureMask
+	if pos.enPassantIdx != NoEnPassant {
+		enPassantTarget := pos.enPassantIdx
+		if captureMask&(1<<enPassantTarget) != 0 {
+			moves = append(moves, enPassantTarget)
+		}
+	}
+
+	// Generate captures
+	for captureMask != 0 {
+		targetIdx := leastSignificantOne(captureMask)
+		captureMask &= captureMask - 1
+		target := pos.board[targetIdx]
+
+		if target != NoPiece && pieceColor != target.Color() {
+			targetRank := RankFromIdx(targetIdx)
+			if (isWhite && targetRank == 7) || (!isWhite && targetRank == 0) {
+				// Handle promotion with capture
+				promotionIdx = targetIdx
+			} else {
+				moves = append(moves, targetIdx)
+			}
+		}
+	}
+
+	return moves, promotionIdx
 }
 
 func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos Position, idx int8) []int8 {

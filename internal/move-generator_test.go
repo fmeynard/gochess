@@ -328,3 +328,13 @@ func BenchmarkGenerateSliderPseudoLegalMoves(b *testing.B) {
 	}
 
 }
+
+func BenchmarkGeneratePawnPseudoLegalMoves(b *testing.B) {
+	pos, _ := NewPositionFromFEN("rnbqkbnr/p1p1ppp1/7p/1pPp4/8/8/PP1PPPPP/RNBQKBNR w KQkq d6 0 1")
+
+	b.ResetTimer()
+
+	for i := 0; i < 100000000; i++ {
+		PawnPseudoLegalMoves(pos, C5)
+	}
+}

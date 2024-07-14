@@ -213,6 +213,92 @@ func TestKingPseudoLegalMoves(t *testing.T) {
 	}
 }
 
+func TestPawnPseudoLegalMoves(t *testing.T) {
+	data := map[string]struct {
+		fenString string
+		piecePos  int8
+		moves     []int8
+	}{
+		"start pos white": {
+			fenString: "8/8/8/8/8/8/P7/8 w - - 0 1",
+			piecePos:  A2,
+			moves:     []int8{A3, A4},
+		},
+		"start pos black": {
+			fenString: "8/p7/8/8/8/8/8/8 w - - 0 1",
+			piecePos:  A7,
+			moves:     []int8{A6, A5},
+		},
+		"no capture left white": {
+			fenString: "8/8/8/pp5p/P7/8/8/8 w - - 0 1",
+			piecePos:  A4,
+			moves:     []int8{B5},
+		},
+		"no capture left black": {
+			fenString: "8/8/8/p7/1P5P/8/8/8 b - - 0 1",
+			piecePos:  A5,
+			moves:     []int8{A4, B4},
+		},
+		"both capture white": {
+			fenString: "8/8/8/8/8/ppp4p/1P6/8 w - - 0 1",
+			piecePos:  B2,
+			moves:     []int8{A3, C3},
+		},
+		"both capture black": {
+			fenString: "8/8/8/8/3PPP2/3PpP2/PPPPPPPP/8 w - - 0 1",
+			piecePos:  E3,
+			moves:     []int8{D2, F2},
+		},
+		"enPassant left white": {
+			fenString: "8/8/1p6/pPp5/8/8/8/8 w - a6 0 1",
+			piecePos:  B5,
+			moves:     []int8{A6},
+		},
+		"enPassant right white": {
+			fenString: "8/8/1p6/pPp5/8/8/8/8 w - c6 0 1",
+			piecePos:  B5,
+			moves:     []int8{C6},
+		},
+		"no enPassant white": {
+			fenString: "8/8/1p6/pPp5/8/8/8/8 w - - 0 1",
+			piecePos:  B5,
+		},
+		"enPassant left black": {
+			fenString: "8/8/8/8/PpP5/1P6/8/8 b - a3 0 1",
+			piecePos:  B4,
+			moves:     []int8{A3},
+		},
+		"No-EnPassant cross-board black": {
+			fenString: "8/8/8/8/PpP4p/1P6/8/8 b - a3 0 1",
+			piecePos:  H4,
+			moves:     []int8{H3},
+		},
+		"Knight blocking double pawn move": {
+			fenString: "8/8/8/8/8/5N2/5P2/8 w - - 0 1",
+			piecePos:  F2,
+		},
+		"En passant only right": {
+			fenString: "rnbqkbnr/p1p1ppp1/7p/1pPp4/8/8/PP1PPPPP/RNBQKBNR w KQkq d6 0 1",
+			piecePos:  C5,
+			moves:     []int8{C6, D6},
+		},
+	}
+
+	generator := NewBitsBoardMoveGenerator()
+
+	for tName, d := range data {
+		t.Run(tName, func(t *testing.T) {
+			pos, err := NewPositionFromFEN(d.fenString)
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+
+			moves, _ := generator.PawnPseudoLegalMoves(pos, d.piecePos)
+			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
+		})
+	}
+}
+
 func BenchmarkSliderPseudoLegalMoves(b *testing.B) {
 	// queen
 	//pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
@@ -246,5 +332,16 @@ func BenchmarkKnightPseudoLegalMoves(b *testing.B) {
 
 	for i := 0; i < 100000000; i++ {
 		generator.KnightPseudoLegalMoves(pos, E4)
+	}
+}
+
+func BenchmarkPawnPseudoLegalMoves(b *testing.B) {
+	pos, _ := NewPositionFromFEN("rnbqkbnr/p1p1ppp1/7p/1pPp4/8/8/PP1PPPPP/RNBQKBNR w KQkq d6 0 1")
+	generator := NewBitsBoardMoveGenerator()
+
+	b.ResetTimer()
+
+	for i := 0; i < 100000000; i++ {
+		generator.PawnPseudoLegalMoves(pos, C5)
 	}
 }
