@@ -25,6 +25,7 @@ type Position struct {
 	whiteKingIdx      int8
 	whiteAttacks      uint64
 	blackAttacks      uint64
+	occupied          uint64
 }
 
 func NewPosition() Position {
@@ -141,7 +142,14 @@ func NewPositionFromFEN(fen string) (Position, error) {
 
 	// full move number
 
-	updateAttackVectors(&pos)
+	//updateAttackVectors(&pos)
+
+	pos.occupied = uint64(0)
+	for i := 0; i < 64; i++ {
+		if pos.board[i] != NoPiece {
+			pos.occupied |= 1 << i
+		}
+	}
 
 	return pos, nil
 }

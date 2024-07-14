@@ -329,19 +329,14 @@ func BenchmarkGenerateKnightPseudoLegalMoves(b *testing.B) {
 	fmt.Println(rescnt)
 }
 
-//func BenchmarkGenerateSliderPseudoLegalMoves(b *testing.B) {
-//
-//	pos, _ := NewPositionFromFEN("8/8/8/8/3Q4/8/8/8 w - - 0 1")
-//	//piece := Piece(White | Queen)
-//
-//	//res := 0
-//	for i := 0; i < 100000; i++ {
-//		//LegalMoves(pos)
-//		//m1, _ := generateSliderPseudoLegalMoves(pos, D4, piece)
-//		//m1test += len(LegalMoves(pos))
-//
-//		LegalMoves(pos)
-//	}
-//
-//	fmt.Println(m1test)
-//}
+func BenchmarkGenerateSliderPseudoLegalMoves(b *testing.B) {
+
+	pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
+	//piece := Piece(White | Queen)
+
+	for i := 0; i < 1000000; i++ {
+		//LegalMoves(pos)
+		generateSliderPseudoLegalMoves(pos, D4, Piece(Queen|Black))
+	}
+
+}
