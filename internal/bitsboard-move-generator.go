@@ -14,8 +14,10 @@ type BitsBoardMoveGenerator struct {
 
 func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
 	bitsBoardMoveGenerator := &BitsBoardMoveGenerator{
-		knightOffsets: []int8{-17, -15, -10, -6, 6, 10, 15, 17},
-		kingOffsets:   []int8{-9, -8, -7, -1, 1, 7, 8, 9},
+		knightOffsets:    []int8{-17, -15, -10, -6, 6, 10, 15, 17},
+		kingOffsets:      []int8{-9, -8, -7, -1, 1, 7, 8, 9},
+		bishopDirections: []int8{UpLeft, UpRight, DownLeft, DownRight},
+		rookDirections:   []int8{UP, DOWN, LEFT, RIGHT},
 	}
 	bitsBoardMoveGenerator.initMasks()
 
@@ -25,71 +27,84 @@ func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
 // Initialize the attack masks
 func (g *BitsBoardMoveGenerator) initMasks() {
 	for squareIdx := int8(0); squareIdx < 64; squareIdx++ {
-		//squareFile := FileFromIdx(squareIdx)
-		squareRank, squareFile := RankAndFile(squareIdx)
-		for _, dir := range BishopDirections {
-			mask := uint64(0)
-			prevRank, prevFile := squareRank, squareFile
-			for targetIdx := squareIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
-				targetRank, targetFile := RankAndFile(targetIdx)
+		g.initBishopMaskForSquare(squareIdx)
+		g.initRookMaskForSquare(squareIdx)
+		g.initKnightMaskForSquare(squareIdx)
+		g.initKingMaskForSquare(squareIdx)
+	}
+}
 
-				// only possible with out-of-bounds/cross-boards move
-				if targetRank == squareRank ||
-					targetFile == squareFile ||
-					absInt8(prevRank-targetRank) != 1 ||
-					absInt8(prevFile-targetFile) != 1 {
-					break
-				}
+func (g *BitsBoardMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
+	squareRank, squareFile := RankAndFile(squareIdx)
+	for _, dir := range g.bishopDirections {
+		mask := uint64(0)
+		prevRank, prevFile := squareRank, squareFile
+		for targetIdx := squareIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
+			targetRank, targetFile := RankAndFile(targetIdx)
 
-				mask |= 1 << targetIdx
-
-				prevRank, prevFile = targetRank, targetFile
+			// only possible with out-of-bounds/cross-boards move
+			if targetRank == squareRank ||
+				targetFile == squareFile ||
+				absInt8(prevRank-targetRank) != 1 ||
+				absInt8(prevFile-targetFile) != 1 {
+				break
 			}
-			g.bishopMasks[squareIdx] |= mask
+
+			mask |= 1 << targetIdx
+
+			prevRank, prevFile = targetRank, targetFile
 		}
+		g.bishopMasks[squareIdx] |= mask
+	}
+}
 
-		for _, dir := range RookDirections {
-			mask := uint64(0)
-			for targetIdx := squareIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
-				targetRank := RankFromIdx(targetIdx)
-				targetFile := FileFromIdx(targetIdx)
-				if targetFile != squareFile && targetRank != squareRank {
-					break
-				}
-				mask |= 1 << targetIdx
-
-				if (targetFile == 0 && dir == LEFT) || (targetFile == 7 && dir == RIGHT) {
-					break
-				}
-
-				if (targetRank == 0 && dir == UP) || (targetRank == 7 && dir == DOWN) {
-					break
-				}
+func (g *BitsBoardMoveGenerator) initRookMaskForSquare(squareIdx int8) {
+	squareRank, squareFile := RankAndFile(squareIdx)
+	for _, dir := range g.rookDirections {
+		mask := uint64(0)
+		for targetIdx := squareIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
+			targetRank, targetFile := RankAndFile(targetIdx)
+			if targetFile != squareFile && targetRank != squareRank {
+				break
 			}
-			g.rookMasks[squareIdx] |= mask
-		}
+			mask |= 1 << targetIdx
 
-		for _, offset := range g.knightOffsets {
-			targetIdx := squareIdx + offset
-			if targetIdx >= 0 && targetIdx < 64 {
-				targetRank, targetFile := RankAndFile(targetIdx)
-				fileDiff := absInt8(squareFile - targetFile)
-				rankDiff := absInt8(squareRank - targetRank)
-				if fileDiff <= 2 && rankDiff <= 2 {
-					g.knightMasks[squareIdx] |= 1 << targetIdx
-				}
+			if (targetFile == 0 && dir == LEFT) ||
+				(targetFile == 7 && dir == RIGHT) ||
+				(targetRank == 0 && dir == UP) ||
+				(targetRank == 7 && dir == DOWN) {
+				break
 			}
 		}
+		g.rookMasks[squareIdx] |= mask
+	}
+}
 
-		for _, offset := range g.kingOffsets {
-			targetIdx := squareIdx + offset
-			if targetIdx >= 0 && targetIdx < 64 {
-				targetRank, targetFile := RankAndFile(targetIdx)
-				fileDiff := absInt8(squareFile - targetFile)
-				rankDiff := absInt8(squareRank - targetRank)
-				if fileDiff <= 1 && rankDiff <= 1 {
-					g.kingMasks[squareIdx] |= 1 << targetIdx
-				}
+func (g *BitsBoardMoveGenerator) initKnightMaskForSquare(squareIdx int8) {
+	squareRank, squareFile := RankAndFile(squareIdx)
+	for _, offset := range g.knightOffsets {
+		targetIdx := squareIdx + offset
+		if targetIdx >= 0 && targetIdx < 64 {
+			targetRank, targetFile := RankAndFile(targetIdx)
+			fileDiff := absInt8(squareFile - targetFile)
+			rankDiff := absInt8(squareRank - targetRank)
+			if fileDiff <= 2 && rankDiff <= 2 {
+				g.knightMasks[squareIdx] |= 1 << targetIdx
+			}
+		}
+	}
+}
+
+func (g *BitsBoardMoveGenerator) initKingMaskForSquare(squareIdx int8) {
+	squareRank, squareFile := RankAndFile(squareIdx)
+	for _, offset := range g.kingOffsets {
+		targetIdx := squareIdx + offset
+		if targetIdx >= 0 && targetIdx < 64 {
+			targetRank, targetFile := RankAndFile(targetIdx)
+			fileDiff := absInt8(squareFile - targetFile)
+			rankDiff := absInt8(squareRank - targetRank)
+			if fileDiff <= 1 && rankDiff <= 1 {
+				g.kingMasks[squareIdx] |= 1 << targetIdx
 			}
 		}
 	}
