@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -297,21 +296,13 @@ func BenchmarkPerftDivide(b *testing.B) {
 }
 
 func BenchmarkGenerateKingPseudoLegalMoves(b *testing.B) {
-	pos, _ := NewPositionFromFEN("rnbqkbnr/pppppppp/8/8/8/8/8/R3K2R w KQkq - 0 1")
+	pos, _ := NewPositionFromFEN("8/8/8/3P4/3K4/2p5/8/8 w KQkq - 0 1")
 
 	b.ResetTimer()
 
-	rescnt := 0
-	//piece := Piece(Knight | Rook)
-	for i := 0; i < 10000000; i++ {
-		//for i := 0; i < 1000000; i++ {
-		r, _ := KingPseudoLegalMoves(pos, E1)
-		//r, _ := generateKnightPseudoLegalMoves(pos, D4, piece)
-		if r != nil {
-			rescnt++
-		}
+	for i := 0; i < 100000000; i++ {
+		KingPseudoLegalMoves(pos, D4)
 	}
-	fmt.Println(rescnt)
 }
 
 func BenchmarkGenerateKnightPseudoLegalMoves(b *testing.B) {

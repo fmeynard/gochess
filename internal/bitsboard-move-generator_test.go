@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -82,8 +81,6 @@ func TestSliderPseudoLegalMoves(t *testing.T) {
 
 	generator := NewBitsBoardMoveGenerator()
 
-	fmt.Println(fmt.Sprintf("%d -> %b ", generator.rookMasks[A1], generator.rookMasks[A1]))
-	draw(generator.rookMasks[A1])
 	for tName, d := range data {
 		t.Run(tName, func(t *testing.T) {
 			pos, err := NewPositionFromFEN(d.fenString)
@@ -132,11 +129,6 @@ func TestKnightPseudoLegalMoves(t *testing.T) {
 
 	generator := NewBitsBoardMoveGenerator()
 
-	draw(generator.knightMasks[E4])
-
-	fmt.Println("--")
-	draw(generator.knightMasks[E4] & (1 << D2))
-
 	for tName, d := range data {
 		t.Run(tName, func(t *testing.T) {
 			pos, err := NewPositionFromFEN(d.fenString)
@@ -145,6 +137,77 @@ func TestKnightPseudoLegalMoves(t *testing.T) {
 			}
 
 			moves := generator.KnightPseudoLegalMoves(pos, d.piecePos)
+			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
+		})
+	}
+}
+
+func TestKingPseudoLegalMoves(t *testing.T) {
+	data := map[string]struct {
+		fenString string
+		piecePos  int8
+		moves     []int8
+	}{
+		"Start pos no moves white": {
+			fenString: FenStartPos,
+			piecePos:  E1,
+		},
+		"All directions white - no capture": {
+			fenString: "8/8/8/8/8/8/2k5/8 w - - 0 1",
+			piecePos:  C2,
+			moves:     []int8{B1, C1, D1, B2, D2, B3, C3, D3},
+		},
+		"All directions capture": {
+			fenString: "8/1QRB4/1PkP4/1BRQ4/8/8/8/8 b - - 0 1",
+			piecePos:  C6,
+			moves:     []int8{B7, C7, D7, B6, D6, B5, C5, D5},
+		},
+		"All directions no capture same color": {
+			fenString: "8/1QRB4/1PKP4/1BRQ4/8/8/8/8 w - - 0 1",
+			piecePos:  C6,
+		},
+		"QueenSide castle white": {
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR w KQkq - 0 1",
+			piecePos:  E1,
+			moves:     []int8{C1, D1},
+		},
+		"QueenSide castle white - Only kingSide allowed": {
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR w Kkq - 0 1",
+			piecePos:  E1,
+			moves:     []int8{D1},
+		},
+		"QueenSide castle white - no rights": {
+			fenString: "rnbqkbnr/pppppppp/8/8/8/B1NP4/PPPQPPPP/R3KBNR w kq - 0 1",
+			piecePos:  E1,
+			moves:     []int8{D1},
+		},
+		"KingSide castle black": {
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+			piecePos:  E8,
+			moves:     []int8{F8, G8},
+		},
+		"KingSide castle black - Only queen allowed": {
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR b KQq - 0 1",
+			piecePos:  E8,
+			moves:     []int8{F8},
+		},
+		"KingSide castle black - ro rights": {
+			fenString: "rnbqk2r/ppppnppp/3bp3/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1",
+			piecePos:  E8,
+			moves:     []int8{F8},
+		},
+	}
+
+	generator := NewBitsBoardMoveGenerator()
+
+	for tName, d := range data {
+		t.Run(tName, func(t *testing.T) {
+			pos, err := NewPositionFromFEN(d.fenString)
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+
+			moves := generator.KingPseudoLegalMoves(pos, d.piecePos)
 			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
 		})
 	}
@@ -161,6 +224,17 @@ func BenchmarkSliderPseudoLegalMoves(b *testing.B) {
 
 	for i := 0; i < 100000000; i++ {
 		generator.SliderPseudoLegalMoves(pos, D4)
+	}
+}
+
+func BenchmarkKingPseudoLegalMoves(b *testing.B) {
+	pos, _ := NewPositionFromFEN("8/8/8/3P4/3K4/2p5/8/8 w KQkq - 0 1")
+	generator := NewBitsBoardMoveGenerator()
+
+	b.ResetTimer()
+
+	for i := 0; i < 100000000; i++ {
+		generator.KingPseudoLegalMoves(pos, D4)
 	}
 }
 

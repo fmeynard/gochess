@@ -4,15 +4,18 @@ type BitsBoardMoveGenerator struct {
 	bishopMasks [64]uint64
 	rookMasks   [64]uint64
 	knightMasks [64]uint64
+	kingMasks   [64]uint64
 
 	rookDirections   []int8
 	bishopDirections []int8
 	knightOffsets    []int8
+	kingOffsets      []int8
 }
 
 func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
 	bitsBoardMoveGenerator := &BitsBoardMoveGenerator{
 		knightOffsets: []int8{-17, -15, -10, -6, 6, 10, 15, 17},
+		kingOffsets:   []int8{-9, -8, -7, -1, 1, 7, 8, 9},
 	}
 	bitsBoardMoveGenerator.initMasks()
 
@@ -77,7 +80,99 @@ func (g *BitsBoardMoveGenerator) initMasks() {
 				}
 			}
 		}
+
+		for _, offset := range g.kingOffsets {
+			targetIdx := squareIdx + offset
+			if targetIdx >= 0 && targetIdx < 64 {
+				targetRank, targetFile := RankAndFile(targetIdx)
+				fileDiff := absInt8(squareFile - targetFile)
+				rankDiff := absInt8(squareRank - targetRank)
+				if fileDiff <= 1 && rankDiff <= 1 {
+					g.kingMasks[squareIdx] |= 1 << targetIdx
+				}
+			}
+		}
 	}
+}
+
+func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos Position, idx int8) []int8 {
+	var moves = make([]int8, 0, 8)
+
+	pieceColor := pos.board[idx].Color()
+	for _, currentOffset := range g.kingOffsets {
+		targetIdx := idx + currentOffset
+		if targetIdx < 0 || targetIdx > 63 || g.kingMasks[idx]&(1<<targetIdx) == 0 {
+			continue
+		}
+
+		target := pos.board[targetIdx]
+		if target == NoPiece || target.Color() != pieceColor {
+			moves = append(moves, targetIdx)
+		}
+	}
+
+	var (
+		castleRights int8
+		kingStartIdx int8
+	)
+	if pos.activeColor == White {
+		castleRights = pos.whiteCastleRights
+		kingStartIdx = E1
+	} else {
+		castleRights = pos.blackCastleRights
+		kingStartIdx = E8
+	}
+
+	// early exit no castle
+	if idx != kingStartIdx || castleRights == NoCastle {
+		return moves
+	}
+
+	// queen side
+	var (
+		queenPathIsClear bool
+		queenRookIdx     int8
+		queenCastleIdx   int8
+	)
+	if (castleRights & QueenSideCastle) != 0 {
+		if pos.activeColor == White {
+			queenRookIdx = A1
+			queenCastleIdx = C1
+			queenPathIsClear = (pos.PieceAt(B1) == NoPiece) && (pos.PieceAt(C1) == NoPiece) && (pos.PieceAt(D1) == NoPiece)
+		} else {
+			queenRookIdx = A8
+			queenCastleIdx = C8
+			queenPathIsClear = (pos.PieceAt(B8) == NoPiece) && (pos.PieceAt(C8) == NoPiece) && (pos.PieceAt(D8) == NoPiece)
+		}
+
+		if queenPathIsClear && pos.PieceAt(queenRookIdx).Type() == Rook {
+			moves = append(moves, queenCastleIdx)
+		}
+	}
+
+	// king side
+	var (
+		kingPathIsClear bool
+		kingRookIdx     int8
+		kingCastleIdx   int8
+	)
+	if (castleRights & KingSideCastle) != 0 {
+		if pos.activeColor == White {
+			kingRookIdx = H1
+			kingCastleIdx = G1
+			kingPathIsClear = (pos.PieceAt(G1) == NoPiece) && (pos.PieceAt(F1) == NoPiece)
+		} else {
+			kingRookIdx = H8
+			kingCastleIdx = G8
+			kingPathIsClear = (pos.PieceAt(G8) == NoPiece) && (pos.PieceAt(F8) == NoPiece)
+		}
+
+		if kingPathIsClear && pos.PieceAt(kingRookIdx).Type() == Rook {
+			moves = append(moves, kingCastleIdx)
+		}
+	}
+
+	return moves
 }
 
 func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos Position, idx int8) []int8 {
