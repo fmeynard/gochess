@@ -80,35 +80,21 @@ func (g *BitsBoardMoveGenerator) initPawnMasksForSquare(squareIdx int8) {
 
 func (g *BitsBoardMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
-	for _, dir := range g.bishopDirections {
-		var d int
-		switch dir {
-		case UpLeft:
-			d = 0
-		case UpRight:
-			d = 1
-		case DownLeft:
-			d = 2
-		case DownRight:
-			d = 3
-		}
-
-		prevRank, prevFile := squareRank, squareFile
-		for targetIdx := squareIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
-			targetRank, targetFile := RankAndFile(targetIdx)
-
-			// only possible with out-of-bounds/cross-boards move
-			if targetRank == squareRank ||
-				targetFile == squareFile ||
-				absInt8(prevRank-targetRank) != 1 ||
-				absInt8(prevFile-targetFile) != 1 {
-				break
-			}
-
-			g.bishopMasks[squareIdx][d] = append(g.bishopMasks[squareIdx][d], targetIdx)
-
-			prevRank, prevFile = targetRank, targetFile
-		}
+	// UpLeft direction
+	for r, f := squareRank+1, squareFile-1; r < 8 && f >= 0; r, f = r+1, f-1 {
+		g.bishopMasks[squareIdx][0] = append(g.bishopMasks[squareIdx][0], r*8+f)
+	}
+	// UpRight direction
+	for r, f := squareRank+1, squareFile+1; r < 8 && f < 8; r, f = r+1, f+1 {
+		g.bishopMasks[squareIdx][1] = append(g.bishopMasks[squareIdx][1], r*8+f)
+	}
+	// DownLeft direction
+	for r, f := squareRank-1, squareFile-1; r >= 0 && f >= 0; r, f = r-1, f-1 {
+		g.bishopMasks[squareIdx][2] = append(g.bishopMasks[squareIdx][2], r*8+f)
+	}
+	// DownRight direction
+	for r, f := squareRank-1, squareFile+1; r >= 0 && f < 8; r, f = r-1, f+1 {
+		g.bishopMasks[squareIdx][3] = append(g.bishopMasks[squareIdx][3], r*8+f)
 	}
 }
 
