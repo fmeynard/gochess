@@ -1,8 +1,8 @@
 package internal
 
 type BitsBoardMoveGenerator struct {
-	bishopMasks            [64]uint64
-	rookMasks              [64]uint64
+	bishopMasks            [64][4][]int8
+	rookMasks              [64][4][]int8
 	knightMasks            [64]uint64
 	kingMasks              [64]uint64
 	whitePawnMovesMasks    [64]uint64
@@ -81,7 +81,18 @@ func (g *BitsBoardMoveGenerator) initPawnMasksForSquare(squareIdx int8) {
 func (g *BitsBoardMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
 	for _, dir := range g.bishopDirections {
-		mask := uint64(0)
+		var d int
+		switch dir {
+		case UpLeft:
+			d = 0
+		case UpRight:
+			d = 1
+		case DownLeft:
+			d = 2
+		case DownRight:
+			d = 3
+		}
+
 		prevRank, prevFile := squareRank, squareFile
 		for targetIdx := squareIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
 			targetRank, targetFile := RankAndFile(targetIdx)
@@ -94,33 +105,30 @@ func (g *BitsBoardMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
 				break
 			}
 
-			mask |= 1 << targetIdx
+			g.bishopMasks[squareIdx][d] = append(g.bishopMasks[squareIdx][d], targetIdx)
 
 			prevRank, prevFile = targetRank, targetFile
 		}
-		g.bishopMasks[squareIdx] |= mask
 	}
 }
 
 func (g *BitsBoardMoveGenerator) initRookMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
-	for _, dir := range g.rookDirections {
-		mask := uint64(0)
-		for targetIdx := squareIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
-			targetRank, targetFile := RankAndFile(targetIdx)
-			if targetFile != squareFile && targetRank != squareRank {
-				break
-			}
-			mask |= 1 << targetIdx
-
-			if (targetFile == 0 && dir == LEFT) ||
-				(targetFile == 7 && dir == RIGHT) ||
-				(targetRank == 0 && dir == UP) ||
-				(targetRank == 7 && dir == DOWN) {
-				break
-			}
-		}
-		g.rookMasks[squareIdx] |= mask
+	// Up direction
+	for r := squareRank + 1; r < 8; r++ {
+		g.rookMasks[squareIdx][0] = append(g.rookMasks[squareIdx][0], r*8+squareFile)
+	}
+	// Down direction
+	for r := squareRank - 1; r >= 0; r-- {
+		g.rookMasks[squareIdx][1] = append(g.rookMasks[squareIdx][1], r*8+squareFile)
+	}
+	// Left direction
+	for f := squareFile - 1; f >= 0; f-- {
+		g.rookMasks[squareIdx][2] = append(g.rookMasks[squareIdx][2], squareRank*8+f)
+	}
+	// Right direction
+	for f := squareFile + 1; f < 8; f++ {
+		g.rookMasks[squareIdx][3] = append(g.rookMasks[squareIdx][3], squareRank*8+f)
 	}
 }
 
@@ -155,12 +163,11 @@ func (g *BitsBoardMoveGenerator) initKingMaskForSquare(squareIdx int8) {
 }
 
 // PawnPseudoLegalMoves Generate pawn moves using bitboards
-func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos Position, idx int8) ([]int8, int8) {
+func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(idx int8, activeColor int8, enPassantIdx int8, occupiedMask uint64, opponentOccupiedMask uint64) ([]int8, int8) {
 	moves := make([]int8, 0, 4)
 	promotionIdx := int8(-1)
 
-	pieceColor := pos.board[idx].Color()
-	isWhite := pieceColor == White
+	isWhite := activeColor == White
 
 	var moveMask, captureMask uint64
 	if isWhite {
@@ -177,17 +184,17 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos Position, idx int8) ([
 		targetIdx := leastSignificantOne(moveMask)
 		moveMask &= moveMask - 1
 
-		if pos.board[targetIdx] == NoPiece {
+		if occupiedMask&(1<<targetIdx) == 0 {
 			targetRank := RankFromIdx(targetIdx)
-			if (isWhite && targetIdx/8 == 7) || (!isWhite && targetIdx/8 == 0) {
+			if (isWhite && targetRank == 7) || (!isWhite && targetRank == 0) {
 				// Handle promotion
 				promotionIdx = targetIdx
 			} else {
-				if targetRank == 3 && pieceColor == White && targetIdx-idx == 16 && pos.board[idx+8] != NoPiece {
+				if targetRank == 3 && activeColor == White && targetIdx-idx == 16 && occupiedMask&(1<<(idx+8)) != 0 {
 					continue
 				}
 
-				if targetRank == 4 && pieceColor == Black && idx-targetIdx == 16 && pos.board[idx-8] != NoPiece {
+				if targetRank == 4 && activeColor == Black && idx-targetIdx == 16 && occupiedMask&(1<<(idx-8)) != 0 {
 					continue
 				}
 				moves = append(moves, targetIdx)
@@ -197,8 +204,8 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos Position, idx int8) ([
 
 	// Handle en passant
 	// check first as next part is modifying the captureMask
-	if pos.enPassantIdx != NoEnPassant {
-		enPassantTarget := pos.enPassantIdx
+	if enPassantIdx != NoEnPassant {
+		enPassantTarget := enPassantIdx
 		if captureMask&(1<<enPassantTarget) != 0 {
 			moves = append(moves, enPassantTarget)
 		}
@@ -208,9 +215,8 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos Position, idx int8) ([
 	for captureMask != 0 {
 		targetIdx := leastSignificantOne(captureMask)
 		captureMask &= captureMask - 1
-		target := pos.board[targetIdx]
 
-		if target != NoPiece && pieceColor != target.Color() {
+		if opponentOccupiedMask&(1<<targetIdx) != 0 {
 			targetRank := RankFromIdx(targetIdx)
 			if (isWhite && targetRank == 7) || (!isWhite && targetRank == 0) {
 				// Handle promotion with capture
@@ -224,31 +230,30 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos Position, idx int8) ([
 	return moves, promotionIdx
 }
 
-func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos Position, idx int8) []int8 {
+func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(
+	idx int8, activeColor int8,
+	castleRights int8,
+	occupiedMask uint64,
+	opponentOccupiedMask uint64,
+) []int8 {
 	var moves = make([]int8, 0, 8)
 
-	pieceColor := pos.board[idx].Color()
-	for _, currentOffset := range g.kingOffsets {
-		targetIdx := idx + currentOffset
-		if targetIdx < 0 || targetIdx > 63 || g.kingMasks[idx]&(1<<targetIdx) == 0 {
-			continue
-		}
+	moveMask := g.kingMasks[idx]
+	for moveMask != 0 {
+		targetIdx := leastSignificantOne(moveMask)
+		moveMask &= moveMask - 1
 
-		target := pos.board[targetIdx]
-		if target == NoPiece || target.Color() != pieceColor {
+		if occupiedMask&(1<<targetIdx) == 0 || opponentOccupiedMask&(1<<targetIdx) != 0 {
 			moves = append(moves, targetIdx)
 		}
 	}
 
 	var (
-		castleRights int8
 		kingStartIdx int8
 	)
-	if pos.activeColor == White {
-		castleRights = pos.whiteCastleRights
+	if activeColor == White {
 		kingStartIdx = E1
 	} else {
-		castleRights = pos.blackCastleRights
 		kingStartIdx = E8
 	}
 
@@ -260,21 +265,18 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos Position, idx int8) []
 	// queen side
 	var (
 		queenPathIsClear bool
-		queenRookIdx     int8
 		queenCastleIdx   int8
 	)
 	if (castleRights & QueenSideCastle) != 0 {
-		if pos.activeColor == White {
-			queenRookIdx = A1
+		if activeColor == White {
 			queenCastleIdx = C1
-			queenPathIsClear = (pos.PieceAt(B1) == NoPiece) && (pos.PieceAt(C1) == NoPiece) && (pos.PieceAt(D1) == NoPiece)
+			queenPathIsClear = (occupiedMask&(1<<B1) == 0) && (occupiedMask&(1<<C1) == 0) && (occupiedMask&(1<<D1) == 0)
 		} else {
-			queenRookIdx = A8
 			queenCastleIdx = C8
-			queenPathIsClear = (pos.PieceAt(B8) == NoPiece) && (pos.PieceAt(C8) == NoPiece) && (pos.PieceAt(D8) == NoPiece)
+			queenPathIsClear = (occupiedMask&(1<<B8) == 0) && (occupiedMask&(1<<C8) == 0) && (occupiedMask&(1<<D8) == 0)
 		}
 
-		if queenPathIsClear && pos.PieceAt(queenRookIdx).Type() == Rook {
+		if queenPathIsClear {
 			moves = append(moves, queenCastleIdx)
 		}
 	}
@@ -282,21 +284,18 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos Position, idx int8) []
 	// king side
 	var (
 		kingPathIsClear bool
-		kingRookIdx     int8
 		kingCastleIdx   int8
 	)
 	if (castleRights & KingSideCastle) != 0 {
-		if pos.activeColor == White {
-			kingRookIdx = H1
+		if activeColor == White {
 			kingCastleIdx = G1
-			kingPathIsClear = (pos.PieceAt(G1) == NoPiece) && (pos.PieceAt(F1) == NoPiece)
+			kingPathIsClear = (occupiedMask&(1<<G1) == 0) && (occupiedMask&(1<<F1) == 0)
 		} else {
-			kingRookIdx = H8
 			kingCastleIdx = G8
-			kingPathIsClear = (pos.PieceAt(G8) == NoPiece) && (pos.PieceAt(F8) == NoPiece)
+			kingPathIsClear = (occupiedMask&(1<<G8) == 0) && (occupiedMask&(1<<F8) == 0)
 		}
 
-		if kingPathIsClear && pos.PieceAt(kingRookIdx).Type() == Rook {
+		if kingPathIsClear {
 			moves = append(moves, kingCastleIdx)
 		}
 	}
@@ -304,18 +303,19 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos Position, idx int8) []
 	return moves
 }
 
-func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos Position, idx int8) []int8 {
+func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(
+	idx int8,
+	occupiedMask uint64,
+	opponentOccupiedMask uint64,
+) []int8 {
 	var moves = make([]int8, 0, 8)
-
-	pieceColor := pos.board[idx].Color()
 	knightMask := g.knightMasks[idx]
 
 	for knightMask != 0 {
 		targetIdx := leastSignificantOne(knightMask)
 		knightMask &= knightMask - 1
 
-		targetPiece := pos.board[targetIdx]
-		if targetPiece == NoPiece || targetPiece.Color() != pieceColor {
+		if occupiedMask&(1<<targetIdx) == 0 || opponentOccupiedMask&(1<<targetIdx) != 0 {
 			moves = append(moves, targetIdx)
 		}
 	}
@@ -323,83 +323,62 @@ func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos Position, idx int8) 
 	return moves
 }
 
-func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos Position, idx int8) []int8 {
+func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(
+	idx int8,
+	pieceType int8,
+	occupiedMask uint64,
+	opponentOccupiedMask uint64,
+) []int8 {
 	var (
-		moves                   = make([]int8, 0, 28)
 		processBishopDirections = false
 		processRookDirections   = false
 	)
 
-	piece := pos.board[idx]
-
-	switch piece.Type() {
+	maxMovesCnt := 28
+	switch pieceType {
 	case Bishop:
 		processBishopDirections = true
+		maxMovesCnt = 14
 	case Rook:
 		processRookDirections = true
+		maxMovesCnt = 14
 	case Queen:
 		processBishopDirections = true
 		processRookDirections = true
 	}
 
-	pieceRank, pieceFile := RankAndFile(idx)
-	pieceColor := piece.Color()
+	moves := make([]int8, 0, maxMovesCnt)
 
-	if processBishopDirections {
-		for _, dir := range BishopDirections {
-			prevRank, prevFile := pieceRank, pieceFile
-			for targetIdx := idx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
-				moveToTargetMask := g.bishopMasks[idx] & (1 << targetIdx)
-				if moveToTargetMask == 0 {
-					break
+	for dir := 0; dir < 4; dir++ {
+		if processRookDirections {
+			for _, targetIdx := range g.rookMasks[idx][dir] {
+				targetMask := uint64(1 << targetIdx)
+				if occupiedMask&targetMask == 0 {
+					moves = append(moves, targetIdx)
+					continue
 				}
 
-				targetRank, targetFile := RankAndFile(targetIdx)
-				if targetRank == pieceRank ||
-					targetFile == pieceFile ||
-					absInt8(prevRank-targetRank) != 1 ||
-					absInt8(prevFile-targetFile) != 1 {
-					break
+				if opponentOccupiedMask&targetMask != 0 {
+					moves = append(moves, targetIdx)
 				}
 
-				if (moveToTargetMask & pos.occupied) != 0 {
-					if pos.board[targetIdx].Color() != pieceColor {
-						moves = append(moves, targetIdx)
-					}
-					break
-				}
-				moves = append(moves, targetIdx)
-
-				prevRank, prevFile = targetRank, targetFile
+				break
 			}
 		}
-	}
 
-	if processRookDirections {
-		for _, dir := range RookDirections {
-			for targetIdx := idx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
-				moveToTargetMask := g.rookMasks[idx] & (1 << targetIdx)
-				if moveToTargetMask == 0 {
-					break
+		if processBishopDirections {
+			for _, targetIdx := range g.bishopMasks[idx][dir] {
+				targetMask := uint64(1 << targetIdx)
+				if occupiedMask&targetMask == 0 {
+					moves = append(moves, targetIdx)
+					continue
 				}
 
-				if (moveToTargetMask & pos.occupied) != 0 {
-					if pos.board[targetIdx].Color() != pieceColor {
-						moves = append(moves, targetIdx)
-					}
-					break
-				}
-				moves = append(moves, targetIdx)
-
-				targetFile := FileFromIdx(targetIdx)
-				if (targetFile == 0 && dir == LEFT) || (targetFile == 7 && dir == RIGHT) {
-					break
+				if opponentOccupiedMask&targetMask != 0 {
+					moves = append(moves, targetIdx)
 				}
 
-				targetRank := RankFromIdx(targetIdx)
-				if (targetRank == 0 && dir == UP) || (targetRank == 7 && dir == DOWN) {
-					break
-				}
+				break
 			}
 		}
 	}

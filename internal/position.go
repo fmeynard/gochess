@@ -26,6 +26,8 @@ type Position struct {
 	whiteAttacks      uint64
 	blackAttacks      uint64
 	occupied          uint64
+	blackOccupied     uint64
+	whiteOccupied     uint64
 }
 
 func NewPosition() Position {
@@ -145,9 +147,16 @@ func NewPositionFromFEN(fen string) (Position, error) {
 	//updateAttackVectors(&pos)
 
 	pos.occupied = uint64(0)
+	pos.whiteOccupied = uint64(0)
+	pos.blackOccupied = uint64(0)
 	for i := 0; i < 64; i++ {
 		if pos.board[i] != NoPiece {
 			pos.occupied |= 1 << i
+			if pos.board[i].IsWhite() {
+				pos.whiteOccupied |= 1 << i
+			} else {
+				pos.blackOccupied |= 1 << i
+			}
 		}
 	}
 
@@ -307,4 +316,24 @@ func (p Position) PositionAfterMove(move Move) Position {
 	updateAttackVectors(&newPos)
 
 	return newPos
+}
+
+func (p Position) IsOccupied(idx int8) bool {
+	return (p.occupied & (1 << idx)) != 0
+}
+
+func (p Position) OpponentOccupiedMask() uint64 {
+	if p.activeColor == White {
+		return p.blackOccupied
+	}
+
+	return p.whiteOccupied
+}
+
+func (p Position) CastleRights() int8 {
+	if p.activeColor == White {
+		return p.whiteCastleRights
+	}
+
+	return p.blackCastleRights
 }

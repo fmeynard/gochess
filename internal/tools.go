@@ -59,8 +59,5 @@ func IsSameDiagonal(pieceRank, pieceFile, targetRank, targetFile int8) bool {
 }
 
 func leastSignificantOne(bb uint64) int8 {
-	if bb == 0 {
-		return -1
-	}
 	return int8(bits.TrailingZeros64(bb))
 }

@@ -34,7 +34,7 @@ func TestSliderPseudoLegalMoves(t *testing.T) {
 			fenString: "8/8/2ppppp1/2pPPPp1/2pPQPp1/2pPPPp1/2ppppp1/8 w - - 0 1",
 		},
 		"Queen Captures all directions": {
-			fenString: "8/8/2PPPPP1/2PPPPP1/2PPqPP1/2PPPPP1/2PPPPP1/8 w - - 0 1",
+			fenString: "8/8/2PPPPP1/2PPPPP1/2PPqPP1/2PPPPP1/2PPPPP1/8 b - - 0 1",
 			piecePos:  E4,
 			moves:     []int8{D3, D4, D5, E3, E5, F3, F4, F5},
 		},
@@ -49,7 +49,7 @@ func TestSliderPseudoLegalMoves(t *testing.T) {
 			moves:     []int8{B7, C6, D5, E4, F3, G2, H1},
 		},
 		"Bishop Blocked all directions": {
-			fenString: "8/8/8/2pPp3/2PbP3/2pPp3/8/8 w - - 0 1",
+			fenString: "8/8/8/2pPp3/2PbP3/2pPp3/8/8 b - - 0 1",
 			piecePos:  D4,
 		},
 		"Bishop Captures all directions": {
@@ -88,7 +88,7 @@ func TestSliderPseudoLegalMoves(t *testing.T) {
 				t.Fatal(err.Error())
 			}
 
-			moves := generator.SliderPseudoLegalMoves(pos, d.piecePos)
+			moves := generator.SliderPseudoLegalMoves(d.piecePos, pos.board[d.piecePos].Type(), pos.occupied, pos.OpponentOccupiedMask())
 			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
 		})
 	}
@@ -136,7 +136,7 @@ func TestKnightPseudoLegalMoves(t *testing.T) {
 				t.Fatal(err.Error())
 			}
 
-			moves := generator.KnightPseudoLegalMoves(pos, d.piecePos)
+			moves := generator.KnightPseudoLegalMoves(d.piecePos, pos.occupied, pos.OpponentOccupiedMask())
 			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
 		})
 	}
@@ -207,7 +207,13 @@ func TestKingPseudoLegalMoves(t *testing.T) {
 				t.Fatal(err.Error())
 			}
 
-			moves := generator.KingPseudoLegalMoves(pos, d.piecePos)
+			moves := generator.KingPseudoLegalMoves(
+				d.piecePos,
+				pos.activeColor,
+				pos.CastleRights(),
+				pos.occupied,
+				pos.OpponentOccupiedMask(),
+			)
 			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
 		})
 	}
@@ -225,7 +231,7 @@ func TestPawnPseudoLegalMoves(t *testing.T) {
 			moves:     []int8{A3, A4},
 		},
 		"start pos black": {
-			fenString: "8/p7/8/8/8/8/8/8 w - - 0 1",
+			fenString: "8/p7/8/8/8/8/8/8 b - - 0 1",
 			piecePos:  A7,
 			moves:     []int8{A6, A5},
 		},
@@ -245,7 +251,7 @@ func TestPawnPseudoLegalMoves(t *testing.T) {
 			moves:     []int8{A3, C3},
 		},
 		"both capture black": {
-			fenString: "8/8/8/8/3PPP2/3PpP2/PPPPPPPP/8 w - - 0 1",
+			fenString: "8/8/8/8/3PPP2/3PpP2/PPPPPPPP/8 b - - 0 1",
 			piecePos:  E3,
 			moves:     []int8{D2, F2},
 		},
@@ -293,23 +299,32 @@ func TestPawnPseudoLegalMoves(t *testing.T) {
 				t.Fatal(err.Error())
 			}
 
-			moves, _ := generator.PawnPseudoLegalMoves(pos, d.piecePos)
+			moves, _ := generator.PawnPseudoLegalMoves(d.piecePos, pos.activeColor, pos.enPassantIdx, pos.occupied, pos.OpponentOccupiedMask())
 			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
 		})
 	}
 }
 
-func BenchmarkSliderPseudoLegalMoves(b *testing.B) {
-	// queen
-	//pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
-	// rook
+func BenchmarkRookPseudoLegalMoves(b *testing.B) {
 	pos, _ := NewPositionFromFEN("3p4/8/8/8/3R3P/3p4/8/8 w - - 0 1")
 	generator := NewBitsBoardMoveGenerator()
 
 	b.ResetTimer()
 
 	for i := 0; i < 100000000; i++ {
-		generator.SliderPseudoLegalMoves(pos, D4)
+		generator.SliderPseudoLegalMoves(D4, Rook, pos.occupied, pos.OpponentOccupiedMask())
+	}
+}
+
+func BenchmarkQueenPseudoLegalMoves(b *testing.B) {
+	// queen
+	pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
+	generator := NewBitsBoardMoveGenerator()
+
+	b.ResetTimer()
+
+	for i := 0; i < 100000000; i++ {
+		generator.SliderPseudoLegalMoves(D4, Queen, pos.occupied, pos.OpponentOccupiedMask())
 	}
 }
 
@@ -320,7 +335,13 @@ func BenchmarkKingPseudoLegalMoves(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < 100000000; i++ {
-		generator.KingPseudoLegalMoves(pos, D4)
+		generator.KingPseudoLegalMoves(
+			D4,
+			pos.activeColor,
+			pos.CastleRights(),
+			pos.occupied,
+			pos.OpponentOccupiedMask(),
+		)
 	}
 }
 
@@ -331,7 +352,7 @@ func BenchmarkKnightPseudoLegalMoves(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < 100000000; i++ {
-		generator.KnightPseudoLegalMoves(pos, E4)
+		generator.KnightPseudoLegalMoves(E4, pos.occupied, pos.OpponentOccupiedMask())
 	}
 }
 
@@ -342,6 +363,6 @@ func BenchmarkPawnPseudoLegalMoves(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < 100000000; i++ {
-		generator.PawnPseudoLegalMoves(pos, C5)
+		generator.PawnPseudoLegalMoves(C5, pos.activeColor, pos.enPassantIdx, pos.occupied, pos.OpponentOccupiedMask())
 	}
 }
