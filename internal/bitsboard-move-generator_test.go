@@ -299,7 +299,7 @@ func TestPawnPseudoLegalMoves(t *testing.T) {
 				t.Fatal(err.Error())
 			}
 
-			moves, _ := generator.PawnPseudoLegalMoves(d.piecePos, pos.activeColor, pos.enPassantIdx, pos.occupied, pos.OpponentOccupiedMask())
+			moves, _ := generator.PawnPseudoLegalMoves(&pos, d.piecePos)
 			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
 		})
 	}
@@ -363,6 +363,6 @@ func BenchmarkPawnPseudoLegalMoves(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < 100000000; i++ {
-		generator.PawnPseudoLegalMoves(C5, pos.activeColor, pos.enPassantIdx, pos.occupied, pos.OpponentOccupiedMask())
+		generator.PawnPseudoLegalMoves(&pos, C5)
 	}
 }

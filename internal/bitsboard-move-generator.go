@@ -149,11 +149,11 @@ func (g *BitsBoardMoveGenerator) initKingMaskForSquare(squareIdx int8) {
 }
 
 // PawnPseudoLegalMoves Generate pawn moves using bitboards
-func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(idx int8, activeColor int8, enPassantIdx int8, occupiedMask uint64, opponentOccupiedMask uint64) ([]int8, int8) {
+func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) ([]int8, int8) {
 	moves := make([]int8, 0, 4)
 	promotionIdx := int8(-1)
 
-	isWhite := activeColor == White
+	isWhite := pos.activeColor == White
 
 	var moveMask, captureMask uint64
 	if isWhite {
@@ -170,17 +170,16 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(idx int8, activeColor int8
 		targetIdx := leastSignificantOne(moveMask)
 		moveMask &= moveMask - 1
 
-		if occupiedMask&(1<<targetIdx) == 0 {
-			targetRank := RankFromIdx(targetIdx)
-			if (isWhite && targetRank == 7) || (!isWhite && targetRank == 0) {
+		if pos.occupied&(1<<targetIdx) == 0 {
+			if (isWhite && targetIdx >= A8) || (!isWhite && targetIdx <= H1) {
 				// Handle promotion
 				promotionIdx = targetIdx
 			} else {
-				if targetRank == 3 && activeColor == White && targetIdx-idx == 16 && occupiedMask&(1<<(idx+8)) != 0 {
+				if isWhite && targetIdx >= A4 && targetIdx <= H4 && targetIdx-idx == 16 && pos.occupied&(1<<(idx+8)) != 0 {
 					continue
 				}
 
-				if targetRank == 4 && activeColor == Black && idx-targetIdx == 16 && occupiedMask&(1<<(idx-8)) != 0 {
+				if !isWhite && targetIdx >= A5 && targetIdx <= H5 && idx-targetIdx == 16 && pos.occupied&(1<<(idx-8)) != 0 {
 					continue
 				}
 				moves = append(moves, targetIdx)
@@ -190,21 +189,20 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(idx int8, activeColor int8
 
 	// Handle en passant
 	// check first as next part is modifying the captureMask
-	if enPassantIdx != NoEnPassant {
-		enPassantTarget := enPassantIdx
-		if captureMask&(1<<enPassantTarget) != 0 {
-			moves = append(moves, enPassantTarget)
+	if pos.enPassantIdx != NoEnPassant {
+		if captureMask&(1<<pos.enPassantIdx) != 0 {
+			moves = append(moves, pos.enPassantIdx)
 		}
 	}
 
 	// Generate captures
+	oMask := pos.OpponentOccupiedMask()
 	for captureMask != 0 {
 		targetIdx := leastSignificantOne(captureMask)
 		captureMask &= captureMask - 1
 
-		if opponentOccupiedMask&(1<<targetIdx) != 0 {
-			targetRank := RankFromIdx(targetIdx)
-			if (isWhite && targetRank == 7) || (!isWhite && targetRank == 0) {
+		if oMask&(1<<targetIdx) != 0 {
+			if (isWhite && targetIdx >= A8) || (!isWhite && targetIdx <= H1) {
 				// Handle promotion with capture
 				promotionIdx = targetIdx
 			} else {

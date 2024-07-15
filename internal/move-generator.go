@@ -313,7 +313,7 @@ func PawnPseudoLegalMoves(p Position, pieceIdx int8) ([]int8, []int8) {
 // if a captureMove is found it means that the current king is visible from these squares,
 // so additional checks are required to verify if a capture is really possible
 func (p Position) IsCheck() bool {
-	return isKingInCheckByVector(p, p.activeColor)
+	return IsKingInCheck(p, p.activeColor)
 }
 
 func LegalMoves(pos Position) []Move {
