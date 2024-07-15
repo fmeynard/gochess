@@ -216,10 +216,25 @@ func (p Position) CanCastle(clr int8, castleRight int8) bool {
 	return true
 }
 
+// updatePieceOnBoard
+// update board and position masks
+// Important: capture moves need to update opponent occupancy maks
 func updatePieceOnBoard(p *Position, piece Piece, oldIdx int8, newIdx int8) {
 	p.board[oldIdx] = NoPiece
 	p.board[newIdx] = piece
 
+	if piece.Color() == White {
+		p.whiteOccupied &= ^(uint64(1) << oldIdx)
+		p.whiteOccupied |= uint64(1) << newIdx
+		p.blackOccupied &= ^(uint64(1) << newIdx)
+	} else {
+		p.whiteOccupied &= ^(uint64(1) << newIdx)
+		p.blackOccupied &= ^(uint64(1) << oldIdx)
+		p.blackOccupied |= uint64(1) << newIdx
+	}
+
+	p.occupied &= ^(uint64(1) << oldIdx)
+	p.occupied |= uint64(1) << newIdx
 }
 
 func (p Position) PositionAfterMove(move Move) Position {
@@ -231,9 +246,7 @@ func (p Position) PositionAfterMove(move Move) Position {
 	startPieceType := startPiece.Type()
 
 	// update position
-	newPos.board[startPieceIdx] = NoPiece
-	newPos.board[endPieceIdx] = startPiece
-	//updatePieceOnBoard(&newPos, startPiece, startPieceIdx, endPieceIdx)
+	updatePieceOnBoard(&newPos, startPiece, startPieceIdx, endPieceIdx)
 
 	// King move -> update king pos and castleRights
 	if startPieceType == King {
@@ -243,25 +256,20 @@ func (p Position) PositionAfterMove(move Move) Position {
 
 			if startPieceIdx == E1 {
 				if endPieceIdx == G1 {
-					newPos.board[H1] = NoPiece
-					newPos.board[F1] = Piece(White | Rook)
+					updatePieceOnBoard(&newPos, Piece(White|Rook), H1, F1)
 				} else if endPieceIdx == C1 {
-					newPos.board[A1] = NoPiece
-					newPos.board[D1] = Piece(White | Rook)
+					updatePieceOnBoard(&newPos, Piece(White|Rook), A1, D1)
 				}
 			}
-
 		} else {
 			newPos.blackKingIdx = endPieceIdx
 			newPos.blackCastleRights = NoCastle
 
 			if startPieceIdx == E8 {
 				if endPieceIdx == G8 {
-					newPos.board[H8] = NoPiece
-					newPos.board[F8] = Piece(Black | Rook)
+					updatePieceOnBoard(&newPos, Piece(Black|Rook), H8, F8)
 				} else if endPieceIdx == C8 {
-					newPos.board[A8] = NoPiece
-					newPos.board[D8] = Piece(Black | Rook)
+					updatePieceOnBoard(&newPos, Piece(Black|Rook), A8, D8)
 				}
 			}
 		}
@@ -271,12 +279,13 @@ func (p Position) PositionAfterMove(move Move) Position {
 	if startPieceType == Pawn {
 		if endPieceIdx == p.enPassantIdx {
 			var capturesPawnIdx int8
-			if startPiece.Color() == White {
+			if p.activeColor == White {
 				capturesPawnIdx = p.enPassantIdx - 8
 			} else {
 				capturesPawnIdx = p.enPassantIdx + 8
 			}
-			newPos.board[capturesPawnIdx] = NoPiece
+			updatePieceOnBoard(&newPos, Piece(Pawn|p.activeColor), startPieceIdx, capturesPawnIdx)
+			updatePieceOnBoard(&newPos, Piece(Pawn|p.activeColor), capturesPawnIdx, endPieceIdx)
 		}
 
 		diffIdx := endPieceIdx - startPieceIdx

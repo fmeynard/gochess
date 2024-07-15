@@ -193,6 +193,150 @@ func Test_PositionAfterMove(t *testing.T) {
 	}
 }
 
+func TestUpdatePieceOnBoard(t *testing.T) {
+	type MaskCheckArgs struct {
+		idx     int8
+		isEmpty bool
+	}
+	data := map[string]struct {
+		fenPos              string
+		move                Move
+		occupiedChecks      []MaskCheckArgs
+		whiteOccupiedChecks []MaskCheckArgs
+		blackOccupiedChecks []MaskCheckArgs
+	}{
+		"White queen-side castle": {
+			fenPos: "8/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+			move:   NewMove(Piece(King|White), E1, C1, Castle),
+			occupiedChecks: []MaskCheckArgs{
+				{C1, false},
+				{D1, false},
+				{E1, true},
+				{A1, true},
+			},
+		},
+		"White king-side castle": {
+			fenPos: "8/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+			move:   NewMove(Piece(King|White), E1, G1, Castle),
+			occupiedChecks: []MaskCheckArgs{
+				{G1, false},
+				{F1, false},
+				{E1, true},
+				{H1, true},
+			},
+		},
+		"Black queen-side castle": {
+			fenPos: "r3k2r/8/8/8/8/8/8/8 b KQkq - 0 1",
+			move:   NewMove(Piece(King|Black), E8, C8, Castle),
+			occupiedChecks: []MaskCheckArgs{
+				{C8, false},
+				{D8, false},
+				{E8, true},
+				{A8, true},
+			},
+		},
+		"Black king-side castle": {
+			fenPos: "r3k2r/8/8/8/8/8/8/8 b KQkq - 0 1",
+			move:   NewMove(Piece(King|Black), E8, G8, Castle),
+			occupiedChecks: []MaskCheckArgs{
+				{G8, false},
+				{F8, false},
+				{E8, true},
+				{H8, true},
+			},
+		},
+		"White capture": {
+			fenPos: "3r4/8/8/8/8/8/8/3R4 w - - 0 1",
+			move:   NewMove(Piece(Rook|White), D1, D8, NormalMove),
+			occupiedChecks: []MaskCheckArgs{
+				{D1, true},
+				{D8, false},
+			},
+			whiteOccupiedChecks: []MaskCheckArgs{
+				{D1, true},
+				{D8, false},
+			},
+			blackOccupiedChecks: []MaskCheckArgs{
+				{D1, true},
+				{D8, true},
+			},
+		},
+		"Black capture": {
+			fenPos: "3r4/8/8/8/8/8/8/3R4 b - - 0 1",
+			move:   NewMove(Piece(Rook|Black), D8, D1, NormalMove),
+			occupiedChecks: []MaskCheckArgs{
+				{D1, false},
+				{D8, true},
+			},
+			whiteOccupiedChecks: []MaskCheckArgs{
+				{D1, true},
+				{D8, true},
+			},
+			blackOccupiedChecks: []MaskCheckArgs{
+				{D1, false},
+				{D8, true},
+			},
+		},
+		"White en-passant capture": {
+			fenPos: "8/8/8/1Pp5/8/8/8/8 w KQkq c6 0 1",
+			move:   NewMove(Piece(Pawn|White), B5, C6, EnPassant),
+			occupiedChecks: []MaskCheckArgs{
+				{B5, true},
+				{C5, true},
+				{C6, false},
+			},
+			whiteOccupiedChecks: []MaskCheckArgs{
+				{B5, true},
+				{C5, true},
+				{C6, false},
+			},
+			blackOccupiedChecks: []MaskCheckArgs{
+				{B5, true},
+				{C5, true},
+				{C6, true},
+			},
+		},
+		"Black en-passant capture": {
+			fenPos: "8/8/8/8/1Pp5/8/8/8 b KQkq b3 0 1",
+			move:   NewMove(Piece(Pawn|Black), C4, B3, EnPassant),
+			occupiedChecks: []MaskCheckArgs{
+				{B4, true},
+				{C4, true},
+				{B3, false},
+			},
+			whiteOccupiedChecks: []MaskCheckArgs{
+				{B4, true},
+				{C4, true},
+				{B3, true},
+			},
+			blackOccupiedChecks: []MaskCheckArgs{
+				{B4, true},
+				{C4, true},
+				{B3, false},
+			},
+		},
+	}
+
+	for name, d := range data {
+		t.Run(name, func(t *testing.T) {
+			initPos, _ := NewPositionFromFEN(d.fenPos)
+			newPos := initPos.PositionAfterMove(d.move)
+
+			for _, check := range d.occupiedChecks {
+				assert.Equal(t, !check.isEmpty, newPos.occupied&(1<<check.idx) != 0)
+			}
+
+			for _, check := range d.whiteOccupiedChecks {
+				assert.Equal(t, !check.isEmpty, newPos.whiteOccupied&(1<<check.idx) != 0)
+			}
+
+			for _, check := range d.blackOccupiedChecks {
+				assert.Equal(t, !check.isEmpty, newPos.blackOccupied&(1<<check.idx) != 0)
+			}
+		})
+	}
+}
+
 func Test_PositionAfterMoveCastleRights(t *testing.T) {
 	data := map[string]struct {
 		fenPos         string
