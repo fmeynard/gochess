@@ -12,7 +12,7 @@ func isOnBoard(file, rank int8) bool {
 }
 
 // verify if the square is attacked by pawn
-func isSquareAttackedByPawn(pos Position, idx int8, kingColor int8) bool {
+func isSquareAttackedByPawn(pos *Position, idx int8, kingColor int8) bool {
 	rank, file := RankAndFile(idx)
 	pawnAttacks := [2][2]int8{{-1, 1}, {1, 1}}
 	if kingColor != White {
@@ -36,7 +36,7 @@ func isSquareAttackedByPawn(pos Position, idx int8, kingColor int8) bool {
 }
 
 // verify if the square is attacked by knight
-func isSquareAttackedByKnight(pos Position, idx int8, kingColor int8) bool {
+func isSquareAttackedByKnight(pos *Position, idx int8, kingColor int8) bool {
 	rank, file := RankAndFile(idx)
 	for _, move := range knightMoves {
 		newFile := file + move[0]
@@ -52,7 +52,7 @@ func isSquareAttackedByKnight(pos Position, idx int8, kingColor int8) bool {
 	return false
 }
 
-func isSquareAttackedBySlidingPiece(pos Position, pieceIdx int8, kingColor int8) bool {
+func isSquareAttackedBySlidingPiece(pos *Position, pieceIdx int8, kingColor int8) bool {
 	pieceRank, pieceFile := RankAndFile(pieceIdx)
 
 	for _, dir := range queenDirections {
@@ -91,7 +91,7 @@ func isSquareAttackedBySlidingPiece(pos Position, pieceIdx int8, kingColor int8)
 }
 
 // verify if the square is attacked by king
-func isSquareAttackedByKing(pos Position, idx int8) bool {
+func isSquareAttackedByKing(pos *Position, idx int8) bool {
 	rank, file := RankAndFile(idx)
 
 	for _, move := range kingMoves {
@@ -109,7 +109,7 @@ func isSquareAttackedByKing(pos Position, idx int8) bool {
 }
 
 // IsKingInCheck verifies if the king at the given index is in check.
-func IsKingInCheck(pos Position, kingColor int8) bool {
+func IsKingInCheck(pos *Position, kingColor int8) bool {
 	var kingIdx int8
 	if kingColor == White {
 		kingIdx = pos.whiteKingIdx

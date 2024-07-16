@@ -61,3 +61,30 @@ func IsSameDiagonal(pieceRank, pieceFile, targetRank, targetFile int8) bool {
 func leastSignificantOne(bb uint64) int8 {
 	return int8(bits.TrailingZeros64(bb))
 }
+
+func isSameLine(fromIdx, toIdx, direction int8) bool {
+	if direction == 1 || direction == -1 { // Horizontal movement
+		return fromIdx/8 == toIdx/8
+	}
+
+	if direction == 8 || direction == -8 { // Vertical movement
+		return fromIdx%8 == toIdx%8
+	}
+
+	return absInt8((fromIdx%8)-(toIdx%8)) == absInt8((fromIdx/8)-(toIdx/8))
+}
+
+func canReach(pieceType int8, direction int8) bool {
+	switch pieceType {
+	case Rook:
+		return direction == 1 || direction == -1 || direction == 8 || direction == -8
+	case Bishop:
+		return direction == 7 || direction == -7 || direction == 9 || direction == -9
+	case Queen:
+		return true
+	case King, Knight:
+		return true // Kings and Knights move in all directions but limited distance
+	default:
+		return false
+	}
+}

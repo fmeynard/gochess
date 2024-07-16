@@ -28,6 +28,7 @@ type Position struct {
 	occupied          uint64
 	blackOccupied     uint64
 	whiteOccupied     uint64
+	movesCache        [64][]int8
 }
 
 func NewPosition() Position {
@@ -214,119 +215,6 @@ func (p Position) CanCastle(clr int8, castleRight int8) bool {
 	}
 
 	return true
-}
-
-// updatePieceOnBoard
-// update board and position masks
-// Important: capture moves need to update opponent occupancy maks
-func updatePieceOnBoard(p *Position, piece Piece, oldIdx int8, newIdx int8) {
-	p.board[oldIdx] = NoPiece
-	p.board[newIdx] = piece
-
-	if piece.Color() == White {
-		p.whiteOccupied &= ^(uint64(1) << oldIdx)
-		p.whiteOccupied |= uint64(1) << newIdx
-		p.blackOccupied &= ^(uint64(1) << newIdx)
-	} else {
-		p.whiteOccupied &= ^(uint64(1) << newIdx)
-		p.blackOccupied &= ^(uint64(1) << oldIdx)
-		p.blackOccupied |= uint64(1) << newIdx
-	}
-
-	p.occupied &= ^(uint64(1) << oldIdx)
-	p.occupied |= uint64(1) << newIdx
-}
-
-func (p Position) PositionAfterMove(move Move) Position {
-	newPos := p
-
-	startPieceIdx := move.StartIdx()
-	endPieceIdx := move.EndIdx()
-	startPiece := p.PieceAt(move.StartIdx())
-	startPieceType := startPiece.Type()
-
-	// update position
-	updatePieceOnBoard(&newPos, startPiece, startPieceIdx, endPieceIdx)
-
-	// King move -> update king pos and castleRights
-	if startPieceType == King {
-		if p.activeColor == White {
-			newPos.whiteKingIdx = endPieceIdx
-			newPos.whiteCastleRights = NoCastle
-
-			if startPieceIdx == E1 {
-				if endPieceIdx == G1 {
-					updatePieceOnBoard(&newPos, Piece(White|Rook), H1, F1)
-				} else if endPieceIdx == C1 {
-					updatePieceOnBoard(&newPos, Piece(White|Rook), A1, D1)
-				}
-			}
-		} else {
-			newPos.blackKingIdx = endPieceIdx
-			newPos.blackCastleRights = NoCastle
-
-			if startPieceIdx == E8 {
-				if endPieceIdx == G8 {
-					updatePieceOnBoard(&newPos, Piece(Black|Rook), H8, F8)
-				} else if endPieceIdx == C8 {
-					updatePieceOnBoard(&newPos, Piece(Black|Rook), A8, D8)
-				}
-			}
-		}
-	}
-
-	// en passant
-	if startPieceType == Pawn {
-		if endPieceIdx == p.enPassantIdx {
-			var capturesPawnIdx int8
-			if p.activeColor == White {
-				capturesPawnIdx = p.enPassantIdx - 8
-			} else {
-				capturesPawnIdx = p.enPassantIdx + 8
-			}
-			updatePieceOnBoard(&newPos, Piece(Pawn|p.activeColor), startPieceIdx, capturesPawnIdx)
-			updatePieceOnBoard(&newPos, Piece(Pawn|p.activeColor), capturesPawnIdx, endPieceIdx)
-		}
-
-		diffIdx := endPieceIdx - startPieceIdx
-		if p.activeColor == White && diffIdx == 16 {
-			newPos.enPassantIdx = startPieceIdx + 8
-		} else if p.activeColor == Black && diffIdx == -16 {
-			newPos.enPassantIdx = startPieceIdx - 8
-		} else {
-			newPos.enPassantIdx = NoEnPassant
-		}
-	} else {
-		newPos.enPassantIdx = NoEnPassant
-	}
-
-	// knight
-	if startPieceType == Rook {
-		if p.activeColor == White {
-			if startPieceIdx == A1 {
-				newPos.whiteCastleRights = newPos.whiteCastleRights &^ QueenSideCastle
-			} else if startPieceIdx == H1 {
-				newPos.whiteCastleRights = newPos.whiteCastleRights &^ KingSideCastle
-			}
-		} else {
-			if startPieceIdx == A8 {
-				newPos.blackCastleRights = newPos.blackCastleRights &^ QueenSideCastle
-			} else if startPieceIdx == H8 {
-				newPos.blackCastleRights = newPos.blackCastleRights &^ KingSideCastle
-			}
-		}
-	}
-
-	// change side ( important to do it last for previous updates )
-	if p.activeColor == White {
-		newPos.activeColor = Black
-	} else {
-		newPos.activeColor = White
-	}
-
-	//updateAttackVectors(&newPos)
-
-	return newPos
 }
 
 func (p Position) IsOccupied(idx int8) bool {

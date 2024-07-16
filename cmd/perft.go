@@ -20,9 +20,9 @@ func main() {
 		panic(err)
 	}
 
-	generator := internal.NewBitsBoardMoveGenerator()
+	engine := internal.NewEngine()
 	pos, _ := internal.NewPositionFromFEN(fenPos)
-	res, nodesCount := generator.PerftDivide(pos, depth)
+	res, nodesCount := engine.PerftDivide(&pos, depth)
 
 	keys := make([]string, 0, len(res))
 	for k := range res {

@@ -354,21 +354,3 @@ func BenchmarkPawnPseudoLegalMoves(b *testing.B) {
 		generator.PawnPseudoLegalMoves(&pos, C5)
 	}
 }
-
-func BenchmarkPerftDivideB(b *testing.B) {
-	pos, _ := NewPositionFromFEN("rnbqkbnr/2pppppp/8/pp6/2P5/N7/PP1PPPPP/R1BQKBNR w KQkq - 0 3")
-	generator := NewBitsBoardMoveGenerator()
-	generator.PerftDivide(pos, 2)
-}
-
-func TestPerftDivideB(t *testing.T) {
-	pos, _ := NewPositionFromFEN(FenStartPos)
-	pos = pos.PositionAfterMove(NewMove(Piece(White|Pawn), E2, E3, NormalMove))
-	pos = pos.PositionAfterMove(NewMove(Piece(Black|Pawn), A7, A6, NormalMove))
-	//pos = pos.PositionAfterMove(NewMove(Piece(White|Rook), F1, B5, NormalMove))
-
-	draw(pos.occupied)
-
-	generator := NewBitsBoardMoveGenerator()
-	generator.PerftDivide(pos, 4)
-}
