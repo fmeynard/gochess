@@ -182,6 +182,7 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 				if !isWhite && targetIdx >= A5 && targetIdx <= H5 && idx-targetIdx == 16 && pos.occupied&(1<<(idx-8)) != 0 {
 					continue
 				}
+
 				moves = append(moves, targetIdx)
 			}
 		}
@@ -189,6 +190,8 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 
 	// Handle en passant
 	// check first as next part is modifying the captureMask
+	// no color check need as pos.enPassantIdx is automatically set to NoEnPassant after player move,
+	// so it is impossible to be in the scenario of a Pawn being able
 	if pos.enPassantIdx != NoEnPassant {
 		if captureMask&(1<<pos.enPassantIdx) != 0 {
 			moves = append(moves, pos.enPassantIdx)
@@ -201,7 +204,7 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 		targetIdx := leastSignificantOne(captureMask)
 		captureMask &= captureMask - 1
 
-		if oMask&(1<<targetIdx) != 0 {
+		if (oMask & (1 << targetIdx)) != 0 {
 			if (isWhite && targetIdx >= A8) || (!isWhite && targetIdx <= H1) {
 				// Handle promotion with capture
 				promotionIdx = targetIdx
@@ -214,20 +217,18 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 	return moves, promotionIdx
 }
 
-func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(
-	idx int8, activeColor int8,
-	castleRights int8,
-	occupiedMask uint64,
-	opponentOccupiedMask uint64,
-) []int8 {
+func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) []int8 {
 	var moves = make([]int8, 0, 8)
 
+	opponentOccupiedMask := pos.OpponentOccupiedMask()
+	castleRights := pos.CastleRights()
+	isWhite := pos.activeColor == White
 	moveMask := g.kingMasks[idx]
 	for moveMask != 0 {
 		targetIdx := leastSignificantOne(moveMask)
 		moveMask &= moveMask - 1
 
-		if occupiedMask&(1<<targetIdx) == 0 || opponentOccupiedMask&(1<<targetIdx) != 0 {
+		if pos.occupied&(1<<targetIdx) == 0 || opponentOccupiedMask&(1<<targetIdx) != 0 {
 			moves = append(moves, targetIdx)
 		}
 	}
@@ -235,7 +236,7 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(
 	var (
 		kingStartIdx int8
 	)
-	if activeColor == White {
+	if isWhite {
 		kingStartIdx = E1
 	} else {
 		kingStartIdx = E8
@@ -252,12 +253,12 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(
 		queenCastleIdx   int8
 	)
 	if (castleRights & QueenSideCastle) != 0 {
-		if activeColor == White {
+		if isWhite {
 			queenCastleIdx = C1
-			queenPathIsClear = (occupiedMask&(1<<B1) == 0) && (occupiedMask&(1<<C1) == 0) && (occupiedMask&(1<<D1) == 0)
+			queenPathIsClear = (pos.occupied&(1<<B1) == 0) && (pos.occupied&(1<<C1) == 0) && (pos.occupied&(1<<D1) == 0)
 		} else {
 			queenCastleIdx = C8
-			queenPathIsClear = (occupiedMask&(1<<B8) == 0) && (occupiedMask&(1<<C8) == 0) && (occupiedMask&(1<<D8) == 0)
+			queenPathIsClear = (pos.occupied&(1<<B8) == 0) && (pos.occupied&(1<<C8) == 0) && (pos.occupied&(1<<D8) == 0)
 		}
 
 		if queenPathIsClear {
@@ -271,12 +272,12 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(
 		kingCastleIdx   int8
 	)
 	if (castleRights & KingSideCastle) != 0 {
-		if activeColor == White {
+		if isWhite {
 			kingCastleIdx = G1
-			kingPathIsClear = (occupiedMask&(1<<G1) == 0) && (occupiedMask&(1<<F1) == 0)
+			kingPathIsClear = (pos.occupied&(1<<G1) == 0) && (pos.occupied&(1<<F1) == 0)
 		} else {
 			kingCastleIdx = G8
-			kingPathIsClear = (occupiedMask&(1<<G8) == 0) && (occupiedMask&(1<<F8) == 0)
+			kingPathIsClear = (pos.occupied&(1<<G8) == 0) && (pos.occupied&(1<<F8) == 0)
 		}
 
 		if kingPathIsClear {
@@ -287,19 +288,16 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(
 	return moves
 }
 
-func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(
-	idx int8,
-	occupiedMask uint64,
-	opponentOccupiedMask uint64,
-) []int8 {
+func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos *Position, idx int8) []int8 {
 	var moves = make([]int8, 0, 8)
 	knightMask := g.knightMasks[idx]
+	opponentOccupiedMask := pos.OpponentOccupiedMask()
 
 	for knightMask != 0 {
 		targetIdx := leastSignificantOne(knightMask)
 		knightMask &= knightMask - 1
 
-		if occupiedMask&(1<<targetIdx) == 0 || opponentOccupiedMask&(1<<targetIdx) != 0 {
+		if pos.occupied&(1<<targetIdx) == 0 || opponentOccupiedMask&(1<<targetIdx) != 0 {
 			moves = append(moves, targetIdx)
 		}
 	}
@@ -307,12 +305,7 @@ func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(
 	return moves
 }
 
-func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(
-	idx int8,
-	pieceType int8,
-	occupiedMask uint64,
-	opponentOccupiedMask uint64,
-) []int8 {
+func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8, pieceType int8) []int8 {
 	var (
 		processBishopDirections = false
 		processRookDirections   = false
@@ -333,11 +326,12 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(
 
 	moves := make([]int8, 0, maxMovesCnt)
 
+	opponentOccupiedMask := pos.OpponentOccupiedMask()
 	for dir := 0; dir < 4; dir++ {
 		if processRookDirections {
 			for _, targetIdx := range g.rookMasks[idx][dir] {
 				targetMask := uint64(1 << targetIdx)
-				if occupiedMask&targetMask == 0 {
+				if pos.occupied&targetMask == 0 {
 					moves = append(moves, targetIdx)
 					continue
 				}
@@ -353,7 +347,7 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(
 		if processBishopDirections {
 			for _, targetIdx := range g.bishopMasks[idx][dir] {
 				targetMask := uint64(1 << targetIdx)
-				if occupiedMask&targetMask == 0 {
+				if pos.occupied&targetMask == 0 {
 					moves = append(moves, targetIdx)
 					continue
 				}
@@ -368,4 +362,73 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(
 	}
 
 	return moves
+}
+
+func (g *BitsBoardMoveGenerator) LegalMoves(pos *Position) []Move {
+	var moves []Move
+
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece.Color() != pos.activeColor {
+			continue
+		}
+
+		var pseudoLegalMoves []int8
+
+		switch piece.Type() {
+		case Pawn:
+			pseudoLegalMoves, _ = g.PawnPseudoLegalMoves(pos, idx)
+		case Rook:
+			pseudoLegalMoves = g.SliderPseudoLegalMoves(pos, idx, Rook)
+		case Bishop:
+			pseudoLegalMoves = g.SliderPseudoLegalMoves(pos, idx, Bishop)
+		case Knight:
+			pseudoLegalMoves = g.KnightPseudoLegalMoves(pos, idx)
+		case Queen:
+			pseudoLegalMoves = g.SliderPseudoLegalMoves(pos, idx, Queen)
+		case King:
+			pseudoLegalMoves = g.KingPseudoLegalMoves(pos, idx)
+		}
+
+		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
+			pseudoLegalMove := NewMove(piece, idx, pseudoLegalMoveIdx, NormalMove)
+			newPos := pos.PositionAfterMove(pseudoLegalMove)
+			if !IsKingInCheck(newPos, pos.activeColor) { // check is the new position that the initial color is not in check
+				moves = append(moves, pseudoLegalMove)
+			}
+		}
+	}
+
+	return moves
+}
+
+func (g *BitsBoardMoveGenerator) PerftDivide(pos Position, depth int) (map[string]uint64, uint64) {
+	res := make(map[string]uint64)
+	total := uint64(0)
+
+	for _, move := range g.LegalMoves(&pos) {
+		newPos := pos.PositionAfterMove(move)
+		res[move.UCI()] = g.MoveGenerationTest(&newPos, depth)
+		total += res[move.UCI()]
+	}
+
+	return res, total
+}
+
+func (g *BitsBoardMoveGenerator) MoveGenerationTest(pos *Position, depth int) uint64 {
+	if depth == 1 {
+		return uint64(1)
+	}
+
+	posCount := uint64(0)
+	for _, move := range g.LegalMoves(pos) {
+		newPos := pos.PositionAfterMove(move)
+
+		nextDepth := depth - 1
+		nextDepthResult := g.MoveGenerationTest(&newPos, nextDepth)
+
+		posCount += nextDepthResult
+	}
+
+	return posCount
 }
