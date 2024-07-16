@@ -296,6 +296,8 @@ func (p Position) PositionAfterMove(move Move) Position {
 		} else {
 			newPos.enPassantIdx = NoEnPassant
 		}
+	} else {
+		newPos.enPassantIdx = NoEnPassant
 	}
 
 	// knight
@@ -322,7 +324,7 @@ func (p Position) PositionAfterMove(move Move) Position {
 		newPos.activeColor = White
 	}
 
-	updateAttackVectors(&newPos)
+	//updateAttackVectors(&newPos)
 
 	return newPos
 }

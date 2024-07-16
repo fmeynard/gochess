@@ -401,11 +401,45 @@ func Test_PositionAfterMoveCastleRights(t *testing.T) {
 }
 
 func Test_PositionAfterEnPassantUpdate(t *testing.T) {
-	pos, _ := NewPositionFromFEN(FenStartPos)
-	newPos := pos.PositionAfterMove(NewMove(Piece(Pawn|White), F2, F4, NormalMove))
-	assert.Equal(t, F3, newPos.enPassantIdx)
-	newPos2 := newPos.PositionAfterMove(NewMove(Piece(Pawn|White), H7, H6, NormalMove))
-	assert.Equal(t, NoEnPassant, newPos2.enPassantIdx)
+	var data = map[string]struct {
+		fenPos                    string
+		move                      Move
+		enPassantIdxExpectedValue int8
+	}{
+		"white double pawn move": {
+			fenPos:                    FenStartPos,
+			move:                      NewMove(Piece(Pawn|White), F2, F4, NormalMove),
+			enPassantIdxExpectedValue: F3,
+		},
+		"black double pawn move": {
+			fenPos:                    "rnbqkbnr/pppppppp/8/8/8/P7/1PPPPPPP/RNBQKBNR b KQkq - 0 1",
+			move:                      NewMove(Piece(Pawn|Black), F7, F5, NormalMove),
+			enPassantIdxExpectedValue: F6,
+		},
+		"reset after pawn move": {
+			fenPos:                    "rnbqkbnr/pppppp1p/8/6p1/8/P7/1PPPPPPP/RNBQKBNR w KQkq g6 0 1",
+			move:                      NewMove(Piece(Pawn|White), B2, B3, NormalMove),
+			enPassantIdxExpectedValue: NoEnPassant,
+		},
+		"reset after non-pawn move": {
+			fenPos:                    "rnbqkbnr/pppppp1p/8/6p1/8/P7/1PPPPPPP/RNBQKBNR w KQkq g6 0 1",
+			move:                      NewMove(Piece(Rook|White), A1, A2, NormalMove),
+			enPassantIdxExpectedValue: NoEnPassant,
+		},
+		"reset after en-passant capture": {
+			fenPos:                    "rnbqkbnr/pppppp1p/8/8/P4Pp1/8/1PPPP1PP/RNBQKBNR b KQkq f3 0 1",
+			move:                      NewMove(Piece(Pawn|Black), G4, G3, EnPassant),
+			enPassantIdxExpectedValue: NoEnPassant,
+		},
+	}
+
+	for name, d := range data {
+		t.Run(name, func(t *testing.T) {
+			pos, _ := NewPositionFromFEN(d.fenPos)
+			pos = pos.PositionAfterMove(d.move)
+			assert.Equal(t, d.enPassantIdxExpectedValue, pos.enPassantIdx)
+		})
+	}
 }
 
 func Test_PositionAfterMoveActiveColorUpdate(t *testing.T) {
