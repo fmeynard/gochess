@@ -14,6 +14,7 @@ const (
 )
 
 const FenStartPos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+const EmptyBoard = "8/8/8/8/8/8/8/8 w - - 0 1"
 
 type Position struct {
 	board             [64]Piece
@@ -31,23 +32,26 @@ type Position struct {
 	movesCache        [64][]int8
 }
 
-func NewPosition() Position {
+func NewPosition() *Position {
 	board := [64]Piece{}
 
 	for i := int8(0); i < 64; i++ {
 		board[i] = NoPiece
 	}
 
-	return Position{
+	return &Position{
 		board:             board,
 		activeColor:       White,
 		whiteCastleRights: KingSideCastle | QueenSideCastle,
 		blackCastleRights: KingSideCastle | QueenSideCastle,
 		enPassantIdx:      NoEnPassant,
+		occupied:          uint64(0),
+		whiteOccupied:     uint64(0),
+		blackOccupied:     uint64(0),
 	}
 }
 
-func NewPositionFromFEN(fen string) (Position, error) {
+func NewPositionFromFEN(fen string) (*Position, error) {
 	var FENCharToPiece = map[rune]Piece{
 		'K': Piece(King | White),
 		'Q': Piece(Queen | White),
@@ -67,7 +71,7 @@ func NewPositionFromFEN(fen string) (Position, error) {
 
 	parts := strings.Split(fen, " ")
 	if len(parts) < 4 {
-		return pos, errors.New("invalid FEN")
+		return nil, errors.New("invalid FEN")
 	}
 
 	// Board init
@@ -92,9 +96,9 @@ func NewPositionFromFEN(fen string) (Position, error) {
 
 		piece, ok := FENCharToPiece[char]
 		if !ok {
-			return pos, errors.New(fmt.Sprintf("invalid FEN: invalid char '%c' at position %d", char, i))
+			return nil, errors.New(fmt.Sprintf("invalid FEN: invalid char '%c' at position %d", char, i))
 		}
-		pos.board[idx] = piece
+		pos.setPieceAt(idx, piece)
 		if piece.Type() == King {
 			if piece.Color() == White {
 				pos.whiteKingIdx = idx
@@ -112,7 +116,7 @@ func NewPositionFromFEN(fen string) (Position, error) {
 	case 'b':
 		pos.activeColor = Black
 	default:
-		return pos, errors.New(fmt.Sprintf("invalid FEN: invalid color %s", string(parts[1][0])))
+		return nil, errors.New(fmt.Sprintf("invalid FEN: invalid color %s", string(parts[1][0])))
 	}
 
 	// Castle rights
@@ -130,7 +134,7 @@ func NewPositionFromFEN(fen string) (Position, error) {
 			case 'Q':
 				pos.whiteCastleRights |= QueenSideCastle
 			default:
-				return pos, errors.New(fmt.Sprintf("invalid FEN: castle rights %s", string(char)))
+				return nil, errors.New(fmt.Sprintf("invalid FEN: castle rights %s", string(char)))
 			}
 		}
 	}
@@ -145,83 +149,66 @@ func NewPositionFromFEN(fen string) (Position, error) {
 
 	// full move number
 
-	//updateAttackVectors(&pos)
-
-	pos.occupied = uint64(0)
-	pos.whiteOccupied = uint64(0)
-	pos.blackOccupied = uint64(0)
-	for i := 0; i < 64; i++ {
-		if pos.board[i] != NoPiece {
-			pos.occupied |= 1 << i
-			if pos.board[i].IsWhite() {
-				pos.whiteOccupied |= 1 << i
-			} else {
-				pos.blackOccupied |= 1 << i
-			}
-		}
-	}
-
 	return pos, nil
 }
 
-func (p Position) PieceAt(idx int8) Piece {
+// @TODO
+// update cache
+// update attack vectors
+func (p *Position) setPieceAt(idx int8, piece Piece) {
+	p.board[idx] = piece
+
+	if piece == NoPiece {
+		if p.activeColor == White {
+			p.whiteOccupied &= ^(uint64(1) << idx)
+		} else {
+			p.blackOccupied &= ^(uint64(1) << idx)
+		}
+		p.occupied &= ^(uint64(1) << idx)
+	} else {
+		if piece.Color() == White {
+			p.blackOccupied &= ^(uint64(1) << idx)
+			p.whiteOccupied |= uint64(1) << idx
+		} else {
+			p.whiteOccupied &= ^(uint64(1) << idx)
+			p.blackOccupied |= uint64(1) << idx
+		}
+		p.occupied |= uint64(1) << idx
+	}
+}
+
+func (p *Position) OpponentColor() int8 {
+	if p.activeColor == White {
+		return Black
+	}
+	return White
+}
+
+func (p *Position) PieceAt(idx int8) Piece {
 	return p.board[idx]
 }
 
-func (p Position) CanCastle(clr int8, castleRight int8) bool {
-	var (
-		kingPos      int8
-		rookPos      int8
-		emptyIdx     []int8
-		castleRights int8
-	)
-
-	if clr == White {
-		castleRights = p.whiteCastleRights
-		kingPos = 4
-		switch castleRight {
-		case QueenSideCastle:
-			rookPos = 0
-			emptyIdx = []int8{1, 2}
-		case KingSideCastle:
-			rookPos = 7
-			emptyIdx = []int8{5, 6}
-		}
-	} else {
-		castleRights = p.blackCastleRights
-		kingPos = 60
-		switch castleRight {
-		case QueenSideCastle:
-			rookPos = 56
-			emptyIdx = []int8{57, 58}
-		case KingSideCastle:
-			rookPos = 63
-			emptyIdx = []int8{61, 62}
-		}
-	}
-
-	if (castleRights & castleRight) == 0 {
-		return false
-	}
-
-	if (p.PieceAt(kingPos) != Piece(King|clr)) || (p.PieceAt(rookPos) != Piece(Rook|clr)) {
-		return false
-	}
-
-	for _, idx := range emptyIdx {
-		if p.PieceAt(idx) != NoPiece {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (p Position) IsOccupied(idx int8) bool {
+func (p *Position) IsOccupied(idx int8) bool {
 	return (p.occupied & (1 << idx)) != 0
 }
 
-func (p Position) OpponentOccupiedMask() uint64 {
+func (p *Position) IsColorOccupied(color, idx int8) bool {
+	if color == White {
+		return (p.whiteOccupied & (1 << idx)) != 0
+	}
+
+	return (p.blackOccupied & (1 << idx)) != 0
+}
+
+func (p *Position) OccupancyMask(color int8) uint64 {
+	if color == White {
+		return p.whiteOccupied
+	}
+
+	return p.blackOccupied
+}
+
+func (p *Position) OpponentOccupiedMask() uint64 {
 	if p.activeColor == White {
 		return p.blackOccupied
 	}
@@ -229,7 +216,7 @@ func (p Position) OpponentOccupiedMask() uint64 {
 	return p.whiteOccupied
 }
 
-func (p Position) CastleRights() int8 {
+func (p *Position) CastleRights() int8 {
 	if p.activeColor == White {
 		return p.whiteCastleRights
 	}

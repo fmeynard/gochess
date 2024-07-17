@@ -67,14 +67,14 @@ func Test_PositionAfterMove(t *testing.T) {
 	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
-			initPos, err := NewPositionFromFEN(d.fenPos)
+			pos, err := NewPositionFromFEN(d.fenPos)
 			if err != nil {
 				t.Error(err)
 			}
 
-			newPos := updater.PositionAfterMove(&initPos, d.move)
+			updater.MakeMove(pos, d.move)
 			for _, check := range d.checks {
-				assert.Equal(t, check.piece, newPos.PieceAt(check.idx), fmt.Sprintf("Wrong piece at idx : %d", check.idx))
+				assert.Equal(t, check.piece, pos.PieceAt(check.idx), fmt.Sprintf("Wrong piece at idx : %d", check.idx))
 			}
 		})
 	}
@@ -207,19 +207,19 @@ func TestUpdatePieceOnBoard(t *testing.T) {
 	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
-			initPos, _ := NewPositionFromFEN(d.fenPos)
-			newPos := updater.PositionAfterMove(&initPos, d.move)
+			pos, _ := NewPositionFromFEN(d.fenPos)
+			updater.MakeMove(pos, d.move)
 
 			for _, check := range d.occupiedChecks {
-				assert.Equal(t, !check.isEmpty, newPos.occupied&(1<<check.idx) != 0)
+				assert.Equal(t, !check.isEmpty, pos.occupied&(1<<check.idx) != 0)
 			}
 
 			for _, check := range d.whiteOccupiedChecks {
-				assert.Equal(t, !check.isEmpty, newPos.whiteOccupied&(1<<check.idx) != 0)
+				assert.Equal(t, !check.isEmpty, pos.whiteOccupied&(1<<check.idx) != 0)
 			}
 
 			for _, check := range d.blackOccupiedChecks {
-				assert.Equal(t, !check.isEmpty, newPos.blackOccupied&(1<<check.idx) != 0)
+				assert.Equal(t, !check.isEmpty, pos.blackOccupied&(1<<check.idx) != 0)
 			}
 		})
 	}
@@ -272,20 +272,22 @@ func Test_PositionAfterMoveCastleRights(t *testing.T) {
 
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
-			initPos, err := NewPositionFromFEN(d.fenPos)
+			pos, err := NewPositionFromFEN(d.fenPos)
 			if err != nil {
 				t.Error(err)
 			}
 
-			newPos := updater.PositionAfterMove(&initPos, d.move)
+			initialPosColor := pos.activeColor
 
-			var actualRights int8
-			if initPos.activeColor == White {
-				actualRights = newPos.whiteCastleRights
+			updater.MakeMove(pos, d.move)
+
+			var initialColorCastleRights int8
+			if initialPosColor == White {
+				initialColorCastleRights = pos.whiteCastleRights
 			} else {
-				actualRights = newPos.blackCastleRights
+				initialColorCastleRights = pos.blackCastleRights
 			}
-			assert.Equal(t, d.expectedRights, actualRights)
+			assert.Equal(t, d.expectedRights, initialColorCastleRights)
 		})
 	}
 }
@@ -326,8 +328,8 @@ func Test_PositionAfterEnPassantUpdate(t *testing.T) {
 	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
-			initPos, _ := NewPositionFromFEN(d.fenPos)
-			pos := updater.PositionAfterMove(&initPos, d.move)
+			pos, _ := NewPositionFromFEN(d.fenPos)
+			updater.MakeMove(pos, d.move)
 			assert.Equal(t, d.enPassantIdxExpectedValue, pos.enPassantIdx)
 		})
 	}
@@ -337,9 +339,59 @@ func Test_PositionAfterMoveActiveColorUpdate(t *testing.T) {
 
 	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
 
-	initPos, _ := NewPositionFromFEN(FenStartPos)
-	newPos := updater.PositionAfterMove(&initPos, NewMove(Piece(Pawn|White), F2, F4, NormalMove))
-	assert.Equal(t, Black, newPos.activeColor)
-	newPos2 := updater.PositionAfterMove(newPos, NewMove(Piece(Pawn|Black), G7, G6, NormalMove))
-	assert.Equal(t, White, newPos2.activeColor)
+	pos, _ := NewPositionFromFEN(FenStartPos)
+	updater.MakeMove(pos, NewMove(Piece(Pawn|White), F2, F4, NormalMove))
+	assert.Equal(t, Black, pos.activeColor)
+	updater.MakeMove(pos, NewMove(Piece(Pawn|Black), G7, G6, NormalMove))
+	assert.Equal(t, White, pos.activeColor)
+}
+
+func TestPositionUpdater_UnMakeMove(t *testing.T) {
+
+	engine := NewEngine()
+	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
+	t.Run("Simple pawn move", func(t *testing.T) {
+		pos, _ := NewPositionFromFEN(FenStartPos)
+		move := NewMove(Piece(White|Pawn), A2, A4, NormalMove)
+		history := updater.MakeMove(pos, move)
+		assert.Equal(t, Black, pos.activeColor)
+		assert.Equal(t, NoPiece, pos.PieceAt(A2))
+		assert.Equal(t, Piece(White|Pawn), pos.PieceAt(A4))
+
+		updater.UnMakeMove(pos, move, history)
+		assert.Equal(t, White, pos.activeColor)
+		assert.Equal(t, NoPiece, pos.PieceAt(A4))
+		assert.Equal(t, Piece(White|Pawn), pos.PieceAt(A2))
+	})
+
+	t.Run("Test Position 4", func(t *testing.T) {
+		pos, _ := NewPositionFromFEN("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+		legalMoves := engine.LegalMoves(pos)
+		assert.Len(t, legalMoves, 6)
+
+		var (
+			whiteCastleRights = pos.whiteCastleRights
+			blackCastleRights = pos.blackCastleRights
+			occupied          = pos.occupied
+			blackOccupied     = pos.blackOccupied
+			whiteOccupied     = pos.whiteOccupied
+			board             = pos.board
+			enPassantIdx      = pos.enPassantIdx
+			activeColor       = pos.activeColor
+		)
+
+		for _, move := range legalMoves {
+			history := engine.positionUpdater.MakeMove(pos, move)
+			engine.positionUpdater.UnMakeMove(pos, move, history)
+		}
+
+		assert.Equal(t, occupied, pos.occupied)
+		assert.Equal(t, whiteOccupied, pos.whiteOccupied)
+		assert.Equal(t, blackOccupied, pos.blackOccupied)
+		assert.Equal(t, whiteCastleRights, pos.whiteCastleRights)
+		assert.Equal(t, blackCastleRights, pos.blackCastleRights)
+		assert.ElementsMatch(t, board, pos.board)
+		assert.Equal(t, enPassantIdx, pos.enPassantIdx)
+		assert.Equal(t, activeColor, pos.activeColor)
+	})
 }

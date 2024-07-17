@@ -7,7 +7,8 @@ type Engine struct {
 }
 
 type IPositionUpdater interface {
-	PositionAfterMove(initPos *Position, move Move) *Position
+	MakeMove(initPos *Position, move Move) MoveHistory
+	UnMakeMove(initPos *Position, move Move, history MoveHistory)
 }
 
 type IMoveGenerator interface {
@@ -58,11 +59,13 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 		}
 
 		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
+			initialColor := pos.activeColor
 			pseudoLegalMove := NewMove(piece, idx, pseudoLegalMoveIdx, NormalMove)
-			newPos := e.positionUpdater.PositionAfterMove(pos, pseudoLegalMove)
-			if !IsKingInCheck(newPos, pos.activeColor) { // check is the new position that the initial color is not in check
+			history := e.positionUpdater.MakeMove(pos, pseudoLegalMove)
+			if !IsKingInCheck(pos, initialColor) { // check is the new position that the initial color is not in check
 				moves = append(moves, pseudoLegalMove)
 			}
+			e.positionUpdater.UnMakeMove(pos, pseudoLegalMove, history)
 		}
 	}
 
@@ -74,9 +77,10 @@ func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint6
 	total := uint64(0)
 
 	for _, move := range e.LegalMoves(pos) {
-		newPos := e.positionUpdater.PositionAfterMove(pos, move)
-		res[move.UCI()] = e.MoveGenerationTest(newPos, depth)
+		history := e.positionUpdater.MakeMove(pos, move)
+		res[move.UCI()] = e.MoveGenerationTest(pos, depth)
 		total += res[move.UCI()]
+		e.positionUpdater.UnMakeMove(pos, move, history)
 	}
 
 	return res, total
@@ -89,10 +93,11 @@ func (e *Engine) MoveGenerationTest(pos *Position, depth int) uint64 {
 
 	posCount := uint64(0)
 	for _, move := range e.LegalMoves(pos) {
-		newPos := e.positionUpdater.PositionAfterMove(pos, move)
+		history := e.positionUpdater.MakeMove(pos, move)
 
 		nextDepth := depth - 1
-		nextDepthResult := e.MoveGenerationTest(newPos, nextDepth)
+		nextDepthResult := e.MoveGenerationTest(pos, nextDepth)
+		e.positionUpdater.UnMakeMove(pos, move, history)
 
 		posCount += nextDepthResult
 	}

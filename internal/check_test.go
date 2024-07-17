@@ -58,7 +58,7 @@ func TestIsSquareAttackedByPawn(t *testing.T) {
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
 			pos, _ := NewPositionFromFEN(d.fenPos)
-			assert.Equal(t, d.result, isSquareAttackedByPawn(&pos, d.kingIdx, d.kingColor))
+			assert.Equal(t, d.result, isSquareAttackedByPawn(pos, d.kingIdx, d.kingColor))
 		})
 	}
 }
@@ -146,7 +146,7 @@ func TestIsSquareAttackedByKnight(t *testing.T) {
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
 			pos, _ := NewPositionFromFEN(d.fenPos)
-			assert.Equal(t, d.result, isSquareAttackedByKnight(&pos, d.kingIdx, d.kingColor))
+			assert.Equal(t, d.result, isSquareAttackedByKnight(pos, d.kingIdx, d.kingColor))
 		})
 	}
 }
@@ -238,7 +238,7 @@ func TestIsSquareAttackedBySlidingPiece(t *testing.T) {
 			assert.Equal(
 				t,
 				d.result,
-				isSquareAttackedBySlidingPiece(&pos, d.kingIdx, d.kingColor),
+				isSquareAttackedBySlidingPiece(pos, d.kingIdx, d.kingColor),
 			)
 		})
 	}

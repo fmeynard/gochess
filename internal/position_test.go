@@ -45,80 +45,6 @@ func Test_NewPositionFromFEN(t *testing.T) {
 	}
 }
 
-func TestPosition_CanCastle(t *testing.T) {
-	data := []struct {
-		fenPos             string
-		color              int8
-		canCastleQueenSide bool
-		canCastleKingSide  bool
-	}{
-		{
-			fenPos:             "8/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
-			color:              White,
-			canCastleQueenSide: true,
-			canCastleKingSide:  true,
-		},
-		{
-			fenPos:             "8/8/8/8/8/8/8/R3K3 w KQkq - 0 1",
-			color:              White,
-			canCastleQueenSide: true,
-			canCastleKingSide:  false,
-		},
-		{
-			fenPos:             "r3k2r/8/8/8/8/8/8/8 w KQkq - 0 1",
-			color:              Black,
-			canCastleQueenSide: true,
-			canCastleKingSide:  true,
-		},
-		{
-			fenPos:             "r3k3/8/8/8/8/8/8/8 w KQkq - 0 1",
-			color:              Black,
-			canCastleQueenSide: true,
-			canCastleKingSide:  false,
-		},
-		{
-			fenPos:             "8/8/8/8/8/8/8/R3K3 w - - 0 1",
-			color:              White,
-			canCastleQueenSide: false,
-			canCastleKingSide:  false,
-		},
-		{
-			fenPos:             "8/8/8/8/8/8/8/R3K3 w - - 0 1",
-			color:              Black,
-			canCastleQueenSide: false,
-			canCastleKingSide:  false,
-		},
-		{
-			fenPos:             "8/8/8/8/8/8/8/R3K2R w kq - 0 1",
-			color:              White,
-			canCastleQueenSide: false,
-			canCastleKingSide:  false,
-		},
-		{
-			fenPos:             "8/8/8/8/8/8/8/R3K2R w KQ - 0 1",
-			color:              White,
-			canCastleQueenSide: true,
-			canCastleKingSide:  true,
-		},
-		{
-			fenPos:             "8/8/8/8/8/8/8/r3K2r w KQkq - 0 1",
-			color:              White,
-			canCastleQueenSide: false,
-			canCastleKingSide:  false,
-		},
-	}
-
-	for _, d := range data {
-		pos, err := NewPositionFromFEN(d.fenPos)
-		if err != nil {
-			t.Error(err)
-		}
-
-		assert.Equal(t, d.canCastleQueenSide, pos.CanCastle(d.color, QueenSideCastle))
-		assert.Equal(t, d.canCastleKingSide, pos.CanCastle(d.color, KingSideCastle))
-	}
-}
-
 func TestPosition_IsCheck(t *testing.T) {
 	data := map[string]struct {
 		fenPos  string
@@ -186,6 +112,45 @@ func TestPosition_IsCheck(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			pos, _ := NewPositionFromFEN(d.fenPos)
 			assert.Equal(t, d.isCheck, pos.IsCheck())
+		})
+	}
+}
+
+func TestSetPieceAt(t *testing.T) {
+	data := map[string]struct {
+		fenPos string
+		idx    int8
+		piece  Piece
+	}{
+		"simple pawn move": {
+			fenPos: EmptyBoard,
+			idx:    A1,
+			piece:  Piece(Rook | White),
+		},
+		"capture by white": {
+			fenPos: "r7/8/8/8/8/8/8/R7 w - - 0 1",
+			idx:    A8,
+			piece:  Piece(Rook | White),
+		},
+	}
+
+	for name, d := range data {
+		t.Run(name, func(t *testing.T) {
+			pos, _ := NewPositionFromFEN(d.fenPos)
+			pos.setPieceAt(d.idx, d.piece)
+
+			assert.Equal(t, d.piece, pos.PieceAt(d.idx))
+
+			isOccupiedExpected := d.piece != NoPiece
+			assert.Equal(t, isOccupiedExpected, pos.IsOccupied(d.idx))
+
+			if !isOccupiedExpected {
+				assert.Equal(t, false, pos.IsColorOccupied(White, d.idx))
+				assert.Equal(t, false, pos.IsColorOccupied(Black, d.idx))
+			} else {
+				assert.Equal(t, true, pos.IsColorOccupied(pos.activeColor, d.idx))
+				assert.Equal(t, false, pos.IsColorOccupied(pos.OpponentColor(), d.idx))
+			}
 		})
 	}
 }
