@@ -62,9 +62,12 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 			initialColor := pos.activeColor
 			pseudoLegalMove := NewMove(piece, idx, pseudoLegalMoveIdx, NormalMove)
 			history := e.positionUpdater.MakeMove(pos, pseudoLegalMove)
-			if !IsKingInCheck(pos, initialColor) { // check is the new position that the initial color is not in check
+			isKingInCheck := IsKingInCheck(pos, initialColor)
+
+			if !isKingInCheck { // check is the new position that the initial color is not in check
 				moves = append(moves, pseudoLegalMove)
 			}
+
 			e.positionUpdater.UnMakeMove(pos, pseudoLegalMove, history)
 		}
 	}

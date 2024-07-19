@@ -36,7 +36,3 @@ var knightMoves = [8][2]int8{
 	{2, 1}, {1, 2}, {-1, 2}, {-2, 1},
 	{-2, -1}, {-1, -2}, {1, -2}, {2, -1},
 }
-
-func (p *Position) IsCheck() bool {
-	return IsKingInCheck(p, p.activeColor)
-}

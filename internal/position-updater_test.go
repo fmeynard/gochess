@@ -378,6 +378,8 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 			board             = pos.board
 			enPassantIdx      = pos.enPassantIdx
 			activeColor       = pos.activeColor
+			whiteKingSafety   = pos.whiteKingSafety
+			blackKingSafety   = pos.blackKingSafety
 		)
 
 		for _, move := range legalMoves {
@@ -393,5 +395,7 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 		assert.ElementsMatch(t, board, pos.board)
 		assert.Equal(t, enPassantIdx, pos.enPassantIdx)
 		assert.Equal(t, activeColor, pos.activeColor)
+		assert.Equal(t, whiteKingSafety, pos.whiteKingSafety)
+		assert.Equal(t, blackKingSafety, pos.blackKingSafety)
 	})
 }

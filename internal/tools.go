@@ -88,3 +88,12 @@ func canReach(pieceType int8, direction int8) bool {
 		return false
 	}
 }
+
+func movesToUci(moves []Move) []string {
+	var uciMoves []string
+	for _, move := range moves {
+		uciMoves = append(uciMoves, move.UCI())
+	}
+
+	return uciMoves
+}

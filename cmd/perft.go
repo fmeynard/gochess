@@ -22,7 +22,7 @@ func main() {
 
 	engine := internal.NewEngine()
 	pos, _ := internal.NewPositionFromFEN(fenPos)
-	res, nodesCount := engine.PerftDivide(&pos, depth)
+	res, nodesCount := engine.PerftDivide(pos, depth)
 
 	keys := make([]string, 0, len(res))
 	for k := range res {

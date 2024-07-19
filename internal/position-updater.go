@@ -14,49 +14,66 @@ func NewPositionUpdater(moveGenerator IMoveGenerator) *PositionUpdater {
 // update board and position masks
 // Important: capture moves need to update opponent occupancy maks
 func updatePieceOnBoard(p *Position, piece Piece, oldIdx int8, newIdx int8) {
-	//p.board[oldIdx] = NoPiece
-	//p.board[newIdx] = piece
-	//
-	//if piece.Color() == White {
-	//	p.whiteOccupied &= ^(uint64(1) << oldIdx)
-	//	p.whiteOccupied |= uint64(1) << newIdx
-	//	p.blackOccupied &= ^(uint64(1) << newIdx)
-	//} else {
-	//	p.whiteOccupied &= ^(uint64(1) << newIdx)
-	//	p.blackOccupied &= ^(uint64(1) << oldIdx)
-	//	p.blackOccupied |= uint64(1) << newIdx
-	//}
-	//
-	//p.occupied &= ^(uint64(1) << oldIdx)
-	//p.occupied |= uint64(1) << newIdx
 	p.setPieceAt(oldIdx, NoPiece)
 	p.setPieceAt(newIdx, piece)
+
+	if piece.Color() == White {
+		p.whiteOccupied &= ^(uint64(1) << oldIdx)
+		p.whiteOccupied |= uint64(1) << newIdx
+		p.blackOccupied &= ^(uint64(1) << newIdx)
+	} else {
+		p.whiteOccupied &= ^(uint64(1) << newIdx)
+		p.blackOccupied &= ^(uint64(1) << oldIdx)
+		p.blackOccupied |= uint64(1) << newIdx
+	}
+
+	p.occupied &= ^(uint64(1) << oldIdx)
+	p.occupied |= uint64(1) << newIdx
+
 }
 
-func (updater *PositionUpdater) CopyPosition(initPos *Position) *Position {
-	newPos := *initPos
+func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
+	if updater.IsMoveAffectsKing(pos, move, pos.whiteKingIdx) {
 
-	return &newPos
+		pos.whiteKingSafety = NotCalculated
+		if IsKingInCheck(pos, White) {
+			pos.whiteKingSafety = KingIsCheck
+		} else {
+			pos.whiteKingSafety = KingIsSafe
+		}
+	}
+
+	if updater.IsMoveAffectsKing(pos, move, pos.blackKingIdx) {
+
+		pos.blackKingSafety = NotCalculated
+		if IsKingInCheck(pos, Black) {
+			pos.blackKingSafety = KingIsCheck
+		} else {
+			pos.blackKingSafety = KingIsSafe
+		}
+	}
+
 }
 
 func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 	startPieceIdx := move.StartIdx()
 	endPieceIdx := move.EndIdx()
 	startPiece := pos.PieceAt(move.StartIdx())
-	endPiece := pos.PieceAt(move.EndIdx())
 	startPieceType := startPiece.Type()
 
 	history := MoveHistory{
-		startPiece:        startPiece,
-		startIdx:          move.StartIdx(),
-		endIdx:            move.EndIdx(),
-		capturedPiece:     endPiece,
+		board:             pos.board,
 		whiteKingIdx:      pos.whiteKingIdx,
 		blackKingIdx:      pos.blackKingIdx,
 		whiteCastleRights: pos.whiteCastleRights,
 		blackCastleRights: pos.blackCastleRights,
 		enPassantIdx:      pos.enPassantIdx,
 		activeColor:       pos.activeColor,
+		blackKingSafety:   pos.blackKingSafety,
+		whiteKingSafety:   pos.whiteKingSafety,
+		whiteOccupied:     pos.whiteOccupied,
+		blackOccupied:     pos.blackOccupied,
+		occupied:          pos.occupied,
 	}
 
 	// update position
@@ -131,6 +148,8 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 		}
 	}
 
+	updater.updateMovesAfterMove(pos, move)
+
 	// change side ( important to do it last for previous updates )
 	if pos.activeColor == White {
 		pos.activeColor = Black
@@ -143,8 +162,7 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 
 func (updater *PositionUpdater) UnMakeMove(pos *Position, move Move, history MoveHistory) {
 	// Restore the pieces to their original positions
-	pos.setPieceAt(history.startIdx, history.startPiece)
-	pos.setPieceAt(history.endIdx, history.capturedPiece)
+	pos.board = history.board
 
 	// Restore the state of the kings
 	pos.whiteKingIdx = history.whiteKingIdx
@@ -154,55 +172,83 @@ func (updater *PositionUpdater) UnMakeMove(pos *Position, move Move, history Mov
 	pos.whiteCastleRights = history.whiteCastleRights
 	pos.blackCastleRights = history.blackCastleRights
 
-	if move.piece.Type() == King {
-		if move.startIdx == E1 && move.piece.Color() == White {
-			if move.endIdx == C1 {
-				pos.setPieceAt(D1, NoPiece)
-				pos.setPieceAt(A1, Piece(Rook|White))
-			}
-			if move.endIdx == G1 {
-				pos.setPieceAt(F1, NoPiece)
-				pos.setPieceAt(H1, Piece(Rook|White))
-			}
-		}
+	// reset king safety
+	pos.blackKingSafety = history.blackKingSafety
+	pos.whiteKingSafety = history.whiteKingSafety
 
-		if move.startIdx == E8 && move.piece.Color() == Black {
-			if move.endIdx == C8 {
-				pos.setPieceAt(D8, NoPiece)
-				pos.setPieceAt(A8, Piece(Rook|Black))
-			}
-			if move.endIdx == G8 {
-				pos.setPieceAt(F8, NoPiece)
-				pos.setPieceAt(H8, Piece(Rook|Black))
-			}
-		}
-	}
+	// reset occupancies masks
+	pos.occupied = history.occupied
+	pos.blackOccupied = history.blackOccupied
+	pos.whiteOccupied = history.whiteOccupied
 
 	// Restore en passant index
 	pos.enPassantIdx = history.enPassantIdx
-	if history.enPassantIdx != NoEnPassant && move.endIdx == history.enPassantIdx {
-		if pos.activeColor == White {
-			pos.setPieceAt(history.endIdx-8, Piece(Black|Pawn))
-		} else {
-			pos.setPieceAt(history.endIdx+8, Piece(White|Pawn))
-		}
-	}
-
 	// Restore the active color
 	pos.activeColor = history.activeColor
 }
 
+func (updater *PositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingIdx int8) bool {
+	// Convert indices to row and column
+	startRank, startFile := RankAndFile(m.StartIdx())
+	targetRank, targetFile := RankAndFile(m.EndIdx())
+	kingRank, kingFile := RankAndFile(kingIdx)
+
+	// Direct involvement
+	if m.StartIdx() == kingIdx || m.EndIdx() == kingIdx {
+		return true
+	}
+
+	// Check if the move is along the same rank, file, or diagonal as the king
+	if startRank == kingRank || startFile == kingFile || absInt8(startRank-kingRank) == absInt8(startFile-kingFile) {
+		// Now check if the move is actually on the path between the king and the moved piece
+		if m.isOnLine(kingIdx, pos) {
+			return true
+		}
+	}
+
+	// Check the ending square as well, since moves can open up lines
+	if targetRank == kingRank || targetFile == kingFile || absInt8(targetRank-kingRank) == absInt8(targetFile-kingFile) {
+		if m.isOnLine(kingIdx, pos) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m Move) isOnLine(kingIdx int8, pos *Position) bool {
+	direction := []int{1, -1, 8, -8, 7, -7, 9, -9} // directions representing all line movements
+	for _, dir := range direction {
+		for i := 1; i < 8; i++ { // Check up to 7 squares away in each direction
+			checkIdx := kingIdx + int8(i*dir)
+			if checkIdx < 0 || checkIdx >= 64 {
+				break
+			}
+			if checkIdx == m.StartIdx() || checkIdx == m.EndIdx() {
+				return true
+			}
+
+			if pos.IsOccupied(checkIdx) {
+				break
+			}
+		}
+	}
+	return false
+}
+
 type MoveHistory struct {
-	capturedPiece     Piece
-	startPiece        Piece
-	startIdx          int8
-	endIdx            int8
 	whiteKingIdx      int8
 	blackKingIdx      int8
 	whiteCastleRights int8
 	blackCastleRights int8
 	enPassantIdx      int8
 	activeColor       int8
+	whiteKingSafety   int8
+	blackKingSafety   int8
+	whiteOccupied     uint64
+	blackOccupied     uint64
+	occupied          uint64
+	board             [64]Piece
 }
 
 //

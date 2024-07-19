@@ -11,6 +11,11 @@ const (
 	KingSideCastle       = 1
 	QueenSideCastle      = 2
 	NoEnPassant     int8 = -1
+
+	//king safety
+	NotCalculated int8 = 0
+	KingIsSafe    int8 = 8
+	KingIsCheck   int8 = 16
 )
 
 const FenStartPos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -30,6 +35,8 @@ type Position struct {
 	blackOccupied     uint64
 	whiteOccupied     uint64
 	movesCache        [64][]int8
+	whiteKingSafety   int8
+	blackKingSafety   int8
 }
 
 func NewPosition() *Position {
@@ -48,6 +55,8 @@ func NewPosition() *Position {
 		occupied:          uint64(0),
 		whiteOccupied:     uint64(0),
 		blackOccupied:     uint64(0),
+		whiteKingSafety:   NotCalculated,
+		blackKingSafety:   NotCalculated,
 	}
 }
 
@@ -145,6 +154,19 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 		pos.enPassantIdx = SquareToIdx(parts[3])
 	}
 
+	// Init king safety
+	if IsKingInCheck(pos, White) {
+		pos.whiteKingSafety = KingIsCheck
+	} else {
+		pos.whiteKingSafety = KingIsSafe
+	}
+
+	if IsKingInCheck(pos, Black) {
+		pos.blackKingSafety = KingIsCheck
+	} else {
+		pos.blackKingSafety = KingIsSafe
+	}
+
 	// Half move clock
 
 	// full move number
@@ -222,4 +244,8 @@ func (p *Position) CastleRights() int8 {
 	}
 
 	return p.blackCastleRights
+}
+
+func (p *Position) IsCheck() bool {
+	return IsKingInCheck(p, p.activeColor)
 }

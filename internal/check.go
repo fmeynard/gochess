@@ -32,6 +32,7 @@ func isSquareAttackedByPawn(pos *Position, idx int8, kingColor int8) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -49,6 +50,7 @@ func isSquareAttackedByKnight(pos *Position, idx int8, kingColor int8) bool {
 			}
 		}
 	}
+
 	return false
 }
 
@@ -87,6 +89,7 @@ func isSquareAttackedBySlidingPiece(pos *Position, pieceIdx int8, kingColor int8
 			}
 		}
 	}
+
 	return false
 }
 
@@ -108,21 +111,47 @@ func isSquareAttackedByKing(pos *Position, idx int8) bool {
 	return false
 }
 
+var cacheHits = 0
+var cacheMiss = 0
+
 // IsKingInCheck verifies if the king at the given index is in check.
 func IsKingInCheck(pos *Position, kingColor int8) bool {
-	var kingIdx int8
+	var (
+		kingIdx int8
+	)
 	if kingColor == White {
 		kingIdx = pos.whiteKingIdx
+		if pos.whiteKingSafety != NotCalculated {
+			return pos.whiteKingSafety == KingIsCheck
+		}
 	} else {
 		kingIdx = pos.blackKingIdx
+		if pos.blackKingSafety != NotCalculated {
+			return pos.blackKingSafety == KingIsCheck
+		}
 	}
 
+	isAttacked := false
 	if isSquareAttackedByPawn(pos, kingIdx, kingColor) ||
 		isSquareAttackedByKnight(pos, kingIdx, kingColor) ||
 		isSquareAttackedBySlidingPiece(pos, kingIdx, kingColor) ||
 		isSquareAttackedByKing(pos, kingIdx) {
-		return true
+		isAttacked = true
 	}
 
-	return false
+	if kingColor == White {
+		if isAttacked {
+			pos.whiteKingSafety = KingIsCheck
+		} else {
+			pos.whiteKingSafety = KingIsSafe
+		}
+	} else {
+		if isAttacked {
+			pos.blackKingSafety = KingIsCheck
+		} else {
+			pos.blackKingSafety = KingIsSafe
+		}
+	}
+
+	return isAttacked
 }
