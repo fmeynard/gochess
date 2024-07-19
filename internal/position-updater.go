@@ -206,6 +206,11 @@ func (updater *PositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingIdx
 		}
 	}
 
+	// Special checks for knights moves
+	if m.piece.Type() == Knight && m.knightAffectsKing(m.EndIdx(), kingIdx) {
+		return true
+	}
+
 	// Check the ending square as well, since moves can open up lines
 	if targetRank == kingRank || targetFile == kingFile || absInt8(targetRank-kingRank) == absInt8(targetFile-kingFile) {
 		if m.isOnLine(kingIdx, pos) {
@@ -213,6 +218,16 @@ func (updater *PositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingIdx
 		}
 	}
 
+	return false
+}
+
+func (m Move) knightAffectsKing(knightEndIdx, kingIdx int8) bool {
+	knightMoves := []int8{-17, -15, -10, -6, 6, 10, 15, 17} // Possible knight moves
+	for _, move := range knightMoves {
+		if kingIdx == knightEndIdx+move {
+			return true
+		}
+	}
 	return false
 }
 
