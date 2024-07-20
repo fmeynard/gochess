@@ -6,11 +6,6 @@ const (
 	RookSlider   = 2
 )
 
-// isOnBoard checks if the given file and rank are within the bounds of the board.
-func isOnBoard(file, rank int8) bool {
-	return file >= 0 && file < 8 && rank >= 0 && rank < 8
-}
-
 // verify if the square is attacked by pawn
 func isSquareAttackedByPawn(pos *Position, idx int8, kingColor int8) bool {
 	rank, file := RankAndFile(idx)
@@ -57,7 +52,7 @@ func isSquareAttackedByKnight(pos *Position, idx int8, kingColor int8) bool {
 func isSquareAttackedBySlidingPiece(pos *Position, pieceIdx int8, kingColor int8) bool {
 	pieceRank, pieceFile := RankAndFile(pieceIdx)
 
-	for _, dir := range queenDirections {
+	for _, dir := range QueenDirections {
 		for targetIdx := pieceIdx + dir; targetIdx >= 0 && targetIdx < 64; targetIdx += dir {
 			targetRank, targetFile := RankAndFile(targetIdx)
 			if (dir == LEFT || dir == RIGHT) && targetRank != pieceRank {

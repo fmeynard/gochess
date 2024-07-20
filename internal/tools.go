@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"math/bits"
+	"strings"
 )
 
 func SquareToIdx(square string) int8 {
@@ -96,4 +97,25 @@ func movesToUci(moves []Move) []string {
 	}
 
 	return uciMoves
+}
+
+func draw(vector uint64) {
+	for rank := 7; rank >= 0; rank-- {
+		var currentLine []string
+		for file := 0; file < 8; file++ {
+			mask := uint64(1) << (rank*8 + file)
+			if vector&mask != 0 {
+				currentLine = append(currentLine, "1")
+			} else {
+				currentLine = append(currentLine, "0")
+			}
+		}
+
+		fmt.Println("|", strings.Join(currentLine, " | "), "|")
+	}
+}
+
+// isOnBoard checks if the given file and rank are within the bounds of the board.
+func isOnBoard(file, rank int8) bool {
+	return file >= 0 && file < 8 && rank >= 0 && rank < 8
 }

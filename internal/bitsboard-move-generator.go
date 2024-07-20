@@ -1,5 +1,36 @@
 package internal
 
+const (
+	LEFT      int8 = -1
+	RIGHT     int8 = 1
+	UP        int8 = -8
+	DOWN      int8 = 8
+	UpLeft    int8 = -9
+	UpRight   int8 = -7
+	DownLeft  int8 = 7
+	DownRight int8 = 9
+)
+
+var (
+	QueenDirections  = []int8{LEFT, RIGHT, UP, DOWN, UpLeft, UpRight, DownLeft, DownRight}
+	RookDirections   = []int8{UP, DOWN, LEFT, RIGHT}
+	BishopDirections = []int8{UpLeft, UpRight, DownLeft, DownRight}
+
+	// move offsets per piece type
+
+	KingOffsets   = []int8{-9, -8, -7, -1, 1, 7, 8, 9}
+	KnightOffsets = []int8{-17, -15, -10, -6, 6, 10, 15, 17}
+
+	// move per rank and file
+
+	kingMoves = [8][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
+
+	knightMoves = [8][2]int8{
+		{2, 1}, {1, 2}, {-1, 2}, {-2, 1},
+		{-2, -1}, {-1, -2}, {1, -2}, {2, -1},
+	}
+)
+
 type BitsBoardMoveGenerator struct {
 	bishopMasks            [64][4][]int8
 	rookMasks              [64][4][]int8
@@ -9,20 +40,10 @@ type BitsBoardMoveGenerator struct {
 	blackPawnMovesMasks    [64]uint64
 	whitePawnCapturesMasks [64]uint64
 	blackPawnCapturesMasks [64]uint64
-
-	rookDirections   []int8
-	bishopDirections []int8
-	knightOffsets    []int8
-	kingOffsets      []int8
 }
 
 func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
-	bitsBoardMoveGenerator := &BitsBoardMoveGenerator{
-		knightOffsets:    []int8{-17, -15, -10, -6, 6, 10, 15, 17},
-		kingOffsets:      []int8{-9, -8, -7, -1, 1, 7, 8, 9},
-		bishopDirections: []int8{UpLeft, UpRight, DownLeft, DownRight},
-		rookDirections:   []int8{UP, DOWN, LEFT, RIGHT},
-	}
+	bitsBoardMoveGenerator := &BitsBoardMoveGenerator{}
 	bitsBoardMoveGenerator.initMasks()
 
 	return bitsBoardMoveGenerator
@@ -120,7 +141,7 @@ func (g *BitsBoardMoveGenerator) initRookMaskForSquare(squareIdx int8) {
 
 func (g *BitsBoardMoveGenerator) initKnightMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
-	for _, offset := range g.knightOffsets {
+	for _, offset := range KnightOffsets {
 		targetIdx := squareIdx + offset
 		if targetIdx >= 0 && targetIdx < 64 {
 			targetRank, targetFile := RankAndFile(targetIdx)
@@ -135,7 +156,7 @@ func (g *BitsBoardMoveGenerator) initKnightMaskForSquare(squareIdx int8) {
 
 func (g *BitsBoardMoveGenerator) initKingMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
-	for _, offset := range g.kingOffsets {
+	for _, offset := range KingOffsets {
 		targetIdx := squareIdx + offset
 		if targetIdx >= 0 && targetIdx < 64 {
 			targetRank, targetFile := RankAndFile(targetIdx)

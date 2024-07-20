@@ -1,10 +1,5 @@
 package internal
 
-import (
-	"fmt"
-	"strings"
-)
-
 func updateAttackVectors(pos *Position) {
 	// Clear previous attacks
 	pos.whiteAttacks = 0
@@ -60,7 +55,7 @@ func updateKnightAttacks(pos *Position, idx int8, isWhite bool) {
 
 	pieceRank, pieceFile := RankAndFile(idx)
 
-	for _, move := range knightMoves2 {
+	for _, move := range KnightOffsets {
 		targetIdx := idx + move
 		if targetIdx >= 0 && targetIdx < 64 {
 
@@ -110,12 +105,9 @@ func updateSlidingPieceAttacks(pos *Position, idx int8, directions []int8, isWhi
 
 // updateKingAttacks updates the attack bitboards for kings.
 func updateKingAttacks(pos *Position, idx int8, isWhite bool) {
-	//kingMoves := []int{
-	//	-9, -8, -7, -1, 1, 7, 8, 9,
-	//}
 
 	currentRank, currentFile := RankAndFile(idx)
-	for _, move := range kingMoves2 {
+	for _, move := range KingOffsets {
 		targetIdx := idx + move
 		if targetIdx >= 0 && targetIdx < 64 {
 			targetRank, targetFile := RankAndFile(targetIdx)
@@ -144,20 +136,4 @@ func isKingInCheckByVector(pos Position, kingColor int8) bool {
 		return isSquareAttacked(pos, int(pos.whiteKingIdx), Black)
 	}
 	return isSquareAttacked(pos, int(pos.blackKingIdx), White)
-}
-
-func draw(vector uint64) {
-	for rank := 7; rank >= 0; rank-- {
-		var currentLine []string
-		for file := 0; file < 8; file++ {
-			mask := uint64(1) << (rank*8 + file)
-			if vector&mask != 0 {
-				currentLine = append(currentLine, "1")
-			} else {
-				currentLine = append(currentLine, "0")
-			}
-		}
-
-		fmt.Println("|", strings.Join(currentLine, " | "), "|")
-	}
 }

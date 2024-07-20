@@ -207,7 +207,11 @@ func (updater *PositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingIdx
 	}
 
 	// Special checks for knights moves
-	if m.piece.Type() == Knight && m.knightAffectsKing(m.EndIdx(), kingIdx) {
+	if m.knightAffectsKing(m.EndIdx(), kingIdx) {
+		return true
+	}
+
+	if m.knightAffectsKing(m.StartIdx(), kingIdx) {
 		return true
 	}
 
@@ -222,8 +226,7 @@ func (updater *PositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingIdx
 }
 
 func (m Move) knightAffectsKing(knightEndIdx, kingIdx int8) bool {
-	knightMoves := []int8{-17, -15, -10, -6, 6, 10, 15, 17} // Possible knight moves
-	for _, move := range knightMoves {
+	for _, move := range KnightOffsets {
 		if kingIdx == knightEndIdx+move {
 			return true
 		}
@@ -232,10 +235,9 @@ func (m Move) knightAffectsKing(knightEndIdx, kingIdx int8) bool {
 }
 
 func (m Move) isOnLine(kingIdx int8, pos *Position) bool {
-	direction := []int{1, -1, 8, -8, 7, -7, 9, -9} // directions representing all line movements
-	for _, dir := range direction {
-		for i := 1; i < 8; i++ { // Check up to 7 squares away in each direction
-			checkIdx := kingIdx + int8(i*dir)
+	for _, dir := range QueenDirections {
+		for i := int8(1); i < 8; i++ { // Check up to 7 squares away in each direction
+			checkIdx := kingIdx + i*dir
 			if checkIdx < 0 || checkIdx >= 64 {
 				break
 			}
@@ -265,27 +267,3 @@ type MoveHistory struct {
 	occupied          uint64
 	board             [64]Piece
 }
-
-//
-//func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
-//	// Identify pieces potentially affected by the move
-//	fromIdx := move.StartIdx()
-//	toIdx := move.EndIdx()
-//
-//	for _, dir := range []int8{8, -8, 1, -1, 7, -7, 9, -9} {
-//		for dist := int8(1); dist <= 7; dist++ { // Maximum board distance
-//			affectedIdx := fromIdx + dir*dist
-//			if affectedIdx < 0 || affectedIdx >= 64 || !isSameLine(fromIdx, affectedIdx, dir) {
-//				break
-//			}
-//			piece := pos.board[affectedIdx]
-//			if piece != NoPiece && canReach(piece.Type(), dir) {
-//				//delete(pos.moveCache, affectedIdx)
-//				//pos.generateMovesForPiece(affectedIdx)
-//				pos.movesCache[affectedIdx] = nil
-//				pos.generateMovesForPiece(affectedIdx)
-//			}
-//		}
-//	}
-//	pos.moveCache[toIdx] = pos.generateMovesForPiece(toIdx) // Recalculate moves for the moved piece
-//}
