@@ -33,20 +33,7 @@ func isSquareAttackedByPawn(pos *Position, idx int8, kingColor int8) bool {
 
 // verify if the square is attacked by knight
 func isSquareAttackedByKnight(pos *Position, idx int8, kingColor int8) bool {
-	rank, file := RankAndFile(idx)
-	for _, move := range knightMoves {
-		newFile := file + move[0]
-		newRank := rank + move[1]
-		if isOnBoard(newFile, newRank) {
-			endIdx := newRank*8 + newFile
-			piece := pos.board[endIdx]
-			if piece.Type() == Knight && piece.Color() != kingColor {
-				return true
-			}
-		}
-	}
-
-	return false
+	return (knightAttacksMask[idx] & pos.knightBoard & pos.OpponentOccupiedMaskByPieceColor(kingColor)) != 0
 }
 
 func isSquareAttackedBySlidingPiece(pos *Position, squareIdx int8, kingColor int8) bool {
@@ -193,21 +180,8 @@ func isFileAttackedByEnemy(pos *Position, index int8, enemyColor int8) bool {
 }
 
 // verify if the square is attacked by king
-func isSquareAttackedByKing(pos *Position, idx int8) bool {
-	rank, file := RankAndFile(idx)
-
-	for _, move := range kingMoves {
-		newFile := file + move[0]
-		newRank := rank + move[1]
-		if isOnBoard(newFile, newRank) {
-			endIdx := newRank*8 + newFile
-			piece := pos.board[endIdx]
-			if piece.Type() == King && piece.Color() != pos.activeColor {
-				return true
-			}
-		}
-	}
-	return false
+func isSquareAttackedByKing(pos *Position, idx int8, kingColor int8) bool {
+	return (kingAttacksMask[idx] & pos.kingBoard & pos.OpponentOccupiedMaskByPieceColor(kingColor)) != 0
 }
 
 // IsKingInCheck verifies if the king at the given index is "check".
@@ -231,7 +205,7 @@ func IsKingInCheck(pos *Position, kingColor int8) bool {
 	if isSquareAttackedByPawn(pos, kingIdx, kingColor) ||
 		isSquareAttackedByKnight(pos, kingIdx, kingColor) ||
 		isSquareAttackedBySlidingPiece(pos, kingIdx, kingColor) ||
-		isSquareAttackedByKing(pos, kingIdx) {
+		isSquareAttackedByKing(pos, kingIdx, kingColor) {
 		isAttacked = true
 	}
 

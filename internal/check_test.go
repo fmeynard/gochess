@@ -143,6 +143,7 @@ func TestIsSquareAttackedByKnight(t *testing.T) {
 		},
 	}
 
+	NewEngine()
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
 			pos, _ := NewPositionFromFEN(d.fenPos)

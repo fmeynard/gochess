@@ -264,6 +264,14 @@ func (p *Position) OccupancyMask(color int8) uint64 {
 	return p.blackOccupied
 }
 
+func (p *Position) OpponentOccupiedMaskByPieceColor(pieceColor int8) uint64 {
+	if pieceColor == White {
+		return p.blackOccupied
+	}
+
+	return p.whiteOccupied
+}
+
 func (p *Position) OpponentOccupiedMask() uint64 {
 	if p.activeColor == White {
 		return p.blackOccupied
