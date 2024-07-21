@@ -16,20 +16,6 @@ func NewPositionUpdater(moveGenerator IMoveGenerator) *PositionUpdater {
 func updatePieceOnBoard(p *Position, piece Piece, oldIdx int8, newIdx int8) {
 	p.setPieceAt(oldIdx, NoPiece)
 	p.setPieceAt(newIdx, piece)
-
-	if piece.Color() == White {
-		p.whiteOccupied &= ^(uint64(1) << oldIdx)
-		p.whiteOccupied |= uint64(1) << newIdx
-		p.blackOccupied &= ^(uint64(1) << newIdx)
-	} else {
-		p.whiteOccupied &= ^(uint64(1) << newIdx)
-		p.blackOccupied &= ^(uint64(1) << oldIdx)
-		p.blackOccupied |= uint64(1) << newIdx
-	}
-
-	p.occupied &= ^(uint64(1) << oldIdx)
-	p.occupied |= uint64(1) << newIdx
-
 }
 
 func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
@@ -61,20 +47,7 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 	startPiece := pos.PieceAt(move.StartIdx())
 	startPieceType := startPiece.Type()
 
-	history := MoveHistory{
-		board:             pos.board,
-		whiteKingIdx:      pos.whiteKingIdx,
-		blackKingIdx:      pos.blackKingIdx,
-		whiteCastleRights: pos.whiteCastleRights,
-		blackCastleRights: pos.blackCastleRights,
-		enPassantIdx:      pos.enPassantIdx,
-		activeColor:       pos.activeColor,
-		blackKingSafety:   pos.blackKingSafety,
-		whiteKingSafety:   pos.whiteKingSafety,
-		whiteOccupied:     pos.whiteOccupied,
-		blackOccupied:     pos.blackOccupied,
-		occupied:          pos.occupied,
-	}
+	history := NewMoveHistory(pos)
 
 	// update position
 	updatePieceOnBoard(pos, startPiece, startPieceIdx, endPieceIdx)
@@ -181,6 +154,13 @@ func (updater *PositionUpdater) UnMakeMove(pos *Position, move Move, history Mov
 	pos.blackOccupied = history.blackOccupied
 	pos.whiteOccupied = history.whiteOccupied
 
+	pos.kingBoard = history.kingBoard
+	pos.queenBoard = history.queenBoard
+	pos.rookBoard = history.rookBoard
+	pos.bishopBoard = history.bishopBoard
+	pos.knightBoard = history.knightBoard
+	pos.pawnBoard = history.pawnBoard
+
 	// Restore en passant index
 	pos.enPassantIdx = history.enPassantIdx
 	// Restore the active color
@@ -251,19 +231,4 @@ func (m Move) isOnLine(kingIdx int8, pos *Position) bool {
 		}
 	}
 	return false
-}
-
-type MoveHistory struct {
-	whiteKingIdx      int8
-	blackKingIdx      int8
-	whiteCastleRights int8
-	blackCastleRights int8
-	enPassantIdx      int8
-	activeColor       int8
-	whiteKingSafety   int8
-	blackKingSafety   int8
-	whiteOccupied     uint64
-	blackOccupied     uint64
-	occupied          uint64
-	board             [64]Piece
 }
