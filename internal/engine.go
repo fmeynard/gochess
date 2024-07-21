@@ -37,7 +37,8 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 
 	for idx := int8(0); idx < 64; idx++ {
 		piece := pos.PieceAt(idx)
-		if piece.Color() != pos.activeColor {
+
+		if piece == NoPiece || piece.Color() != pos.activeColor {
 			continue
 		}
 
