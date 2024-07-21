@@ -349,16 +349,15 @@ func Test_PositionAfterMoveActiveColorUpdate(t *testing.T) {
 func TestPositionUpdater_UnMakeMove(t *testing.T) {
 
 	engine := NewEngine()
-	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
 	t.Run("Simple pawn move", func(t *testing.T) {
 		pos, _ := NewPositionFromFEN(FenStartPos)
 		move := NewMove(Piece(White|Pawn), A2, A4, NormalMove)
-		history := updater.MakeMove(pos, move)
+		history := engine.positionUpdater.MakeMove(pos, move)
 		assert.Equal(t, Black, pos.activeColor)
 		assert.Equal(t, NoPiece, pos.PieceAt(A2))
 		assert.Equal(t, Piece(White|Pawn), pos.PieceAt(A4))
 
-		updater.UnMakeMove(pos, move, history)
+		engine.positionUpdater.UnMakeMove(pos, move, history)
 		assert.Equal(t, White, pos.activeColor)
 		assert.Equal(t, NoPiece, pos.PieceAt(A4))
 		assert.Equal(t, Piece(White|Pawn), pos.PieceAt(A2))
@@ -398,4 +397,6 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 		assert.Equal(t, whiteKingSafety, pos.whiteKingSafety)
 		assert.Equal(t, blackKingSafety, pos.blackKingSafety)
 	})
+
+	draw(kingAttacksMask[D4])
 }

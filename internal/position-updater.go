@@ -19,7 +19,7 @@ func updatePieceOnBoard(p *Position, piece Piece, oldIdx int8, newIdx int8) {
 }
 
 func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
-	if updater.IsMoveAffectsKing(pos, move, pos.whiteKingIdx) {
+	if updater.IsMoveAffectsKing(pos, move, White) {
 
 		pos.whiteKingSafety = NotCalculated
 		if IsKingInCheck(pos, White) {
@@ -29,8 +29,7 @@ func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
 		}
 	}
 
-	if updater.IsMoveAffectsKing(pos, move, pos.blackKingIdx) {
-
+	if updater.IsMoveAffectsKing(pos, move, Black) {
 		pos.blackKingSafety = NotCalculated
 		if IsKingInCheck(pos, Black) {
 			pos.blackKingSafety = KingIsCheck
@@ -38,7 +37,6 @@ func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
 			pos.blackKingSafety = KingIsSafe
 		}
 	}
-
 }
 
 func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
@@ -167,68 +165,32 @@ func (updater *PositionUpdater) UnMakeMove(pos *Position, move Move, history Mov
 	pos.activeColor = history.activeColor
 }
 
-func (updater *PositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingIdx int8) bool {
+// IsMoveAffectsKing
+// The goal here is to trigger king safety recalculation as less as possible,
+// but it's a balance, if detection is less performant than the recalculation it's better to recalculate
+func (updater *PositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool {
 	// Convert indices to row and column
-	startRank, startFile := RankAndFile(m.StartIdx())
-	targetRank, targetFile := RankAndFile(m.EndIdx())
-	kingRank, kingFile := RankAndFile(kingIdx)
+	var kingIdx int8
+	if kingColor == White {
+		kingIdx = pos.whiteKingIdx
+	} else {
+		kingIdx = pos.blackKingIdx
+	}
 
+	movePiecesMask := uint64(1<<m.startIdx | 1<<m.endIdx)
 	// Direct involvement
 	if m.StartIdx() == kingIdx || m.EndIdx() == kingIdx {
 		return true
 	}
 
-	// Check if the move is along the same rank, file, or diagonal as the king
-	if startRank == kingRank || startFile == kingFile || absInt8(startRank-kingRank) == absInt8(startFile-kingFile) {
-		// Now check if the move is actually on the path between the king and the moved piece
-		if m.isOnLine(kingIdx, pos) {
-			return true
-		}
+	if (queenAttacksMask[kingIdx] & movePiecesMask) != 0 {
+		return true
 	}
 
 	// Special checks for knights moves
-	if m.knightAffectsKing(m.EndIdx(), kingIdx) {
+	if knightAttacksMask[kingIdx]&movePiecesMask != 0 {
 		return true
 	}
 
-	if m.knightAffectsKing(m.StartIdx(), kingIdx) {
-		return true
-	}
-
-	// Check the ending square as well, since moves can open up lines
-	if targetRank == kingRank || targetFile == kingFile || absInt8(targetRank-kingRank) == absInt8(targetFile-kingFile) {
-		if m.isOnLine(kingIdx, pos) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (m Move) knightAffectsKing(knightEndIdx, kingIdx int8) bool {
-	for _, move := range KnightOffsets {
-		if kingIdx == knightEndIdx+move {
-			return true
-		}
-	}
-	return false
-}
-
-func (m Move) isOnLine(kingIdx int8, pos *Position) bool {
-	for _, dir := range QueenDirections {
-		for i := int8(1); i < 8; i++ { // Check up to 7 squares away in each direction
-			checkIdx := kingIdx + i*dir
-			if checkIdx < 0 || checkIdx >= 64 {
-				break
-			}
-			if checkIdx == m.StartIdx() || checkIdx == m.EndIdx() {
-				return true
-			}
-
-			if pos.IsOccupied(checkIdx) {
-				break
-			}
-		}
-	}
 	return false
 }
