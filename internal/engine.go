@@ -1,5 +1,7 @@
 package internal
 
+import "math/bits"
+
 type Engine struct {
 	game            *Game
 	moveGenerator   IMoveGenerator
@@ -9,6 +11,7 @@ type Engine struct {
 type IPositionUpdater interface {
 	MakeMove(initPos *Position, move Move) MoveHistory
 	UnMakeMove(initPos *Position, move Move, history MoveHistory)
+	IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool
 }
 
 type IMoveGenerator interface {
@@ -35,42 +38,49 @@ func (e *Engine) Move() {}
 func (e *Engine) LegalMoves(pos *Position) []Move {
 	var moves []Move
 
-	for idx := int8(0); idx < 64; idx++ {
-		piece := pos.PieceAt(idx)
+	piecesMask := pos.OccupancyMask(pos.activeColor)
+	for piecesMask != 0 { //for idx := int8(0); idx < 64; idx++ {
+		idx := int8(bits.TrailingZeros64(piecesMask))
+		//piece := pos.PieceAt(idx)
 
-		if piece == NoPiece || piece.Color() != pos.activeColor {
-			continue
-		}
-
+		pieceMask := uint64(1 << idx)
 		var pseudoLegalMoves []int8
 
-		switch piece.Type() {
-		case Pawn:
+		switch {
+		case pieceMask&pos.pawnBoard != 0:
 			pseudoLegalMoves, _ = e.moveGenerator.PawnPseudoLegalMoves(pos, idx)
-		case Rook:
-			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Rook)
-		case Bishop:
-			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Bishop)
-		case Knight:
+		case pieceMask&pos.knightBoard != 0:
 			pseudoLegalMoves = e.moveGenerator.KnightPseudoLegalMoves(pos, idx)
-		case Queen:
+		case pieceMask&pos.bishopBoard != 0:
+			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Bishop)
+		case pieceMask&pos.rookBoard != 0:
+			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Rook)
+		case pieceMask&pos.queenBoard != 0:
 			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Queen)
-		case King:
+		case pieceMask&pos.kingBoard != 0:
 			pseudoLegalMoves = e.moveGenerator.KingPseudoLegalMoves(pos, idx)
 		}
 
 		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
 			initialColor := pos.activeColor
-			pseudoLegalMove := NewMove(piece, idx, pseudoLegalMoveIdx, NormalMove)
-			history := e.positionUpdater.MakeMove(pos, pseudoLegalMove)
-			isKingInCheck := IsKingInCheck(pos, initialColor)
+			pseudoLegalMove := NewMove(pos.board[idx], idx, pseudoLegalMoveIdx, NormalMove)
 
-			if !isKingInCheck { // check is the new position that the initial color is not in check
+			// skip further checks if not needed
+			if !pos.IsCheck() && !e.positionUpdater.IsMoveAffectsKing(pos, pseudoLegalMove, pos.activeColor) {
+				moves = append(moves, pseudoLegalMove)
+				continue
+			}
+
+			history := e.positionUpdater.MakeMove(pos, pseudoLegalMove)
+
+			if !IsKingInCheck(pos, initialColor) { // check is the new position that the initial color is not in check
 				moves = append(moves, pseudoLegalMove)
 			}
 
 			e.positionUpdater.UnMakeMove(pos, pseudoLegalMove, history)
 		}
+
+		piecesMask &^= 1 << idx
 	}
 
 	return moves
