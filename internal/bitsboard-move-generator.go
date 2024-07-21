@@ -1,20 +1,20 @@
 package internal
 
 const (
-	LEFT      int8 = -1
-	RIGHT     int8 = 1
-	UP        int8 = -8
-	DOWN      int8 = 8
-	UpLeft    int8 = -9
-	UpRight   int8 = -7
-	DownLeft  int8 = 7
-	DownRight int8 = 9
+	West      int8 = -1
+	East      int8 = 1
+	South     int8 = -8
+	North     int8 = 8
+	SouthWest int8 = -9
+	SouthEast int8 = -7
+	NorthWest int8 = 7
+	NorthEast int8 = 9
 )
 
 var (
-	QueenDirections  = []int8{LEFT, RIGHT, UP, DOWN, UpLeft, UpRight, DownLeft, DownRight}
-	RookDirections   = []int8{UP, DOWN, LEFT, RIGHT}
-	BishopDirections = []int8{UpLeft, UpRight, DownLeft, DownRight}
+	QueenDirections  = []int8{West, East, South, North, SouthWest, SouthEast, NorthWest, NorthEast}
+	RookDirections   = []int8{South, North, West, East}
+	BishopDirections = []int8{SouthWest, SouthEast, NorthWest, NorthEast}
 
 	// move offsets per piece type
 
@@ -156,19 +156,19 @@ func (g *BitsBoardMoveGenerator) initPawnMasksForSquare(squareIdx int8) {
 
 func (g *BitsBoardMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
-	// UpLeft direction
+	// SouthWest direction
 	for r, f := squareRank+1, squareFile-1; r < 8 && f >= 0; r, f = r+1, f-1 {
 		g.bishopMasks[squareIdx][0] = append(g.bishopMasks[squareIdx][0], r*8+f)
 	}
-	// UpRight direction
+	// SouthEast direction
 	for r, f := squareRank+1, squareFile+1; r < 8 && f < 8; r, f = r+1, f+1 {
 		g.bishopMasks[squareIdx][1] = append(g.bishopMasks[squareIdx][1], r*8+f)
 	}
-	// DownLeft direction
+	// NorthWest direction
 	for r, f := squareRank-1, squareFile-1; r >= 0 && f >= 0; r, f = r-1, f-1 {
 		g.bishopMasks[squareIdx][2] = append(g.bishopMasks[squareIdx][2], r*8+f)
 	}
-	// DownRight direction
+	// NorthEast direction
 	for r, f := squareRank-1, squareFile+1; r >= 0 && f < 8; r, f = r-1, f+1 {
 		g.bishopMasks[squareIdx][3] = append(g.bishopMasks[squareIdx][3], r*8+f)
 	}

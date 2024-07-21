@@ -81,13 +81,13 @@ func diagonalAttacks(pos *Position, index int8) uint64 {
 	for _, dir := range BishopDirections {
 		var boardLimit int8
 		switch dir {
-		case UpRight:
+		case SouthEast:
 			boardLimit = min(row, 7-col)
-		case UpLeft:
+		case SouthWest:
 			boardLimit = min(row, col)
-		case DownRight:
+		case NorthEast:
 			boardLimit = min(7-row, 7-col)
-		case DownLeft:
+		case NorthWest:
 			boardLimit = min(7-row, col)
 		}
 		for step := int8(1); step <= boardLimit; step++ {
