@@ -12,7 +12,6 @@ const (
 	QueenSideCastle      = 2
 	NoEnPassant     int8 = -1
 
-	//king safety
 	NotCalculated int8 = 0
 	KingIsSafe    int8 = 8
 	KingIsCheck   int8 = 16
@@ -29,14 +28,25 @@ type Position struct {
 	enPassantIdx      int8
 	blackKingIdx      int8
 	whiteKingIdx      int8
-	whiteAttacks      uint64
-	blackAttacks      uint64
 	occupied          uint64
 	blackOccupied     uint64
 	whiteOccupied     uint64
-	movesCache        [64][]int8
 	whiteKingSafety   int8
 	blackKingSafety   int8
+
+	queenBoard  uint64
+	kingBoard   uint64
+	bishopBoard uint64
+	rookBoard   uint64
+	knightBoard uint64
+	pawnBoard   uint64
+
+	// is init
+	isInit bool
+	// @todo
+	movesCache   [64][]int8
+	whiteAttacks uint64
+	blackAttacks uint64
 }
 
 func NewPosition() *Position {
@@ -57,6 +67,7 @@ func NewPosition() *Position {
 		blackOccupied:     uint64(0),
 		whiteKingSafety:   NotCalculated,
 		blackKingSafety:   NotCalculated,
+		isInit:            false,
 	}
 }
 
@@ -155,6 +166,9 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 	}
 
 	// Init king safety
+	// Important to init again safeties: possible wrong states due to early calculation with partial board
+	pos.whiteKingSafety = NotCalculated
+	pos.blackKingSafety = NotCalculated
 	if IsKingInCheck(pos, White) {
 		pos.whiteKingSafety = KingIsCheck
 	} else {
@@ -171,31 +185,51 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 
 	// full move number
 
+	pos.isInit = true
+
 	return pos, nil
 }
 
 // @TODO
 // update cache
 // update attack vectors
+// setPieceAt Reset all the bitboards then update only the relevant ones
 func (p *Position) setPieceAt(idx int8, piece Piece) {
 	p.board[idx] = piece
 
-	if piece == NoPiece {
-		if p.activeColor == White {
-			p.whiteOccupied &= ^(uint64(1) << idx)
-		} else {
-			p.blackOccupied &= ^(uint64(1) << idx)
-		}
-		p.occupied &= ^(uint64(1) << idx)
-	} else {
+	p.kingBoard &= ^(uint64(1) << idx)
+	p.queenBoard &= ^(uint64(1) << idx)
+	p.rookBoard &= ^(uint64(1) << idx)
+	p.bishopBoard &= ^(uint64(1) << idx)
+	p.knightBoard &= ^(uint64(1) << idx)
+	p.pawnBoard &= ^(uint64(1) << idx)
+
+	p.whiteOccupied &= ^(uint64(1) << idx)
+	p.blackOccupied &= ^(uint64(1) << idx)
+	p.occupied &= ^(uint64(1) << idx)
+
+	if piece != NoPiece {
 		if piece.Color() == White {
-			p.blackOccupied &= ^(uint64(1) << idx)
 			p.whiteOccupied |= uint64(1) << idx
 		} else {
-			p.whiteOccupied &= ^(uint64(1) << idx)
 			p.blackOccupied |= uint64(1) << idx
 		}
 		p.occupied |= uint64(1) << idx
+
+		switch piece.Type() {
+		case King:
+			p.kingBoard |= 1 << idx
+		case Queen:
+			p.queenBoard |= 1 << idx
+		case Rook:
+			p.rookBoard |= 1 << idx
+		case Bishop:
+			p.bishopBoard |= 1 << idx
+		case Knight:
+			p.knightBoard |= 1 << idx
+		case Pawn:
+			p.pawnBoard |= 1 << idx
+		}
 	}
 }
 
