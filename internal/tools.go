@@ -202,3 +202,14 @@ func indexToFENPosition(index int8) string {
 	rank := index / 8
 	return strconv.Itoa(int('a'+file)) + strconv.Itoa(int(rank+1))
 }
+
+func isSameLineOrRow(start, end, direction int8) bool {
+	switch direction {
+	case 1, -1: // Horizontal
+		return start/8 == end/8
+	case 8, -8: // Vertical
+		return start%8 == end%8
+	default: // Diagonals
+		return absInt8(start%8-end%8) == absInt8(start/8-end/8)
+	}
+}

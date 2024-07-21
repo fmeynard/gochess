@@ -29,6 +29,11 @@ var (
 		{2, 1}, {1, 2}, {-1, 2}, {-2, 1},
 		{-2, -1}, {-1, -2}, {1, -2}, {2, -1},
 	}
+
+	sliderAttackMasks [64][8]uint64
+	queenAttacksMask  [64]uint64
+	knightAttacksMask [64]uint64
+	kingAttacksMask   [64]uint64
 )
 
 type BitsBoardMoveGenerator struct {
@@ -40,6 +45,7 @@ type BitsBoardMoveGenerator struct {
 	blackPawnMovesMasks    [64]uint64
 	whitePawnCapturesMasks [64]uint64
 	blackPawnCapturesMasks [64]uint64
+	sliderAttackMasks      [64][8]uint64
 }
 
 func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
@@ -57,6 +63,55 @@ func (g *BitsBoardMoveGenerator) initMasks() {
 		g.initKnightMaskForSquare(squareIdx)
 		g.initKingMaskForSquare(squareIdx)
 		g.initPawnMasksForSquare(squareIdx)
+		g.initSliderAttackMasks()
+		g.initKnightAttacksMasks()
+		g.initKingAttacksMasks()
+	}
+}
+
+func (g *BitsBoardMoveGenerator) initSliderAttackMasks() {
+	for idx := int8(0); idx < 64; idx++ {
+		for dirIdx, dir := range QueenDirections {
+			mask := uint64(0)
+			for step := int8(1); step < 8; step++ {
+				nextSquare := idx + step*dir
+				if nextSquare < 0 || nextSquare >= 64 || !isSameLineOrRow(idx, nextSquare, dir) {
+					break
+				}
+				mask |= 1 << nextSquare
+			}
+			g.sliderAttackMasks[idx][dirIdx] = mask
+			queenAttacksMask[idx] |= mask
+		}
+	}
+
+	sliderAttackMasks = g.sliderAttackMasks
+}
+
+func (g *BitsBoardMoveGenerator) initKnightAttacksMasks() {
+	for idx := int8(0); idx < 64; idx++ {
+		rank, file := RankAndFile(idx)
+		for _, move := range knightMoves {
+			newFile := file + move[0]
+			newRank := rank + move[1]
+			if isOnBoard(newFile, newRank) {
+				knightAttacksMask[idx] |= uint64(1 << (newRank*8 + newFile))
+			}
+		}
+	}
+}
+
+func (g *BitsBoardMoveGenerator) initKingAttacksMasks() {
+	for idx := int8(0); idx < 64; idx++ {
+		rank, file := RankAndFile(idx)
+
+		for _, move := range kingMoves {
+			newFile := file + move[0]
+			newRank := rank + move[1]
+			if isOnBoard(newFile, newRank) {
+				kingAttacksMask[idx] |= uint64(1 << (newRank*8 + newFile))
+			}
+		}
 	}
 }
 
