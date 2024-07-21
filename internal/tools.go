@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"math/bits"
+	"strconv"
 	"strings"
 )
 
@@ -55,39 +56,13 @@ func absInt8(x int8) int8 {
 	return x
 }
 
-func IsSameDiagonal(pieceRank, pieceFile, targetRank, targetFile int8) bool {
-	return absInt8(pieceFile-targetFile) == absInt8(pieceRank-targetRank)
-}
-
 func leastSignificantOne(bb uint64) int8 {
 	return int8(bits.TrailingZeros64(bb))
 }
 
-func isSameLine(fromIdx, toIdx, direction int8) bool {
-	if direction == 1 || direction == -1 { // Horizontal movement
-		return fromIdx/8 == toIdx/8
-	}
-
-	if direction == 8 || direction == -8 { // Vertical movement
-		return fromIdx%8 == toIdx%8
-	}
-
-	return absInt8((fromIdx%8)-(toIdx%8)) == absInt8((fromIdx/8)-(toIdx/8))
-}
-
-func canReach(pieceType int8, direction int8) bool {
-	switch pieceType {
-	case Rook:
-		return direction == 1 || direction == -1 || direction == 8 || direction == -8
-	case Bishop:
-		return direction == 7 || direction == -7 || direction == 9 || direction == -9
-	case Queen:
-		return true
-	case King, Knight:
-		return true // Kings and Knights move in all directions but limited distance
-	default:
-		return false
-	}
+// mostSignificantBit returns the position of the highest set bit (most significant bit)
+func mostSignificantBit(x uint64) int8 {
+	return int8(63 - bits.LeadingZeros64(x))
 }
 
 func movesToUci(moves []Move) []string {
@@ -118,4 +93,112 @@ func draw(vector uint64) {
 // isOnBoard checks if the given file and rank are within the bounds of the board.
 func isOnBoard(file, rank int8) bool {
 	return file >= 0 && file < 8 && rank >= 0 && rank < 8
+}
+
+func positionToFEN(pos *Position) string {
+	var fen string
+	emptyCount := 0
+
+	// Generate the piece placement data
+	for row := 7; row >= 0; row-- { // FEN starts from the 8th rank down to the 1st
+		for col := 0; col < 8; col++ {
+			index := row*8 + col
+			piece := pos.board[index]
+
+			if piece == NoPiece {
+				emptyCount++
+			} else {
+				if emptyCount > 0 {
+					fen += strconv.Itoa(emptyCount)
+					emptyCount = 0
+				}
+				fen += pieceToFENChar(piece)
+			}
+		}
+		if emptyCount > 0 {
+			fen += strconv.Itoa(emptyCount)
+			emptyCount = 0
+		}
+		if row > 0 {
+			fen += "/"
+		}
+	}
+
+	// Active color
+	if pos.activeColor == White {
+		fen += " w "
+	} else {
+		fen += " b "
+	}
+
+	// Castling availability
+	castle := ""
+	if pos.whiteCastleRights&KingSideCastle != 0 {
+		castle += "K"
+	}
+	if pos.whiteCastleRights&QueenSideCastle != 0 {
+		castle += "Q"
+	}
+	if pos.blackCastleRights&KingSideCastle != 0 {
+		castle += "k"
+	}
+	if pos.blackCastleRights&QueenSideCastle != 0 {
+		castle += "q"
+	}
+	if castle == "" {
+		castle = "-"
+	}
+	fen += castle + " "
+
+	// En passant target square
+	if pos.enPassantIdx != NoEnPassant {
+		fen += indexToFENPosition(pos.enPassantIdx) + " "
+	} else {
+		fen += "- "
+	}
+
+	// Half-move clock
+	fen += "0 "
+
+	// Full-move number
+	fen += "1"
+
+	return fen
+}
+
+func pieceToFENChar(piece Piece) string {
+	if piece == NoPiece {
+		return ""
+	}
+
+	var pieceStr string
+	switch piece.Type() {
+	case Pawn:
+		pieceStr = "p"
+	case Knight:
+		pieceStr = "n"
+	case Bishop:
+		pieceStr = "b"
+	case Rook:
+		pieceStr = "r"
+	case Queen:
+		pieceStr = "q"
+	case King:
+		pieceStr = "k"
+	default:
+		pieceStr = ""
+	}
+
+	if piece.Color() == White {
+		return strings.ToUpper(pieceStr)
+	}
+
+	return pieceStr
+}
+
+func indexToFENPosition(index int8) string {
+	// Convert board index into FEN position notation, e.g., e2, h7, etc.
+	file := index % 8
+	rank := index / 8
+	return strconv.Itoa(int('a'+file)) + strconv.Itoa(int(rank+1))
 }
