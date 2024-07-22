@@ -63,7 +63,7 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 
 		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
 			initialColor := pos.activeColor
-			pseudoLegalMove := NewMove(pos.board[idx], idx, pseudoLegalMoveIdx, NormalMove)
+			pseudoLegalMove := NewMove(pos.PieceAt(idx), idx, pseudoLegalMoveIdx, NormalMove)
 
 			// skip further checks if not needed
 			if !pos.IsCheck() && !e.positionUpdater.IsMoveAffectsKing(pos, pseudoLegalMove, pos.activeColor) {

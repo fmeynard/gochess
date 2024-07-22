@@ -7,7 +7,7 @@ func updateAttackVectors(pos *Position) {
 
 	// Recalculate attacks for all pieces
 	for i := int8(0); i < 64; i++ {
-		piece := pos.board[i]
+		piece := pos.PieceAt(i)
 		if piece == NoPiece {
 			continue
 		}
@@ -96,7 +96,7 @@ func updateSlidingPieceAttacks(pos *Position, idx int8, directions []int8, isWhi
 				pos.blackAttacks |= 1 << targetIdx
 			}
 
-			if pos.board[targetIdx] != NoPiece {
+			if pos.PieceAt(targetIdx) != NoPiece {
 				break // Stop if another piece is encountered
 			}
 		}

@@ -103,7 +103,7 @@ func positionToFEN(pos *Position) string {
 	for row := 7; row >= 0; row-- { // FEN starts from the 8th rank down to the 1st
 		for col := 0; col < 8; col++ {
 			index := row*8 + col
-			piece := pos.board[index]
+			piece := pos.PieceAt(int8(index))
 
 			if piece == NoPiece {
 				emptyCount++
