@@ -30,10 +30,12 @@ var (
 		{-2, -1}, {-1, -2}, {1, -2}, {2, -1},
 	}
 
-	sliderAttackMasks [64][8]uint64
-	queenAttacksMask  [64]uint64
-	knightAttacksMask [64]uint64
-	kingAttacksMask   [64]uint64
+	sliderAttackMasks           [64][8]uint64
+	queenAttacksMask            [64]uint64
+	knightAttacksMask           [64]uint64
+	kingAttacksMask             [64]uint64
+	diagonalAttacksMask         [64][4]uint64
+	diagonalCombinedAttacksMask [64]uint64
 )
 
 type BitsBoardMoveGenerator struct {
@@ -66,6 +68,24 @@ func (g *BitsBoardMoveGenerator) initMasks() {
 		g.initSliderAttackMasks()
 		g.initKnightAttacksMasks()
 		g.initKingAttacksMasks()
+		g.initDiagonalAttacksMasks()
+	}
+}
+
+func (g *BitsBoardMoveGenerator) initDiagonalAttacksMasks() {
+	for idx := int8(0); idx < 64; idx++ {
+		for dirIdx, dir := range BishopDirections {
+			mask := uint64(0)
+			for step := int8(1); step < 8; step++ {
+				nextSquare := idx + step*dir
+				if nextSquare < 0 || nextSquare >= 64 || !isSameLineOrRow(idx, nextSquare, dir) {
+					break
+				}
+				mask |= 1 << nextSquare
+			}
+			diagonalAttacksMask[idx][dirIdx] = mask
+			diagonalCombinedAttacksMask[idx] |= mask
+		}
 	}
 }
 

@@ -36,7 +36,7 @@ func TestIsSquareAttackedByPawn(t *testing.T) {
 			false,
 		},
 		"Pawn check from left": {
-			"8/8/8/8/2p5/3K4/8/8 b - - 0 1",
+			"8/8/8/8/2p5/3K4/8/8 w - - 0 1",
 			D3,
 			White,
 			true,
@@ -282,6 +282,7 @@ func TestIsSquareAttackedBySlidingPiece(t *testing.T) {
 		},
 	}
 
+	NewEngine()
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
 			pos, _ := NewPositionFromFEN(d.fenPos)
@@ -379,6 +380,87 @@ func TestIsRankAttackedByEnemy(t *testing.T) {
 				t,
 				d.result,
 				isRankAttackedByEnemy(pos, d.pieceIdx, pos.OpponentColor()),
+			)
+		})
+	}
+}
+
+func TestIsDiagonallyAttacked(t *testing.T) {
+	data := map[string]struct {
+		fenPos   string
+		pieceIdx int8
+		result   bool
+	}{
+		"NW Attack": {
+			"8/b7/8/8/3K4/8/8/8 w - - 0 1",
+			D4,
+			true,
+		},
+		"NE Attack": {
+			"8/6b1/8/8/3K4/8/8/8 w - - 0 1",
+			D4,
+			true,
+		},
+		"SW Attack": {
+			"8/8/8/8/3K4/8/8/b7 w - - 0 1",
+			D4,
+			true,
+		},
+		"SE Attack": {
+			"8/8/8/8/3K4/8/8/b7 w - - 0 1",
+			D4,
+			true,
+		},
+		"NW Blocked Attack": {
+			"8/b7/1P6/8/3K4/8/8/8 w - - 0 1",
+			D4,
+			false,
+		},
+		"NE Blocked Attack": {
+			"8/6b1/5P2/8/3K4/8/8/8 w - - 0 1",
+			D4,
+			false,
+		},
+		"SW Blocked Attack": {
+			"8/8/8/8/3K4/2P5/1b6/8 w - - 0 1",
+			D4,
+			false,
+		},
+		"SE Blocked Attack": {
+			"8/8/8/8/3K4/4P3/5b2/8 w - - 0 1",
+			D4,
+			false,
+		},
+		"SE Double Attack": {
+			"8/8/8/8/3K4/4b3/5b2/8 w - - 0 1",
+			D4,
+			true,
+		},
+		"Surrounded diagonally not attack": {
+			"8/8/2b1b3/1b3b2/3K4/1b3b2/2b1b3/8 w - - 0 1",
+			D4,
+			false,
+		},
+		"Surrounded by rooks and bishops not attack": {
+			"8/8/8/2rbr3/2bKb3/2rbr3/8/8 w - - 0 1",
+			D4,
+			false,
+		},
+		"Custom position no attack": {
+			"r1b1kbnr/p2ppp1p/n7/1p4p1/1K3q2/1p1NP3/P1P1PPPP/1RBQB1NR w KQkq - 0 1",
+			D4,
+			false,
+		},
+	}
+
+	NewEngine()
+	for name, d := range data {
+		t.Run(name, func(t *testing.T) {
+			pos, _ := NewPositionFromFEN(d.fenPos)
+			assert.Equal(
+				t,
+				d.result,
+				isDiagonallyAttacked(pos, d.pieceIdx, pos.OpponentColor()),
 			)
 		})
 	}

@@ -88,6 +88,8 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 	}
 
 	pos := NewPosition()
+	hasWhiteKing := false
+	hasBlackKing := false
 
 	parts := strings.Split(fen, " ")
 	if len(parts) < 4 {
@@ -121,8 +123,10 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 		pos.setPieceAt(idx, piece)
 		if piece.Type() == King {
 			if piece.Color() == White {
+				hasWhiteKing = true
 				pos.whiteKingIdx = idx
 			} else {
+				hasBlackKing = true
 				pos.blackKingIdx = idx
 			}
 		}
@@ -169,16 +173,20 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 	// Important to init again safeties: possible wrong states due to early calculation with partial board
 	pos.whiteKingSafety = NotCalculated
 	pos.blackKingSafety = NotCalculated
-	if IsKingInCheck(pos, White) {
-		pos.whiteKingSafety = KingIsCheck
-	} else {
-		pos.whiteKingSafety = KingIsSafe
+	if hasWhiteKing {
+		if IsKingInCheck(pos, White) {
+			pos.whiteKingSafety = KingIsCheck
+		} else {
+			pos.whiteKingSafety = KingIsSafe
+		}
 	}
 
-	if IsKingInCheck(pos, Black) {
-		pos.blackKingSafety = KingIsCheck
-	} else {
-		pos.blackKingSafety = KingIsSafe
+	if hasBlackKing {
+		if IsKingInCheck(pos, Black) {
+			pos.blackKingSafety = KingIsCheck
+		} else {
+			pos.blackKingSafety = KingIsSafe
+		}
 	}
 
 	// Half move clock
@@ -195,40 +203,46 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 // update attack vectors
 // setPieceAt Reset all the bitboards then update only the relevant ones
 func (p *Position) setPieceAt(idx int8, piece Piece) {
+	prevPiece := p.board[idx]
+
 	p.board[idx] = piece
+	pieceMask := uint64(1 << idx)
 
-	p.kingBoard &= ^(uint64(1) << idx)
-	p.queenBoard &= ^(uint64(1) << idx)
-	p.rookBoard &= ^(uint64(1) << idx)
-	p.bishopBoard &= ^(uint64(1) << idx)
-	p.knightBoard &= ^(uint64(1) << idx)
-	p.pawnBoard &= ^(uint64(1) << idx)
+	if prevPiece != NoPiece {
+		p.kingBoard &= ^pieceMask
+		p.queenBoard &= ^pieceMask
+		p.rookBoard &= ^pieceMask
+		p.bishopBoard &= ^pieceMask
+		p.knightBoard &= ^pieceMask
+		p.pawnBoard &= ^pieceMask
 
-	p.whiteOccupied &= ^(uint64(1) << idx)
-	p.blackOccupied &= ^(uint64(1) << idx)
-	p.occupied &= ^(uint64(1) << idx)
+		p.whiteOccupied &= ^pieceMask
+		p.blackOccupied &= ^pieceMask
+	}
+
+	p.occupied &= ^pieceMask
 
 	if piece != NoPiece {
 		if piece.Color() == White {
-			p.whiteOccupied |= uint64(1) << idx
+			p.whiteOccupied |= pieceMask
 		} else {
-			p.blackOccupied |= uint64(1) << idx
+			p.blackOccupied |= pieceMask
 		}
 		p.occupied |= uint64(1) << idx
 
 		switch piece.Type() {
 		case King:
-			p.kingBoard |= 1 << idx
+			p.kingBoard |= pieceMask
 		case Queen:
-			p.queenBoard |= 1 << idx
+			p.queenBoard |= pieceMask
 		case Rook:
-			p.rookBoard |= 1 << idx
+			p.rookBoard |= pieceMask
 		case Bishop:
-			p.bishopBoard |= 1 << idx
+			p.bishopBoard |= pieceMask
 		case Knight:
-			p.knightBoard |= 1 << idx
+			p.knightBoard |= pieceMask
 		case Pawn:
-			p.pawnBoard |= 1 << idx
+			p.pawnBoard |= pieceMask
 		}
 	}
 }

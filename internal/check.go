@@ -6,29 +6,35 @@ const (
 	RookSlider   = 2
 )
 
-// verify if the square is attacked by pawn
 func isSquareAttackedByPawn(pos *Position, idx int8, kingColor int8) bool {
-	rank, file := RankAndFile(idx)
-	pawnAttacks := [2][2]int8{{-1, 1}, {1, 1}}
-	if kingColor != White {
-		pawnAttacks = [2][2]int8{{-1, -1}, {1, -1}}
+	rank := RankFromIdx(idx)
+
+	var (
+		mask         uint64
+		opponentMask uint64
+	)
+
+	if kingColor == Black {
+		rank--
+		if rank == 0 || rank == -1 {
+			return false
+		}
+		mask |= 1 << (idx - 7)
+		mask |= 1 << (idx - 9)
+		opponentMask = pos.OccupancyMask(White)
+	} else {
+		rank++
+		if rank == 8 || rank == 9 {
+			return false
+		}
+		mask |= 1 << (idx + 7)
+		mask |= 1 << (idx + 9)
+		opponentMask = pos.OccupancyMask(Black)
 	}
 
-	for _, attack := range pawnAttacks {
-		newFile := file + attack[0]
-		newRank := rank + attack[1]
-		if !isOnBoard(newFile, newRank) {
-			continue
-		}
+	rankMask := uint64(0xFF) << (rank * 8)
 
-		endIdx := newRank*8 + newFile
-		piece := pos.board[endIdx]
-		if piece.Type() == Pawn && piece.Color() != kingColor {
-			return true
-		}
-	}
-
-	return false
+	return (mask & pos.pawnBoard & rankMask & opponentMask) != 0
 }
 
 // verify if the square is attacked by knight
@@ -39,22 +45,13 @@ func isSquareAttackedByKnight(pos *Position, idx int8, kingColor int8) bool {
 func isSquareAttackedBySlidingPiece(pos *Position, squareIdx int8, kingColor int8) bool {
 	// Bitboards for enemy pieces
 	var (
-		enemyQueens uint64
-		//enemyRooks   uint64
-		enemyBishops uint64
-		enemyColor   int8
+		enemyColor int8
 	)
 
 	if kingColor == White {
 		enemyColor = Black
-		enemyQueens = pos.queenBoard & pos.blackOccupied
-		//enemyRooks = pos.rookBoard & pos.blackOccupied
-		enemyBishops = pos.bishopBoard & pos.blackOccupied
 	} else {
 		enemyColor = White
-		enemyQueens = pos.queenBoard & pos.whiteOccupied
-		//enemyRooks = pos.rookBoard & pos.whiteOccupied
-		enemyBishops = pos.bishopBoard & pos.whiteOccupied
 	}
 
 	if isRankAttackedByEnemy(pos, squareIdx, enemyColor) {
@@ -65,51 +62,54 @@ func isSquareAttackedBySlidingPiece(pos *Position, squareIdx int8, kingColor int
 		return true
 	}
 
-	// Check for threats along diagonals
-	if diagonalAttacks(pos, squareIdx)&(enemyBishops|enemyQueens) != 0 {
+	if isDiagonallyAttacked(pos, squareIdx, enemyColor) {
 		return true
 	}
 
 	return false
 }
 
-func diagonalAttacks(pos *Position, index int8) uint64 {
-	row, col := index/8, index%8
-	var attacks uint64
+func calculateActualAttacks(pos *Position, idx int8, dir int) uint64 {
+	attackMask := diagonalAttacksMask[idx][dir]
+	blocker := attackMask & pos.occupied
 
-	// Trace each diagonal until blocked or end of board
-	for _, dir := range BishopDirections {
-		var boardLimit int8
-		switch dir {
-		case SouthEast:
-			boardLimit = min(row, 7-col)
-		case SouthWest:
-			boardLimit = min(row, col)
-		case NorthEast:
-			boardLimit = min(7-row, 7-col)
-		case NorthWest:
-			boardLimit = min(7-row, col)
-		}
-		for step := int8(1); step <= boardLimit; step++ {
-			targetIdx := index + dir*step
-			if targetIdx < 0 || targetIdx >= 64 {
-				break // Safety check for boundaries, should never actually trigger
-			}
-			attacks |= 1 << targetIdx
-
-			// If this square is occupied, break, as it blocks further attacks in this direction
-			if pos.occupied&(1<<targetIdx) != 0 {
-				break
-			}
-		}
+	lsb, msb := leastSignificantOne(blocker), mostSignificantBit(blocker)
+	if msb == lsb || blocker == 0 {
+		return attackMask
 	}
 
-	return attacks
+	switch dir {
+	case 0: //SouthWest
+		return attackMask & ^((1 << (msb + 1)) - 1)
+	case 1: //SouthEast
+		return attackMask & ^((1 << (lsb + 1)) - 1)
+	case 2: //NorthWest
+		return attackMask&(1<<msb) - 1
+	case 3: //NorthEast
+		return attackMask&(1<<lsb) - 1
+	}
+
+	panic("Unexpected direction value")
+}
+
+// isDiagonallyAttacked determines if the position at index is diagonally attacked by the enemy.
+func isDiagonallyAttacked(pos *Position, idx int8, enemyColor int8) bool {
+	enemyDiagonalSliders := pos.OccupancyMask(enemyColor) & (pos.queenBoard | pos.bishopBoard)
+
+	if enemyDiagonalSliders&diagonalCombinedAttacksMask[idx] == 0 {
+		return false
+	}
+
+	for dir := 0; dir < 4; dir++ {
+		if calculateActualAttacks(pos, idx, dir)&enemyDiagonalSliders != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func isRankAttackedByEnemy(pos *Position, index int8, enemyColor int8) bool {
-	rank := index / 8
-	rankBase := rank * 8
+	rankBase := RankFromIdx(index) * 8
 	rankMask := uint64(0xFF) << (rankBase) // Mask for the entire rank
 
 	// Combine enemy rooks and queens into one bitboard

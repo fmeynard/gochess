@@ -88,7 +88,7 @@ func TestSliderPseudoLegalMoves(t *testing.T) {
 				t.Fatal(err.Error())
 			}
 
-			moves := generator.SliderPseudoLegalMoves(pos, d.piecePos, pos.board[d.piecePos].Type())
+			moves := generator.SliderPseudoLegalMoves(pos, d.piecePos, pos.PieceAt(d.piecePos).Type())
 			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
 		})
 	}
