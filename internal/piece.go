@@ -99,16 +99,3 @@ func (p Piece) Color() int8 {
 func (p Piece) Type() int8 {
 	return int8(p) & 7
 }
-
-func (p Piece) IsSlider(sliderType int) bool {
-	pieceType := p.Type()
-	if sliderType == BishopSlider && (pieceType == Bishop || pieceType == Queen) {
-		return true
-	}
-
-	if sliderType == RookSlider && (pieceType == Rook || pieceType == Queen) {
-		return true
-	}
-
-	return false
-}

@@ -39,7 +39,7 @@ func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
 	}
 }
 
-func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
+func (updater *PositionUpdater) MakeMove(pos *Position, move Move) *MoveHistory {
 	startPieceIdx := move.StartIdx()
 	endPieceIdx := move.EndIdx()
 	startPiece := pos.PieceAt(move.StartIdx())
@@ -128,12 +128,10 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 		pos.activeColor = White
 	}
 
-	return history
+	return &history
 }
 
-func (updater *PositionUpdater) UnMakeMove(pos *Position, move Move, history MoveHistory) {
-	// Restore the pieces to their original positions
-	pos.board = history.board
+func (updater *PositionUpdater) UnMakeMove(pos *Position, history *MoveHistory) {
 
 	// Restore the state of the kings
 	pos.whiteKingIdx = history.whiteKingIdx

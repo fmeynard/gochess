@@ -12,7 +12,6 @@ type MoveHistory struct {
 	whiteOccupied     uint64
 	blackOccupied     uint64
 	occupied          uint64
-	board             [64]Piece
 
 	queenBoard  uint64
 	kingBoard   uint64
@@ -24,7 +23,6 @@ type MoveHistory struct {
 
 func NewMoveHistory(pos *Position) MoveHistory {
 	return MoveHistory{
-		board:             pos.board,
 		whiteKingIdx:      pos.whiteKingIdx,
 		blackKingIdx:      pos.blackKingIdx,
 		whiteCastleRights: pos.whiteCastleRights,

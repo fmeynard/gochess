@@ -3,14 +3,13 @@ package internal
 import "math/bits"
 
 type Engine struct {
-	game            *Game
 	moveGenerator   IMoveGenerator
 	positionUpdater IPositionUpdater
 }
 
 type IPositionUpdater interface {
-	MakeMove(initPos *Position, move Move) MoveHistory
-	UnMakeMove(initPos *Position, move Move, history MoveHistory)
+	MakeMove(pos *Position, move Move) *MoveHistory
+	UnMakeMove(pos *Position, history *MoveHistory)
 	IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool
 }
 
@@ -44,26 +43,35 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 		//piece := pos.PieceAt(idx)
 
 		pieceMask := uint64(1 << idx)
-		var pseudoLegalMoves []int8
+		var (
+			pseudoLegalMoves []int8
+			pieceType        int8
+		)
 
 		switch {
 		case pieceMask&pos.pawnBoard != 0:
 			pseudoLegalMoves, _ = e.moveGenerator.PawnPseudoLegalMoves(pos, idx)
+			pieceType = Pawn
 		case pieceMask&pos.knightBoard != 0:
 			pseudoLegalMoves = e.moveGenerator.KnightPseudoLegalMoves(pos, idx)
+			pieceType = Knight
 		case pieceMask&pos.bishopBoard != 0:
 			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Bishop)
+			pieceType = Bishop
 		case pieceMask&pos.rookBoard != 0:
 			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Rook)
+			pieceType = Rook
 		case pieceMask&pos.queenBoard != 0:
 			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Queen)
+			pieceType = Queen
 		case pieceMask&pos.kingBoard != 0:
 			pseudoLegalMoves = e.moveGenerator.KingPseudoLegalMoves(pos, idx)
+			pieceType = King
 		}
 
 		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
 			initialColor := pos.activeColor
-			pseudoLegalMove := NewMove(pos.PieceAt(idx), idx, pseudoLegalMoveIdx, NormalMove)
+			pseudoLegalMove := NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, NormalMove)
 
 			// skip further checks if not needed
 			if !pos.IsCheck() && !e.positionUpdater.IsMoveAffectsKing(pos, pseudoLegalMove, pos.activeColor) {
@@ -77,7 +85,8 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 				moves = append(moves, pseudoLegalMove)
 			}
 
-			e.positionUpdater.UnMakeMove(pos, pseudoLegalMove, history)
+			e.positionUpdater.UnMakeMove(pos, history)
+			history = nil
 		}
 
 		piecesMask &^= 1 << idx
@@ -94,7 +103,8 @@ func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint6
 		history := e.positionUpdater.MakeMove(pos, move)
 		res[move.UCI()] = e.MoveGenerationTest(pos, depth)
 		total += res[move.UCI()]
-		e.positionUpdater.UnMakeMove(pos, move, history)
+		e.positionUpdater.UnMakeMove(pos, history)
+		history = nil
 	}
 
 	return res, total
@@ -111,7 +121,7 @@ func (e *Engine) MoveGenerationTest(pos *Position, depth int) uint64 {
 
 		nextDepth := depth - 1
 		nextDepthResult := e.MoveGenerationTest(pos, nextDepth)
-		e.positionUpdater.UnMakeMove(pos, move, history)
+		e.positionUpdater.UnMakeMove(pos, history)
 
 		posCount += nextDepthResult
 	}

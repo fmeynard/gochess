@@ -357,7 +357,7 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 		assert.Equal(t, NoPiece, pos.PieceAt(A2))
 		assert.Equal(t, Piece(White|Pawn), pos.PieceAt(A4))
 
-		engine.positionUpdater.UnMakeMove(pos, move, history)
+		engine.positionUpdater.UnMakeMove(pos, history)
 		assert.Equal(t, White, pos.activeColor)
 		assert.Equal(t, NoPiece, pos.PieceAt(A4))
 		assert.Equal(t, Piece(White|Pawn), pos.PieceAt(A2))
@@ -374,7 +374,6 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 			occupied          = pos.occupied
 			blackOccupied     = pos.blackOccupied
 			whiteOccupied     = pos.whiteOccupied
-			board             = pos.board
 			enPassantIdx      = pos.enPassantIdx
 			activeColor       = pos.activeColor
 			whiteKingSafety   = pos.whiteKingSafety
@@ -383,7 +382,7 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 
 		for _, move := range legalMoves {
 			history := engine.positionUpdater.MakeMove(pos, move)
-			engine.positionUpdater.UnMakeMove(pos, move, history)
+			engine.positionUpdater.UnMakeMove(pos, history)
 		}
 
 		assert.Equal(t, occupied, pos.occupied)
@@ -391,7 +390,6 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 		assert.Equal(t, blackOccupied, pos.blackOccupied)
 		assert.Equal(t, whiteCastleRights, pos.whiteCastleRights)
 		assert.Equal(t, blackCastleRights, pos.blackCastleRights)
-		assert.ElementsMatch(t, board, pos.board)
 		assert.Equal(t, enPassantIdx, pos.enPassantIdx)
 		assert.Equal(t, activeColor, pos.activeColor)
 		assert.Equal(t, whiteKingSafety, pos.whiteKingSafety)
