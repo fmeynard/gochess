@@ -21,15 +21,6 @@ var (
 	KingOffsets   = []int8{-9, -8, -7, -1, 1, 7, 8, 9}
 	KnightOffsets = []int8{-17, -15, -10, -6, 6, 10, 15, 17}
 
-	// move per rank and file
-
-	kingMoves = [8][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
-
-	knightMoves = [8][2]int8{
-		{2, 1}, {1, 2}, {-1, 2}, {-2, 1},
-		{-2, -1}, {-1, -2}, {1, -2}, {2, -1},
-	}
-
 	sliderAttackMasks           [64][8]uint64
 	queenAttacksMask            [64]uint64
 	knightAttacksMask           [64]uint64
@@ -109,6 +100,12 @@ func (g *BitsBoardMoveGenerator) initSliderAttackMasks() {
 }
 
 func (g *BitsBoardMoveGenerator) initKnightAttacksMasks() {
+
+	knightMoves := [8][2]int8{
+		{2, 1}, {1, 2}, {-1, 2}, {-2, 1},
+		{-2, -1}, {-1, -2}, {1, -2}, {2, -1},
+	}
+
 	for idx := int8(0); idx < 64; idx++ {
 		rank, file := RankAndFile(idx)
 		for _, move := range knightMoves {
@@ -122,6 +119,8 @@ func (g *BitsBoardMoveGenerator) initKnightAttacksMasks() {
 }
 
 func (g *BitsBoardMoveGenerator) initKingAttacksMasks() {
+	kingMoves := [8][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
+
 	for idx := int8(0); idx < 64; idx++ {
 		rank, file := RankAndFile(idx)
 

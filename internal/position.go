@@ -44,9 +44,7 @@ type Position struct {
 	// is init
 	isInit bool
 	// @todo
-	movesCache   [64][]int8
-	whiteAttacks uint64
-	blackAttacks uint64
+	//movesCache   [64][]int8
 }
 
 func NewPosition() *Position {
