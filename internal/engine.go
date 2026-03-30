@@ -34,6 +34,29 @@ func (e *Engine) StartGame() {}
 
 func (e *Engine) Move() {}
 
+func (e *Engine) isCastleMove(pieceType int8, move Move) bool {
+	return pieceType == King && absInt8(move.EndIdx()-move.StartIdx()) == 2
+}
+
+func (e *Engine) isCastlePathSafe(pos *Position, move Move) bool {
+	initialColor := pos.activeColor
+	if IsKingInCheck(pos, initialColor) {
+		return false
+	}
+
+	step := int8(1)
+	if move.EndIdx() < move.StartIdx() {
+		step = -1
+	}
+
+	intermediateMove := NewMove(Piece(initialColor|King), move.StartIdx(), move.StartIdx()+step, NormalMove)
+	history := e.positionUpdater.MakeMove(pos, intermediateMove)
+	isIntermediateSquareSafe := !IsKingInCheck(pos, initialColor)
+	e.positionUpdater.UnMakeMove(pos, history)
+
+	return isIntermediateSquareSafe
+}
+
 func (e *Engine) LegalMoves(pos *Position) []Move {
 	var moves []Move
 
@@ -71,22 +94,39 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 
 		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
 			initialColor := pos.activeColor
-			pseudoLegalMove := NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, NormalMove)
-
-			// skip further checks if not needed
-			if !pos.IsCheck() && !e.positionUpdater.IsMoveAffectsKing(pos, pseudoLegalMove, pos.activeColor) {
-				moves = append(moves, pseudoLegalMove)
-				continue
+			candidateMoves := []Move{
+				NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, NormalMove),
 			}
 
-			history := e.positionUpdater.MakeMove(pos, pseudoLegalMove)
-
-			if !IsKingInCheck(pos, initialColor) { // check is the new position that the initial color is not in check
-				moves = append(moves, pseudoLegalMove)
+			if pieceType == Pawn && isPromotionSquare(pos.activeColor, pseudoLegalMoveIdx) {
+				candidateMoves = []Move{
+					NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, QueenPromotion),
+					NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, KnightPromotion),
+					NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, BishopPromotion),
+					NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, RookPromotion),
+				}
 			}
 
-			e.positionUpdater.UnMakeMove(pos, history)
-			history = nil
+			for _, pseudoLegalMove := range candidateMoves {
+				if e.isCastleMove(pieceType, pseudoLegalMove) && !e.isCastlePathSafe(pos, pseudoLegalMove) {
+					continue
+				}
+
+				// skip further checks if not needed
+				if !pos.IsCheck() && !e.positionUpdater.IsMoveAffectsKing(pos, pseudoLegalMove, pos.activeColor) {
+					moves = append(moves, pseudoLegalMove)
+					continue
+				}
+
+				history := e.positionUpdater.MakeMove(pos, pseudoLegalMove)
+
+				if !IsKingInCheck(pos, initialColor) { // check is the new position that the initial color is not in check
+					moves = append(moves, pseudoLegalMove)
+				}
+
+				e.positionUpdater.UnMakeMove(pos, history)
+				history = nil
+			}
 		}
 
 		piecesMask &^= 1 << idx

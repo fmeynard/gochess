@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -30,13 +29,4 @@ func BenchmarkEngine_LegalMoves(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		engine.LegalMoves(pos)
 	}
-}
-
-func TestCustom(t *testing.T) {
-	var fen string
-	fen = "r1bqkbnr/1ppppppp/8/p7/8/P2KP3/1PPP1PPP/RNB1QBnR b KQkq - 0 1"
-	pos, _ := NewPositionFromFEN(fen)
-	engine := NewEngine()
-
-	fmt.Println(movesToUci(engine.LegalMoves(pos)))
 }

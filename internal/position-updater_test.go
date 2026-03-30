@@ -395,6 +395,4 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 		assert.Equal(t, whiteKingSafety, pos.whiteKingSafety)
 		assert.Equal(t, blackKingSafety, pos.blackKingSafety)
 	})
-
-	draw(kingAttacksMask[D4])
 }

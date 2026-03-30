@@ -282,6 +282,16 @@ func TestPawnPseudoLegalMoves(t *testing.T) {
 			piecePos:  C5,
 			moves:     []int8{C6, D6},
 		},
+		"single push promotion target": {
+			fenString: "7k/3P4/8/8/8/8/8/4K3 w - - 0 1",
+			piecePos:  D7,
+			moves:     []int8{D8},
+		},
+		"capture promotion targets": {
+			fenString: "2r1k3/3P4/8/8/8/8/8/4K3 w - - 0 1",
+			piecePos:  D7,
+			moves:     []int8{C8, D8, E8},
+		},
 	}
 
 	generator := NewBitsBoardMoveGenerator()
@@ -293,8 +303,22 @@ func TestPawnPseudoLegalMoves(t *testing.T) {
 				t.Fatal(err.Error())
 			}
 
-			moves, _ := generator.PawnPseudoLegalMoves(pos, d.piecePos)
+			moves, promotionIdx := generator.PawnPseudoLegalMoves(pos, d.piecePos)
 			assert.ElementsMatch(t, d.moves, moves, "Moves do not match")
+
+			hasPromotionMove := false
+			for _, move := range d.moves {
+				if isPromotionSquare(pos.activeColor, move) {
+					hasPromotionMove = true
+					break
+				}
+			}
+
+			if hasPromotionMove {
+				assert.True(t, isPromotionSquare(pos.activeColor, promotionIdx))
+			} else {
+				assert.Equal(t, int8(-1), promotionIdx)
+			}
 		})
 	}
 }

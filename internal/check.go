@@ -69,114 +69,50 @@ func isSquareAttackedBySlidingPiece(pos *Position, squareIdx int8, kingColor int
 	return false
 }
 
-func calculateActualAttacks(pos *Position, idx int8, dir int) uint64 {
-	attackMask := diagonalAttacksMask[idx][dir]
-	blocker := attackMask & pos.occupied
+func scanRayForAttack(pos *Position, startIdx int8, direction int8, enemyColor int8, targets uint64) bool {
+	for step := int8(1); step < 8; step++ {
+		nextIdx := startIdx + step*direction
+		if nextIdx < 0 || nextIdx >= 64 || !isSameLineOrRow(startIdx, nextIdx, direction) {
+			return false
+		}
 
-	lsb, msb := leastSignificantOne(blocker), mostSignificantBit(blocker)
-	if msb == lsb || blocker == 0 {
-		return attackMask
+		piece := pos.PieceAt(nextIdx)
+		if piece == NoPiece {
+			continue
+		}
+
+		if piece.Color() != enemyColor {
+			return false
+		}
+
+		return (targets & (uint64(1) << nextIdx)) != 0
 	}
 
-	switch dir {
-	case 0: //SouthWest
-		return attackMask & ^((1 << (msb + 1)) - 1)
-	case 1: //SouthEast
-		return attackMask & ^((1 << (lsb + 1)) - 1)
-	case 2: //NorthWest
-		return attackMask&(1<<msb) - 1
-	case 3: //NorthEast
-		return attackMask&(1<<lsb) - 1
-	}
-
-	panic("Unexpected direction value")
+	return false
 }
 
 // isDiagonallyAttacked determines if the position at index is diagonally attacked by the enemy.
 func isDiagonallyAttacked(pos *Position, idx int8, enemyColor int8) bool {
-	enemyDiagonalSliders := pos.OccupancyMask(enemyColor) & (pos.queenBoard | pos.bishopBoard)
+	targets := (pos.queenBoard | pos.bishopBoard) & pos.OccupancyMask(enemyColor)
 
-	if enemyDiagonalSliders&diagonalCombinedAttacksMask[idx] == 0 {
-		return false
-	}
-
-	for dir := 0; dir < 4; dir++ {
-		if calculateActualAttacks(pos, idx, dir)&enemyDiagonalSliders != 0 {
-			return true
-		}
-	}
-	return false
+	return scanRayForAttack(pos, idx, SouthWest, enemyColor, targets) ||
+		scanRayForAttack(pos, idx, SouthEast, enemyColor, targets) ||
+		scanRayForAttack(pos, idx, NorthWest, enemyColor, targets) ||
+		scanRayForAttack(pos, idx, NorthEast, enemyColor, targets)
 }
 
 func isRankAttackedByEnemy(pos *Position, index int8, enemyColor int8) bool {
-	rankBase := RankFromIdx(index) * 8
-	rankMask := uint64(0xFF) << (rankBase) // Mask for the entire rank
+	targets := (pos.rookBoard | pos.queenBoard) & pos.OccupancyMask(enemyColor)
 
-	// Combine enemy rooks and queens into one bitboard
-	enemyRookOrQueen := (pos.rookBoard | pos.queenBoard) & pos.OccupancyMask(enemyColor) & rankMask
-
-	if enemyRookOrQueen&rankMask == 0 {
-		return false
-	}
-
-	rankOccupied := pos.occupied & rankMask
-
-	msb := mostSignificantBit(enemyRookOrQueen)
-	if index > msb {
-		leftMask := (uint64(1) << index) - 1
-		blockersLeft := rankOccupied & leftMask
-		if msb >= mostSignificantBit(blockersLeft) {
-			return true
-		}
-	}
-
-	lsb := leastSignificantOne(enemyRookOrQueen)
-	if index < lsb {
-		rightMask := ^((uint64(1) << (index + 1)) - 1)
-		blockersRight := rankOccupied & rightMask
-
-		if lsb <= leastSignificantOne(blockersRight) {
-			return true
-		}
-	}
-
-	return false
+	return scanRayForAttack(pos, index, West, enemyColor, targets) ||
+		scanRayForAttack(pos, index, East, enemyColor, targets)
 }
 
 func isFileAttackedByEnemy(pos *Position, index int8, enemyColor int8) bool {
-	file := index % 8
-	fileMask := uint64(0x0101010101010101) << file // Mask for the entire rank
+	targets := (pos.rookBoard | pos.queenBoard) & pos.OccupancyMask(enemyColor)
 
-	enemyRookOrQueen := (pos.rookBoard | pos.queenBoard) & pos.OccupancyMask(enemyColor) & fileMask
-
-	if fileMask&enemyRookOrQueen == 0 {
-		return false
-	}
-
-	fileOccupied := pos.occupied & fileMask
-
-	topMask := uint64(0xFFFFFFFFFFFFFFFF) << (index + 8)
-
-	msb := mostSignificantBit(enemyRookOrQueen)
-	lsb := leastSignificantOne(enemyRookOrQueen & topMask)
-	if index < msb {
-		blockersTop := fileOccupied & topMask
-		if lsb <= leastSignificantOne(blockersTop) {
-			return true
-		}
-	}
-
-	if index > msb {
-
-		bottomMask := uint64(0xFFFFFFFFFFFFFFFF) >> (64 - index)
-		blockersBottom := fileOccupied & bottomMask
-
-		if msb >= mostSignificantBit(blockersBottom) {
-			return true
-		}
-	}
-
-	return false
+	return scanRayForAttack(pos, index, North, enemyColor, targets) ||
+		scanRayForAttack(pos, index, South, enemyColor, targets)
 }
 
 // verify if the square is attacked by king
