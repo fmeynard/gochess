@@ -167,6 +167,7 @@ func (updater *PositionUpdater) UnMakeMove(pos *Position, history *MoveHistory) 
 	pos.bishopBoard = history.bishopBoard
 	pos.knightBoard = history.knightBoard
 	pos.pawnBoard = history.pawnBoard
+	pos.board = history.board
 
 	// Restore en passant index
 	pos.enPassantIdx = history.enPassantIdx

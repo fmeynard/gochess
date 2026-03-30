@@ -19,6 +19,7 @@ type MoveHistory struct {
 	rookBoard   uint64
 	knightBoard uint64
 	pawnBoard   uint64
+	board       [64]Piece
 }
 
 func NewMoveHistory(pos *Position) MoveHistory {
@@ -40,5 +41,6 @@ func NewMoveHistory(pos *Position) MoveHistory {
 		bishopBoard:       pos.bishopBoard,
 		knightBoard:       pos.knightBoard,
 		pawnBoard:         pos.pawnBoard,
+		board:             pos.board,
 	}
 }

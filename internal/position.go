@@ -39,6 +39,7 @@ type Position struct {
 	rookBoard   uint64
 	knightBoard uint64
 	pawnBoard   uint64
+	board       [64]Piece
 
 	// is init
 	isInit bool
@@ -193,7 +194,7 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 // update attack vectors
 // setPieceAt Reset all the bitboards then update only the relevant ones
 func (p *Position) setPieceAt(idx int8, piece Piece) {
-	prevPiece := p.PieceAt(idx)
+	prevPiece := p.board[idx]
 
 	pieceMask := uint64(1 << idx)
 
@@ -234,6 +235,8 @@ func (p *Position) setPieceAt(idx int8, piece Piece) {
 			p.pawnBoard |= pieceMask
 		}
 	}
+
+	p.board[idx] = piece
 }
 
 func (p *Position) OpponentColor() int8 {
@@ -244,38 +247,7 @@ func (p *Position) OpponentColor() int8 {
 }
 
 func (p *Position) PieceAt(idx int8) Piece {
-	var (
-		pieceType  int8
-		pieceColor int8
-	)
-
-	pieceMask := uint64(1 << idx)
-	switch {
-	case pieceMask&p.whiteOccupied != 0:
-		pieceColor = White
-	case pieceMask&p.blackOccupied != 0:
-		pieceColor = Black
-	default:
-		return NoPiece
-	}
-
-	switch {
-	case pieceMask&p.pawnBoard != 0:
-		pieceType = Pawn
-	case pieceMask&p.rookBoard != 0:
-		pieceType = Rook
-	case pieceMask&p.bishopBoard != 0:
-		pieceType = Bishop
-	case pieceMask&p.knightBoard != 0:
-		pieceType = Knight
-	case pieceMask&p.kingBoard != 0:
-		pieceType = King
-	case pieceMask&p.queenBoard != 0:
-		pieceType = Queen
-	}
-
-	return Piece(pieceType | pieceColor)
-	//return p.board[idx]
+	return p.board[idx]
 }
 
 func (p *Position) IsOccupied(idx int8) bool {

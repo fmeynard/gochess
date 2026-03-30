@@ -1,5 +1,7 @@
 package internal
 
+import "math/bits"
+
 const (
 	NoSlider     = 0
 	BishopSlider = 1
@@ -69,50 +71,63 @@ func isSquareAttackedBySlidingPiece(pos *Position, squareIdx int8, kingColor int
 	return false
 }
 
-func scanRayForAttack(pos *Position, startIdx int8, direction int8, enemyColor int8, targets uint64) bool {
-	for step := int8(1); step < 8; step++ {
-		nextIdx := startIdx + step*direction
-		if nextIdx < 0 || nextIdx >= 64 || !isSameLineOrRow(startIdx, nextIdx, direction) {
-			return false
-		}
-
-		piece := pos.PieceAt(nextIdx)
-		if piece == NoPiece {
-			continue
-		}
-
-		if piece.Color() != enemyColor {
-			return false
-		}
-
-		return (targets & (uint64(1) << nextIdx)) != 0
+func firstBlockerOnRay(occupied, ray uint64, direction int8) uint64 {
+	blockers := occupied & ray
+	if blockers == 0 {
+		return 0
 	}
 
-	return false
+	switch direction {
+	case East, North, NorthEast, NorthWest:
+		return uint64(1) << bits.TrailingZeros64(blockers)
+	default:
+		return uint64(1) << (63 - bits.LeadingZeros64(blockers))
+	}
+}
+
+func scanRayForAttack(pos *Position, startIdx int8, direction int8, targets uint64) bool {
+	var rayMask uint64
+	for dirIdx, dir := range QueenDirections {
+		if dir == direction {
+			rayMask = sliderAttackMasks[startIdx][dirIdx]
+			break
+		}
+	}
+
+	if rayMask == 0 {
+		return false
+	}
+
+	firstBlocker := firstBlockerOnRay(pos.occupied, rayMask, direction)
+	if firstBlocker == 0 {
+		return false
+	}
+
+	return (targets & firstBlocker) != 0
 }
 
 // isDiagonallyAttacked determines if the position at index is diagonally attacked by the enemy.
 func isDiagonallyAttacked(pos *Position, idx int8, enemyColor int8) bool {
 	targets := (pos.queenBoard | pos.bishopBoard) & pos.OccupancyMask(enemyColor)
 
-	return scanRayForAttack(pos, idx, SouthWest, enemyColor, targets) ||
-		scanRayForAttack(pos, idx, SouthEast, enemyColor, targets) ||
-		scanRayForAttack(pos, idx, NorthWest, enemyColor, targets) ||
-		scanRayForAttack(pos, idx, NorthEast, enemyColor, targets)
+	return scanRayForAttack(pos, idx, SouthWest, targets) ||
+		scanRayForAttack(pos, idx, SouthEast, targets) ||
+		scanRayForAttack(pos, idx, NorthWest, targets) ||
+		scanRayForAttack(pos, idx, NorthEast, targets)
 }
 
 func isRankAttackedByEnemy(pos *Position, index int8, enemyColor int8) bool {
 	targets := (pos.rookBoard | pos.queenBoard) & pos.OccupancyMask(enemyColor)
 
-	return scanRayForAttack(pos, index, West, enemyColor, targets) ||
-		scanRayForAttack(pos, index, East, enemyColor, targets)
+	return scanRayForAttack(pos, index, West, targets) ||
+		scanRayForAttack(pos, index, East, targets)
 }
 
 func isFileAttackedByEnemy(pos *Position, index int8, enemyColor int8) bool {
 	targets := (pos.rookBoard | pos.queenBoard) & pos.OccupancyMask(enemyColor)
 
-	return scanRayForAttack(pos, index, North, enemyColor, targets) ||
-		scanRayForAttack(pos, index, South, enemyColor, targets)
+	return scanRayForAttack(pos, index, North, targets) ||
+		scanRayForAttack(pos, index, South, targets)
 }
 
 // verify if the square is attacked by king
