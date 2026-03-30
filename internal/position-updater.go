@@ -18,6 +18,33 @@ func updatePieceOnBoard(p *Position, piece Piece, oldIdx int8, newIdx int8) {
 	p.setPieceAt(newIdx, piece)
 }
 
+func isCastleMoveForHistory(move Move, piece Piece) bool {
+	return piece.Type() == King && absInt8(move.EndIdx()-move.StartIdx()) == 2
+}
+
+func isEnPassantMove(pos *Position, move Move, piece Piece) bool {
+	if piece.Type() != Pawn || pos.enPassantIdx == NoEnPassant || move.EndIdx() != pos.enPassantIdx {
+		return false
+	}
+
+	return pos.PieceAt(move.EndIdx()) == NoPiece && absInt8(FileFromIdx(move.EndIdx())-FileFromIdx(move.StartIdx())) == 1
+}
+
+func castleRookSquares(activeColor int8, kingEndIdx int8) (int8, int8) {
+	if activeColor == White {
+		if kingEndIdx == G1 {
+			return H1, F1
+		}
+		return A1, D1
+	}
+
+	if kingEndIdx == G8 {
+		return H8, F8
+	}
+
+	return A8, D8
+}
+
 func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
 	if updater.IsMoveAffectsKing(pos, move, White) {
 
@@ -39,16 +66,34 @@ func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
 	}
 }
 
-func (updater *PositionUpdater) MakeMove(pos *Position, move Move) *MoveHistory {
+func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 	startPieceIdx := move.StartIdx()
 	endPieceIdx := move.EndIdx()
-	startPiece := pos.PieceAt(move.StartIdx())
+	startPiece := pos.PieceAt(startPieceIdx)
 	startPieceType := startPiece.Type()
+	isEnPassant := isEnPassantMove(pos, move, startPiece)
 
-	history := NewMoveHistory(pos)
+	captureIdx := endPieceIdx
+	capturedPiece := pos.PieceAt(endPieceIdx)
+	if isEnPassant {
+		if pos.activeColor == White {
+			captureIdx = endPieceIdx - 8
+		} else {
+			captureIdx = endPieceIdx + 8
+		}
+		capturedPiece = pos.PieceAt(captureIdx)
+	}
+
+	history := NewMoveHistory(pos, move, startPiece, capturedPiece, captureIdx)
 
 	// update position
-	updatePieceOnBoard(pos, startPiece, startPieceIdx, endPieceIdx)
+	if isEnPassant {
+		pos.setPieceAt(startPieceIdx, NoPiece)
+		pos.setPieceAt(captureIdx, NoPiece)
+		pos.setPieceAt(endPieceIdx, startPiece)
+	} else {
+		updatePieceOnBoard(pos, startPiece, startPieceIdx, endPieceIdx)
+	}
 
 	switch move.flag {
 	case QueenPromotion:
@@ -67,40 +112,23 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) *MoveHistory 
 			pos.whiteKingIdx = endPieceIdx
 			pos.whiteCastleRights = NoCastle
 
-			if startPieceIdx == E1 {
-				if endPieceIdx == G1 {
-					updatePieceOnBoard(pos, Piece(White|Rook), H1, F1)
-				} else if endPieceIdx == C1 {
-					updatePieceOnBoard(pos, Piece(White|Rook), A1, D1)
-				}
+			if isCastleMoveForHistory(move, startPiece) {
+				rookStartIdx, rookEndIdx := castleRookSquares(pos.activeColor, endPieceIdx)
+				updatePieceOnBoard(pos, Piece(White|Rook), rookStartIdx, rookEndIdx)
 			}
 		} else {
 			pos.blackKingIdx = endPieceIdx
 			pos.blackCastleRights = NoCastle
 
-			if startPieceIdx == E8 {
-				if endPieceIdx == G8 {
-					updatePieceOnBoard(pos, Piece(Black|Rook), H8, F8)
-				} else if endPieceIdx == C8 {
-					updatePieceOnBoard(pos, Piece(Black|Rook), A8, D8)
-				}
+			if isCastleMoveForHistory(move, startPiece) {
+				rookStartIdx, rookEndIdx := castleRookSquares(pos.activeColor, endPieceIdx)
+				updatePieceOnBoard(pos, Piece(Black|Rook), rookStartIdx, rookEndIdx)
 			}
 		}
 	}
 
 	// en passant
 	if startPieceType == Pawn {
-		if endPieceIdx == pos.enPassantIdx {
-			var capturesPawnIdx int8
-			if pos.activeColor == White {
-				capturesPawnIdx = pos.enPassantIdx - 8
-			} else {
-				capturesPawnIdx = pos.enPassantIdx + 8
-			}
-			updatePieceOnBoard(pos, Piece(Pawn|pos.activeColor), startPieceIdx, capturesPawnIdx)
-			updatePieceOnBoard(pos, Piece(Pawn|pos.activeColor), capturesPawnIdx, endPieceIdx)
-		}
-
 		diffIdx := endPieceIdx - startPieceIdx
 		if pos.activeColor == White && diffIdx == 16 {
 			pos.enPassantIdx = startPieceIdx + 8
@@ -139,40 +167,38 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) *MoveHistory 
 		pos.activeColor = White
 	}
 
-	return &history
+	return history
 }
 
-func (updater *PositionUpdater) UnMakeMove(pos *Position, history *MoveHistory) {
+func (updater *PositionUpdater) UnMakeMove(pos *Position, history MoveHistory) {
+	move := history.move
+	startPieceIdx := move.StartIdx()
+	endPieceIdx := move.EndIdx()
 
-	// Restore the state of the kings
+	pos.activeColor = history.activeColor
 	pos.whiteKingIdx = history.whiteKingIdx
 	pos.blackKingIdx = history.blackKingIdx
-
-	// Restore castling rights
 	pos.whiteCastleRights = history.whiteCastleRights
 	pos.blackCastleRights = history.blackCastleRights
-
-	// reset king safety
-	pos.blackKingSafety = history.blackKingSafety
 	pos.whiteKingSafety = history.whiteKingSafety
-
-	// reset occupancies masks
-	pos.occupied = history.occupied
-	pos.blackOccupied = history.blackOccupied
-	pos.whiteOccupied = history.whiteOccupied
-
-	pos.kingBoard = history.kingBoard
-	pos.queenBoard = history.queenBoard
-	pos.rookBoard = history.rookBoard
-	pos.bishopBoard = history.bishopBoard
-	pos.knightBoard = history.knightBoard
-	pos.pawnBoard = history.pawnBoard
-	pos.board = history.board
-
-	// Restore en passant index
+	pos.blackKingSafety = history.blackKingSafety
 	pos.enPassantIdx = history.enPassantIdx
-	// Restore the active color
-	pos.activeColor = history.activeColor
+
+	if move.flag == QueenPromotion || move.flag == KnightPromotion || move.flag == BishopPromotion || move.flag == RookPromotion {
+		pos.setPieceAt(endPieceIdx, NoPiece)
+		pos.setPieceAt(startPieceIdx, history.movedPiece)
+	} else {
+		updatePieceOnBoard(pos, history.movedPiece, endPieceIdx, startPieceIdx)
+	}
+
+	if isCastleMoveForHistory(move, history.movedPiece) {
+		rookStartIdx, rookEndIdx := castleRookSquares(pos.activeColor, endPieceIdx)
+		updatePieceOnBoard(pos, Piece(pos.activeColor|Rook), rookEndIdx, rookStartIdx)
+	}
+
+	if history.capturedPiece != NoPiece {
+		pos.setPieceAt(history.captureIdx, history.capturedPiece)
+	}
 }
 
 // IsMoveAffectsKing

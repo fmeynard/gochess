@@ -1,6 +1,10 @@
 package internal
 
 type MoveHistory struct {
+	move              Move
+	movedPiece        Piece
+	capturedPiece     Piece
+	captureIdx        int8
 	whiteKingIdx      int8
 	blackKingIdx      int8
 	whiteCastleRights int8
@@ -9,21 +13,14 @@ type MoveHistory struct {
 	activeColor       int8
 	whiteKingSafety   int8
 	blackKingSafety   int8
-	whiteOccupied     uint64
-	blackOccupied     uint64
-	occupied          uint64
-
-	queenBoard  uint64
-	kingBoard   uint64
-	bishopBoard uint64
-	rookBoard   uint64
-	knightBoard uint64
-	pawnBoard   uint64
-	board       [64]Piece
 }
 
-func NewMoveHistory(pos *Position) MoveHistory {
+func NewMoveHistory(pos *Position, move Move, movedPiece, capturedPiece Piece, captureIdx int8) MoveHistory {
 	return MoveHistory{
+		move:              move,
+		movedPiece:        movedPiece,
+		capturedPiece:     capturedPiece,
+		captureIdx:        captureIdx,
 		whiteKingIdx:      pos.whiteKingIdx,
 		blackKingIdx:      pos.blackKingIdx,
 		whiteCastleRights: pos.whiteCastleRights,
@@ -32,15 +29,5 @@ func NewMoveHistory(pos *Position) MoveHistory {
 		activeColor:       pos.activeColor,
 		blackKingSafety:   pos.blackKingSafety,
 		whiteKingSafety:   pos.whiteKingSafety,
-		whiteOccupied:     pos.whiteOccupied,
-		blackOccupied:     pos.blackOccupied,
-		occupied:          pos.occupied,
-		kingBoard:         pos.kingBoard,
-		queenBoard:        pos.queenBoard,
-		rookBoard:         pos.rookBoard,
-		bishopBoard:       pos.bishopBoard,
-		knightBoard:       pos.knightBoard,
-		pawnBoard:         pos.pawnBoard,
-		board:             pos.board,
 	}
 }

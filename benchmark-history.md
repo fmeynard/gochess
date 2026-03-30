@@ -63,6 +63,7 @@ BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | v0 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 24.83s | baseline |
 | v1 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 15.11s | -9.72s (-39.1%) |
+| v2 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 8.46s | -6.65s (-44.0%) |
 
 ## Optimization Log
 
@@ -101,6 +102,32 @@ FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
 Depth: 6
 Nodes: 11030083
 Elapsed: 15.113510305s
+```
+
+### v2
+
+Optimizations applied:
+
+- Replaced full-position `MoveHistory` snapshots with a compact undo record
+- Stored only move delta data needed for undo: moved piece, captured piece, capture square, rights, en passant, king positions, and king safety caches
+- Switched `MakeMove` / `UnMakeMove` to pass `MoveHistory` by value instead of allocating and returning `*MoveHistory`
+- Reworked `UnMakeMove` to restore board state incrementally instead of copying all bitboards and the full square cache
+- Simplified en passant handling so make/unmake directly remove and restore the captured pawn on its real square
+
+Benchmark command:
+
+```bash
+./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Nodes: 11030083
+Elapsed: 8.463420271s
+CPU profile: .codex-tmp/bench-perft.cpu.prof
 ```
 
 ## Update Rules

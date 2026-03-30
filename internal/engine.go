@@ -8,8 +8,8 @@ type Engine struct {
 }
 
 type IPositionUpdater interface {
-	MakeMove(pos *Position, move Move) *MoveHistory
-	UnMakeMove(pos *Position, history *MoveHistory)
+	MakeMove(pos *Position, move Move) MoveHistory
+	UnMakeMove(pos *Position, history MoveHistory)
 	IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool
 }
 
@@ -125,7 +125,6 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 				}
 
 				e.positionUpdater.UnMakeMove(pos, history)
-				history = nil
 			}
 		}
 
@@ -144,7 +143,6 @@ func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint6
 		res[move.UCI()] = e.MoveGenerationTest(pos, depth)
 		total += res[move.UCI()]
 		e.positionUpdater.UnMakeMove(pos, history)
-		history = nil
 	}
 
 	return res, total
