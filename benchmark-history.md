@@ -33,6 +33,30 @@ Elapsed: 24.83193616s
 
 CPU profile inspection was then done with `pprof` in local web UI mode.
 
+## Re-run
+
+On the current checkout:
+
+```bash
+./scripts/bench-perft.sh
+```
+
+On a tagged benchmark version:
+
+```bash
+git switch --detach benchmark-v0
+./scripts/bench-perft.sh
+
+git switch --detach benchmark-v1
+./scripts/bench-perft.sh
+```
+
+Override the benchmark target if needed:
+
+```bash
+BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof ./scripts/bench-perft.sh
+```
+
 ## Results
 
 | Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
