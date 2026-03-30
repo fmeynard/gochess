@@ -28,3 +28,6 @@ go.work.sum
 .project/
 .idea/
 .vscode/
+
+# IA
+.codex-tmp/
