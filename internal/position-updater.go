@@ -50,6 +50,17 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) *MoveHistory 
 	// update position
 	updatePieceOnBoard(pos, startPiece, startPieceIdx, endPieceIdx)
 
+	switch move.flag {
+	case QueenPromotion:
+		pos.setPieceAt(endPieceIdx, Piece(pos.activeColor|Queen))
+	case KnightPromotion:
+		pos.setPieceAt(endPieceIdx, Piece(pos.activeColor|Knight))
+	case BishopPromotion:
+		pos.setPieceAt(endPieceIdx, Piece(pos.activeColor|Bishop))
+	case RookPromotion:
+		pos.setPieceAt(endPieceIdx, Piece(pos.activeColor|Rook))
+	}
+
 	// King move -> update king pos and castleRights
 	if startPieceType == King {
 		if pos.activeColor == White {

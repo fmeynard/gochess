@@ -269,17 +269,17 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 			if (isWhite && targetIdx >= A8) || (!isWhite && targetIdx <= H1) {
 				// Handle promotion
 				promotionIdx = targetIdx
-			} else {
-				if isWhite && targetIdx >= A4 && targetIdx <= H4 && targetIdx-idx == 16 && pos.occupied&(1<<(idx+8)) != 0 {
-					continue
-				}
-
-				if !isWhite && targetIdx >= A5 && targetIdx <= H5 && idx-targetIdx == 16 && pos.occupied&(1<<(idx-8)) != 0 {
-					continue
-				}
-
-				moves = append(moves, targetIdx)
 			}
+
+			if isWhite && targetIdx >= A4 && targetIdx <= H4 && targetIdx-idx == 16 && pos.occupied&(1<<(idx+8)) != 0 {
+				continue
+			}
+
+			if !isWhite && targetIdx >= A5 && targetIdx <= H5 && idx-targetIdx == 16 && pos.occupied&(1<<(idx-8)) != 0 {
+				continue
+			}
+
+			moves = append(moves, targetIdx)
 		}
 	}
 
@@ -303,9 +303,9 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 			if (isWhite && targetIdx >= A8) || (!isWhite && targetIdx <= H1) {
 				// Handle promotion with capture
 				promotionIdx = targetIdx
-			} else {
-				moves = append(moves, targetIdx)
 			}
+
+			moves = append(moves, targetIdx)
 		}
 	}
 
