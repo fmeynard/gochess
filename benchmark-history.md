@@ -64,6 +64,7 @@ BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof
 | v0 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 24.83s | baseline |
 | v1 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 15.11s | -9.72s (-39.1%) |
 | v2 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 8.46s | -6.65s (-44.0%) |
+| v3 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 5.47s | -2.99s (-35.4%) |
 
 ## Optimization Log
 
@@ -127,6 +128,31 @@ FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
 Depth: 6
 Nodes: 11030083
 Elapsed: 8.463420271s
+CPU profile: .codex-tmp/bench-perft.cpu.prof
+```
+
+### v3
+
+Optimizations applied:
+
+- Replaced generic `setPieceAt` usage in the hot make/unmake path with targeted `addPieceAt` / `removePieceAt` updates
+- Changed move application to avoid clearing every piece bitboard when the moved or captured piece is already known
+- Removed the direction-to-ray lookup loop from `scanRayForAttack` by passing the precomputed slider mask index directly
+- Kept generic `setPieceAt` only as a slower fallback for non-hot-path board updates
+
+Benchmark command:
+
+```bash
+./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Nodes: 11030083
+Elapsed: 5.468913786s
 CPU profile: .codex-tmp/bench-perft.cpu.prof
 ```
 

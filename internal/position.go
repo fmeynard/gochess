@@ -193,50 +193,78 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 // update cache
 // update attack vectors
 // setPieceAt Reset all the bitboards then update only the relevant ones
-func (p *Position) setPieceAt(idx int8, piece Piece) {
-	prevPiece := p.board[idx]
-
-	pieceMask := uint64(1 << idx)
-
-	if prevPiece != NoPiece {
-		p.kingBoard &= ^pieceMask
-		p.queenBoard &= ^pieceMask
-		p.rookBoard &= ^pieceMask
-		p.bishopBoard &= ^pieceMask
-		p.knightBoard &= ^pieceMask
-		p.pawnBoard &= ^pieceMask
-
-		p.whiteOccupied &= ^pieceMask
-		p.blackOccupied &= ^pieceMask
+func (p *Position) removePieceAt(idx int8, piece Piece) {
+	if piece == NoPiece {
+		return
 	}
 
-	p.occupied &= ^pieceMask
+	pieceMask := uint64(1 << idx)
+	p.occupied &^= pieceMask
 
-	if piece != NoPiece {
-		if piece.Color() == White {
-			p.whiteOccupied |= pieceMask
-		} else {
-			p.blackOccupied |= pieceMask
-		}
-		p.occupied |= uint64(1) << idx
+	if piece.Color() == White {
+		p.whiteOccupied &^= pieceMask
+	} else {
+		p.blackOccupied &^= pieceMask
+	}
 
-		switch piece.Type() {
-		case King:
-			p.kingBoard |= pieceMask
-		case Queen:
-			p.queenBoard |= pieceMask
-		case Rook:
-			p.rookBoard |= pieceMask
-		case Bishop:
-			p.bishopBoard |= pieceMask
-		case Knight:
-			p.knightBoard |= pieceMask
-		case Pawn:
-			p.pawnBoard |= pieceMask
-		}
+	switch piece.Type() {
+	case King:
+		p.kingBoard &^= pieceMask
+	case Queen:
+		p.queenBoard &^= pieceMask
+	case Rook:
+		p.rookBoard &^= pieceMask
+	case Bishop:
+		p.bishopBoard &^= pieceMask
+	case Knight:
+		p.knightBoard &^= pieceMask
+	case Pawn:
+		p.pawnBoard &^= pieceMask
+	}
+
+	p.board[idx] = NoPiece
+}
+
+func (p *Position) addPieceAt(idx int8, piece Piece) {
+	if piece == NoPiece {
+		return
+	}
+
+	pieceMask := uint64(1 << idx)
+	p.occupied |= pieceMask
+
+	if piece.Color() == White {
+		p.whiteOccupied |= pieceMask
+	} else {
+		p.blackOccupied |= pieceMask
+	}
+
+	switch piece.Type() {
+	case King:
+		p.kingBoard |= pieceMask
+	case Queen:
+		p.queenBoard |= pieceMask
+	case Rook:
+		p.rookBoard |= pieceMask
+	case Bishop:
+		p.bishopBoard |= pieceMask
+	case Knight:
+		p.knightBoard |= pieceMask
+	case Pawn:
+		p.pawnBoard |= pieceMask
 	}
 
 	p.board[idx] = piece
+}
+
+func (p *Position) setPieceAt(idx int8, piece Piece) {
+	prevPiece := p.board[idx]
+	if prevPiece == piece {
+		return
+	}
+
+	p.removePieceAt(idx, prevPiece)
+	p.addPieceAt(idx, piece)
 }
 
 func (p *Position) OpponentColor() int8 {

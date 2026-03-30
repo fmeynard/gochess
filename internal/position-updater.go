@@ -14,8 +14,10 @@ func NewPositionUpdater(moveGenerator IMoveGenerator) *PositionUpdater {
 // update board and position masks
 // Important: capture moves need to update opponent occupancy maks
 func updatePieceOnBoard(p *Position, piece Piece, oldIdx int8, newIdx int8) {
-	p.setPieceAt(oldIdx, NoPiece)
-	p.setPieceAt(newIdx, piece)
+	capturedPiece := p.PieceAt(newIdx)
+	p.removePieceAt(oldIdx, piece)
+	p.removePieceAt(newIdx, capturedPiece)
+	p.addPieceAt(newIdx, piece)
 }
 
 func isCastleMoveForHistory(move Move, piece Piece) bool {
@@ -88,22 +90,26 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 
 	// update position
 	if isEnPassant {
-		pos.setPieceAt(startPieceIdx, NoPiece)
-		pos.setPieceAt(captureIdx, NoPiece)
-		pos.setPieceAt(endPieceIdx, startPiece)
+		pos.removePieceAt(startPieceIdx, startPiece)
+		pos.removePieceAt(captureIdx, capturedPiece)
+		pos.addPieceAt(endPieceIdx, startPiece)
 	} else {
 		updatePieceOnBoard(pos, startPiece, startPieceIdx, endPieceIdx)
 	}
 
 	switch move.flag {
 	case QueenPromotion:
-		pos.setPieceAt(endPieceIdx, Piece(pos.activeColor|Queen))
+		pos.removePieceAt(endPieceIdx, startPiece)
+		pos.addPieceAt(endPieceIdx, Piece(pos.activeColor|Queen))
 	case KnightPromotion:
-		pos.setPieceAt(endPieceIdx, Piece(pos.activeColor|Knight))
+		pos.removePieceAt(endPieceIdx, startPiece)
+		pos.addPieceAt(endPieceIdx, Piece(pos.activeColor|Knight))
 	case BishopPromotion:
-		pos.setPieceAt(endPieceIdx, Piece(pos.activeColor|Bishop))
+		pos.removePieceAt(endPieceIdx, startPiece)
+		pos.addPieceAt(endPieceIdx, Piece(pos.activeColor|Bishop))
 	case RookPromotion:
-		pos.setPieceAt(endPieceIdx, Piece(pos.activeColor|Rook))
+		pos.removePieceAt(endPieceIdx, startPiece)
+		pos.addPieceAt(endPieceIdx, Piece(pos.activeColor|Rook))
 	}
 
 	// King move -> update king pos and castleRights
@@ -185,8 +191,8 @@ func (updater *PositionUpdater) UnMakeMove(pos *Position, history MoveHistory) {
 	pos.enPassantIdx = history.enPassantIdx
 
 	if move.flag == QueenPromotion || move.flag == KnightPromotion || move.flag == BishopPromotion || move.flag == RookPromotion {
-		pos.setPieceAt(endPieceIdx, NoPiece)
-		pos.setPieceAt(startPieceIdx, history.movedPiece)
+		pos.removePieceAt(endPieceIdx, pos.PieceAt(endPieceIdx))
+		pos.addPieceAt(startPieceIdx, history.movedPiece)
 	} else {
 		updatePieceOnBoard(pos, history.movedPiece, endPieceIdx, startPieceIdx)
 	}
@@ -197,7 +203,7 @@ func (updater *PositionUpdater) UnMakeMove(pos *Position, history MoveHistory) {
 	}
 
 	if history.capturedPiece != NoPiece {
-		pos.setPieceAt(history.captureIdx, history.capturedPiece)
+		pos.addPieceAt(history.captureIdx, history.capturedPiece)
 	}
 }
 

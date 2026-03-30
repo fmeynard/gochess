@@ -85,19 +85,8 @@ func firstBlockerOnRay(occupied, ray uint64, direction int8) uint64 {
 	}
 }
 
-func scanRayForAttack(pos *Position, startIdx int8, direction int8, targets uint64) bool {
-	var rayMask uint64
-	for dirIdx, dir := range QueenDirections {
-		if dir == direction {
-			rayMask = sliderAttackMasks[startIdx][dirIdx]
-			break
-		}
-	}
-
-	if rayMask == 0 {
-		return false
-	}
-
+func scanRayForAttack(pos *Position, startIdx int8, dirIdx int, direction int8, targets uint64) bool {
+	rayMask := sliderAttackMasks[startIdx][dirIdx]
 	firstBlocker := firstBlockerOnRay(pos.occupied, rayMask, direction)
 	if firstBlocker == 0 {
 		return false
@@ -110,24 +99,24 @@ func scanRayForAttack(pos *Position, startIdx int8, direction int8, targets uint
 func isDiagonallyAttacked(pos *Position, idx int8, enemyColor int8) bool {
 	targets := (pos.queenBoard | pos.bishopBoard) & pos.OccupancyMask(enemyColor)
 
-	return scanRayForAttack(pos, idx, SouthWest, targets) ||
-		scanRayForAttack(pos, idx, SouthEast, targets) ||
-		scanRayForAttack(pos, idx, NorthWest, targets) ||
-		scanRayForAttack(pos, idx, NorthEast, targets)
+	return scanRayForAttack(pos, idx, 4, SouthWest, targets) ||
+		scanRayForAttack(pos, idx, 5, SouthEast, targets) ||
+		scanRayForAttack(pos, idx, 6, NorthWest, targets) ||
+		scanRayForAttack(pos, idx, 7, NorthEast, targets)
 }
 
 func isRankAttackedByEnemy(pos *Position, index int8, enemyColor int8) bool {
 	targets := (pos.rookBoard | pos.queenBoard) & pos.OccupancyMask(enemyColor)
 
-	return scanRayForAttack(pos, index, West, targets) ||
-		scanRayForAttack(pos, index, East, targets)
+	return scanRayForAttack(pos, index, 0, West, targets) ||
+		scanRayForAttack(pos, index, 1, East, targets)
 }
 
 func isFileAttackedByEnemy(pos *Position, index int8, enemyColor int8) bool {
 	targets := (pos.rookBoard | pos.queenBoard) & pos.OccupancyMask(enemyColor)
 
-	return scanRayForAttack(pos, index, North, targets) ||
-		scanRayForAttack(pos, index, South, targets)
+	return scanRayForAttack(pos, index, 3, North, targets) ||
+		scanRayForAttack(pos, index, 2, South, targets)
 }
 
 // verify if the square is attacked by king
