@@ -58,7 +58,3 @@ func (updater *ZobristPositionUpdater) UnMakeMove(pos *Position, history MoveHis
 	updater.inner.UnMakeMove(pos, history)
 	pos.zobristKey = history.zobristKey
 }
-
-func (updater *ZobristPositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool {
-	return updater.inner.IsMoveAffectsKing(pos, m, kingColor)
-}

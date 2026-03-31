@@ -4,20 +4,20 @@ This file records practical lessons from the perft optimization work so future s
 
 ## Current Best Known Result
 
-- Best raw benchmark so far: `benchmark-v14`
-- Best hot benchmark so far: `benchmark-v17`
+- Best raw benchmark so far: `benchmark-v18`
+- Best hot benchmark so far: `benchmark-v18`
 - Target: `Perft position 3`
 - FEN: `8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1`
 - Mode: `BENCH_NO_PERFT_TRICKS=1`
 - Depth: `7`
 - Nodes: `178,633,661`
-- Time: `6.857738422s`
+- Time: `5.651284934s`
 
 Current preferred reference:
 
 - Harness: `hot`
-- Samples: `6.190472756s`, `6.22881615s`
-- Recorded reference: `6.21s`
+- Samples: `5.777905319s`, `5.651284934s`
+- Recorded reference: `5.71s`
 
 ## Strategy Context
 
@@ -140,6 +140,17 @@ Takeaway:
   - `in-check`
   not the earlier move-materialization helper split.
 
+### v18
+
+- Removing by-value copies of `positionAnalysis` paid once the large `pinRayBySq[64]` table stopped being copied through the legal-generation call chain.
+- Splitting common move emission into dedicated quiet/capture helpers paid when the split removed per-target piece/capture rediscovery from the hottest non-king paths.
+- A narrower pawn-specific quiet-move emitter also paid.
+
+Takeaway:
+
+- In this codebase, moving hot-path metadata from "large struct returned and passed by value" to "caller-owned buffer passed by pointer" is worthwhile.
+- Move-materialization splits can pay if they remove real repeated classification work in the inner loop; the failed earlier attempts were too helper-heavy without removing enough hot-path decisions.
+
 ## What Did Not Pay
 
 ### v15 attempt: broad 4-axis experiment
@@ -252,12 +263,12 @@ Based on the `v12` profile:
 
 Preferred next experiments:
 
-1. Optimize `appendKingMoves(...)` without adding more helper fragmentation.
-2. Optimize `appendPawnMoves(...)` with careful side-specific specialization.
-3. Look for ways to share or cheapen attack computations between `computePositionAnalysis(...)` and `isSquareAttacked(...)`.
-4. Use the new updater microbenchmarks before making further `MakeMove` / `UnMakeMove` changes.
-5. Explore slider attack generation upgrades that are useful beyond perft, including denser lookup schemes or magic-style indexing.
-6. Reduce move materialization overhead in legal generation without splitting the code into many tiny helpers.
+1. Target `MakeMove(...)` / `UnMakeMove(...)` first; they now dominate the profile even more clearly than before.
+2. Optimize `appendKingMoves(...)` by reducing `isSquareAttacked(...)` work for king destinations and castling checks.
+3. Optimize `appendPawnMoves(...)` further with side-specific specialization only if it still measures better after `v18`.
+4. Look for ways to share or cheapen attack computations between `computePositionAnalysis(...)` and `isSquareAttacked(...)`.
+5. Use the updater microbenchmarks before making further updater changes.
+6. Explore tighter undo-state restoration only if correctness coverage remains strong.
 7. Extend magic-based attacks into `computePositionAnalysis(...)` so check and pin discovery also stop paying repeated directional scans.
 8. Continue looking for legality-state fast paths that remove repeated branching before move materialization.
 

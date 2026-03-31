@@ -8,7 +8,7 @@ The current slider move generation still walks precomputed square lists one squa
 
 Relevant code:
 
-- `internal/bitsboard-move-generator.go`
+- `internal/pseudo-legal-move-generator.go`
 - `SliderPseudoLegalMovesInto(...)`
 
 Likely next step:
@@ -62,7 +62,7 @@ Pawn generation is still one of the hotter pseudo-legal generators because it mi
 
 Relevant code:
 
-- `internal/bitsboard-move-generator.go`
+- `internal/pseudo-legal-move-generator.go`
 - `PawnPseudoLegalMovesInto(...)`
 
 Likely next step:

@@ -47,7 +47,7 @@ In practice, the hot path is:
   Mutable board state, FEN parsing, occupancy masks, piece boards, king caches.
 - `internal/position-analysis.go`
   Position-level analysis for checks, pinned pieces, and evasion masks.
-- `internal/bitsboard-move-generator.go`
+- `internal/pseudo-legal-move-generator.go`
   Pseudo-legal move generation and precomputed attack / ray tables.
 - `internal/engine.go`
   Legal move generation entrypoint and recursive perft implementation.
@@ -82,7 +82,7 @@ In practice, the hot path is:
   Direct tests for check / pin analysis.
 - `internal/check_test.go`
   Attack-detection helpers.
-- `internal/bitsboard-move-generator_test.go`
+- `internal/pseudo-legal-move-generator_test.go`
   Pseudo-legal move generation tests and microbenchmarks.
 - `internal/move_test.go`
   `Move` helper tests.
@@ -151,7 +151,7 @@ So special move semantics are more centralized than before.
 
 ## Pseudo-Legal Move Generation
 
-`BitsBoardMoveGenerator` precomputes:
+`PseudoLegalMoveGenerator` precomputes:
 
 - slider rays
 - knight attacks
@@ -336,7 +336,7 @@ The packed representation is good for performance, but needs comments and tests 
 If returning to this code later, the shortest useful model is:
 
 - `Position` is the mutable board and cache container
-- `BitsBoardMoveGenerator` generates pseudo-legal targets
+- `PseudoLegalMoveGenerator` generates pseudo-legal targets
 - `positionAnalysis` computes checks / pins once per node
 - `Engine` turns pseudo-legal targets into legal `Move`s
 - `PlainPositionUpdater` applies and undoes moves

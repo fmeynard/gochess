@@ -82,6 +82,7 @@ Older benchmark suites are kept in [Historical Results](#historical-results).
 | [v15](#current-v15) | 2026-03-31 | Perft position 3 | 7 | hot | off | 178,633,661 | 6.50s | -0.28s (-4.1%) |
 | [v16](#current-v16) | 2026-03-31 | Perft position 3 | 7 | hot | off | 178,633,661 | 6.30s | -0.20s (-3.1%) |
 | [v17](#current-v17) | 2026-03-31 | Perft position 3 | 7 | hot | off | 178,633,661 | 6.21s | -0.09s (-1.4%) |
+| [v18](#current-v18) | 2026-03-31 | Perft position 3 | 7 | hot | off | 178,633,661 | 5.71s | -0.50s (-8.0%) |
 
 Recorded samples:
 
@@ -89,8 +90,47 @@ Recorded samples:
 - `v15`: `6.533347471s`, `6.462752555s`
 - `v16`: `6.319541638s`, `6.295790877s`
 - `v17`: `6.190472756s`, `6.22881615s`
+- `v18`: `5.777905319s`, `5.651284934s`
 
 ## Optimization Log
+
+<a id="current-v18"></a>
+### v18
+
+Optimizations applied:
+
+- changed `computePositionAnalysis(...)` to write into a caller-owned buffer instead of returning the large `positionAnalysis` struct by value
+- passed `*positionAnalysis` through legal-generation helpers to avoid repeated copying of the embedded `pinRayBySq[64]` table
+- replaced generic `appendMovesFromMask(...)` use in the common non-king legal paths with:
+  - `appendNormalMovesFromMask(...)`
+  - `appendCaptureMovesFromMask(...)`
+  - `appendPawnQuietMoves(...)`
+- split pawn move materialization so quiet pawn moves and captures do not pay the generic per-target capture/type classification cost
+
+Benchmark command:
+
+```bash
+BENCH_DEPTH=7 BENCH_MODE=hot BENCH_WARMUP=1 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Mode: hot
+Warmup: 1
+Perft tricks: false
+Nodes: 178633661
+Elapsed: 5.651284934s
+CPU profile: .codex-tmp/bench-perft-v18-rerun.cpu.prof
+```
+
+Interpretation:
+
+- `v18` is a clear win on top of `v17`
+- eliminating large analysis-struct copies and avoiding generic move classification in the hottest legal-generation paths both paid
+- after this slice, `MakeMove(...)` / `UnMakeMove(...)` are even more clearly the next dominant target
 
 <a id="current-v17"></a>
 ### v17

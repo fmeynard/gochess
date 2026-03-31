@@ -14,29 +14,29 @@ Constraints:
 
 Current best:
 
-- `benchmark-v14`
-- `perft(7)`: `6.857738422s`
+- `benchmark-v18`
+- `perft(7)`: `5.651284934s`
 - Nodes: `178,633,661`
 
 Near-term work order:
 
-1. Move generation hot paths
-   - Optimize `appendKingMoves(...)`
-   - Optimize `appendPawnMoves(...)`
-   - Reduce `appendMovesFromMask(...)` overhead without reintroducing the failed helper split
+1. Updater follow-up
+   - Use updater microbenchmarks before changing `MakeMove(...)` / `UnMakeMove(...)`
+   - Reduce undo-state restore overhead only if tests keep the updater trustworthy
+   - Keep specializing only when a narrow path measures better
 
-2. Attack and legality pipeline
+2. Move generation hot paths
+   - Optimize `appendKingMoves(...)`
+   - Re-test `appendPawnMoves(...)` with side-specific specialization
+
+3. Attack and legality pipeline
    - Re-profile `computePositionAnalysis(...)`
    - Re-profile `isSquareAttacked(...)`
    - Look for shared attack computations or cheaper legal filtering
 
-3. Sliders
+4. Sliders
    - Evaluate denser rook/bishop attack lookup strategies
    - Consider magic-style indexing if the code/complexity tradeoff is favorable
-
-4. Updater follow-up
-   - Use updater microbenchmarks before changing `MakeMove(...)` / `UnMakeMove(...)`
-   - Keep specializing only when a narrow path measures better
 
 5. Search-ready architecture
    - Preserve a clean engine core for later scoring/search/UCI work

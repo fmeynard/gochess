@@ -12,7 +12,7 @@ func TestPlainPositionUpdater_DoesNotTrackZobrist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	updater := NewPlainPositionUpdater(NewBitsBoardMoveGenerator())
+	updater := NewPlainPositionUpdater(NewPseudoLegalMoveGenerator())
 	initialKey := pos.zobristKey
 	move := NewMove(Piece(White|Pawn), E2, E4, PawnDoubleMove)
 	history := updater.MakeMove(pos, move)
@@ -30,7 +30,7 @@ func TestZobristPositionUpdater_RestoresKeyOnUnmake(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
+	updater := NewPositionUpdater(NewPseudoLegalMoveGenerator())
 	initialKey := pos.zobristKey
 	move := NewMove(Piece(White|Pawn), E2, E4, PawnDoubleMove)
 	history := updater.MakeMove(pos, move)

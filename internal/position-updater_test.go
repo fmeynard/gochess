@@ -64,7 +64,7 @@ func Test_PositionAfterMove(t *testing.T) {
 		},
 	}
 
-	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
+	updater := NewPositionUpdater(NewPseudoLegalMoveGenerator())
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
 			pos, err := NewPositionFromFEN(d.fenPos)
@@ -204,7 +204,7 @@ func TestUpdatePieceOnBoard(t *testing.T) {
 		},
 	}
 
-	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
+	updater := NewPositionUpdater(NewPseudoLegalMoveGenerator())
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
 			pos, _ := NewPositionFromFEN(d.fenPos)
@@ -268,7 +268,7 @@ func Test_PositionAfterMoveCastleRights(t *testing.T) {
 		},
 	}
 
-	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
+	updater := NewPositionUpdater(NewPseudoLegalMoveGenerator())
 
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
@@ -325,7 +325,7 @@ func Test_PositionAfterEnPassantUpdate(t *testing.T) {
 		},
 	}
 
-	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
+	updater := NewPositionUpdater(NewPseudoLegalMoveGenerator())
 	for name, d := range data {
 		t.Run(name, func(t *testing.T) {
 			pos, _ := NewPositionFromFEN(d.fenPos)
@@ -337,7 +337,7 @@ func Test_PositionAfterEnPassantUpdate(t *testing.T) {
 
 func Test_PositionAfterMoveActiveColorUpdate(t *testing.T) {
 
-	updater := NewPositionUpdater(NewBitsBoardMoveGenerator())
+	updater := NewPositionUpdater(NewPseudoLegalMoveGenerator())
 
 	pos, _ := NewPositionFromFEN(FenStartPos)
 	updater.MakeMove(pos, NewMove(Piece(Pawn|White), F2, F4, NormalMove))
