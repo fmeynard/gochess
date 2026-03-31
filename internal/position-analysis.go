@@ -7,9 +7,7 @@ type positionAnalysis struct {
 	checkerCount int
 	evasionMask  uint64
 	pinnedMask   uint64
-	pinCount     int
-	pinSquares   [8]int8
-	pinRayMasks  [8]uint64
+	pinRayBySq   [64]uint64
 }
 
 func computePositionAnalysis(pos *Position, kingIdx int8, friendlyOcc, enemyOcc uint64) positionAnalysis {
@@ -58,9 +56,7 @@ func computePositionAnalysis(pos *Position, kingIdx int8, friendlyOcc, enemyOcc 
 			second := firstBlockerOnRay(pos.occupied&^first, ray, dir)
 			if second != 0 && second&sliders != 0 {
 				info.pinnedMask |= first
-				info.pinSquares[info.pinCount] = int8(bits.TrailingZeros64(first))
-				info.pinRayMasks[info.pinCount] = ray
-				info.pinCount++
+				info.pinRayBySq[bits.TrailingZeros64(first)] = ray
 			}
 		}
 	}
@@ -74,10 +70,5 @@ func computePositionAnalysis(pos *Position, kingIdx int8, friendlyOcc, enemyOcc 
 }
 
 func (pa *positionAnalysis) pinRayFor(sq int8) uint64 {
-	for i := 0; i < pa.pinCount; i++ {
-		if pa.pinSquares[i] == sq {
-			return pa.pinRayMasks[i]
-		}
-	}
-	return 0
+	return pa.pinRayBySq[sq]
 }

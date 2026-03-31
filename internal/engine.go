@@ -42,6 +42,8 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	count := 0
 	var targets [MaxTargets]int8
 	initialColor := pos.activeColor
+	inCheckColor := initialColor
+	enPassantIdx := pos.enPassantIdx
 
 	var kingIdx int8
 	if pos.activeColor == White {
@@ -88,11 +90,14 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 		isPinned := info.pinnedMask&(1<<idx) != 0
 		var pinRay uint64
 		if isPinned {
-			pinRay = info.pinRayFor(idx)
+			pinRay = info.pinRayBySq[idx]
 		}
 
 		for i := 0; i < pseudoCount; i++ {
 			targetIdx := targets[i]
+			targetMask := uint64(1) << targetIdx
+			targetPiece := pos.board[targetIdx]
+			isEP := pieceType == Pawn && enPassantIdx != NoEnPassant && targetIdx == enPassantIdx
 
 			if pieceType == King {
 				if absInt8(targetIdx-idx) == 2 {
@@ -111,24 +116,29 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 				if isSquareAttacked(pos, targetIdx, enemyColor, occ) {
 					continue
 				}
-				dst[count] = NewMove(piece, idx, targetIdx, classifyMove(pos, piece, idx, targetIdx))
+				flag := int8(NormalMove)
+				if absInt8(targetIdx-idx) == 2 {
+					flag = Castle
+				} else if targetPiece != NoPiece {
+					flag = Capture
+				}
+				dst[count] = Move{piece: piece, startIdx: idx, endIdx: targetIdx, flag: flag}
 				count++
 				continue
 			}
 
 			if info.inCheck && info.checkerCount == 1 {
-				isEP := pieceType == Pawn && pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx
-				if !isEP && info.evasionMask&(1<<targetIdx) == 0 {
+				if !isEP && info.evasionMask&targetMask == 0 {
 					continue
 				}
 			}
 
 			if pieceType == Pawn && isPromotionSquare(pos.activeColor, targetIdx) {
-				if info.inCheck && info.checkerCount == 1 && info.evasionMask&(1<<targetIdx) == 0 {
+				if info.inCheck && info.checkerCount == 1 && info.evasionMask&targetMask == 0 {
 					continue
 				}
 				for _, flag := range promotionFlags {
-					move := NewMove(piece, idx, targetIdx, flag)
+					move := Move{piece: piece, startIdx: idx, endIdx: targetIdx, flag: flag}
 					if !isPinned || pinRay&(1<<targetIdx) != 0 {
 						dst[count] = move
 						count++
@@ -137,10 +147,17 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 				continue
 			}
 
-			move := NewMove(piece, idx, targetIdx, classifyMove(pos, piece, idx, targetIdx))
+			flag := int8(NormalMove)
+			if isEP {
+				flag = EnPassant
+			} else if pieceType == Pawn && absInt8(targetIdx-idx) == 16 {
+				flag = PawnDoubleMove
+			} else if targetPiece != NoPiece {
+				flag = Capture
+			}
+			move := Move{piece: piece, startIdx: idx, endIdx: targetIdx, flag: flag}
 
 			if !info.inCheck && !isPinned {
-				isEP := pieceType == Pawn && pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx
 				if !isEP {
 					dst[count] = move
 					count++
@@ -149,11 +166,10 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 			}
 
 			if !info.inCheck && isPinned {
-				if pinRay&(1<<targetIdx) != 0 {
-					isEP := pieceType == Pawn && pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx
+				if pinRay&targetMask != 0 {
 					if isEP {
 						history := e.positionUpdater.MakeMove(pos, move)
-						if !IsKingInCheck(pos, initialColor) {
+						if !IsKingInCheck(pos, inCheckColor) {
 							dst[count] = move
 							count++
 						}
@@ -167,17 +183,16 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 			}
 
 			if info.inCheck && info.checkerCount == 1 {
-				isEP := pieceType == Pawn && pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx
 				if isEP {
 					history := e.positionUpdater.MakeMove(pos, move)
-					if !IsKingInCheck(pos, initialColor) {
+					if !IsKingInCheck(pos, inCheckColor) {
 						dst[count] = move
 						count++
 					}
 					e.positionUpdater.UnMakeMove(pos, history)
 					continue
 				}
-				if isPinned && pinRay&(1<<targetIdx) == 0 {
+				if isPinned && pinRay&targetMask == 0 {
 					continue
 				}
 				dst[count] = move
@@ -186,7 +201,7 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 			}
 
 			history := e.positionUpdater.MakeMove(pos, move)
-			if !IsKingInCheck(pos, initialColor) {
+			if !IsKingInCheck(pos, inCheckColor) {
 				dst[count] = move
 				count++
 			}

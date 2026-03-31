@@ -85,6 +85,7 @@ These results are the closest raw movegen / make-unmake comparison across versio
 | v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 921ms | -0.75s (-45.0%) |
 | v7 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 809ms | -112ms (-12.2%) |
 | v8 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 776ms | -33ms (-4.1%) |
+| v9 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 576ms | -200ms (-25.8%) |
 
 ### Tricks On
 
@@ -95,6 +96,27 @@ These results include perft-only tricks such as bulk counting and TT. `v6` is th
 | v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 229ms | baseline |
 | v7 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 256ms | +27ms (+11.8%) |
 | v8 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 68ms | -188ms (-73.4%) |
+| v9 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 91ms | +23ms (+33.8%) |
+
+Note: `v9` remains focused on the raw `-no-perft-tricks` path. Tricks-on depth-6 timings are still noisy under `go run`; the single-shot `v9` result above was `90.61035ms`, while a local sample-of-4 taken on March 31, 2026 produced `303ms`, `86ms`, `86ms`, `309ms`.
+
+## Perft(7) Snapshot
+
+These depth-7 numbers were taken on the same benchmark FEN on March 31, 2026. They are useful for checking whether an optimization still helps once the tree is much larger.
+
+### Tricks Off
+
+| Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
+| --- | --- | --- | --- | ---: | ---: | ---: |
+| v8 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 9.83s | baseline |
+| v9 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 9.16s | -0.67s (-6.8%) |
+
+### Tricks On
+
+| Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
+| --- | --- | --- | --- | ---: | ---: | ---: |
+| v8 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 895ms | baseline |
+| v9 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 715ms | -180ms (-20.1%) |
 
 Note: `v7` timings were noisy in single-shot runs because `./scripts/bench-perft.sh` uses `go run`. The recorded `v7` numbers above are medians from four local samples taken on March 31, 2026:
 
@@ -400,6 +422,62 @@ Interpretation:
 
 - With tricks disabled, `v8` is a modest but real improvement over `v7`; most of the gain comes from lighter undo work and skipping unused Zobrist updates
 - With tricks enabled, `v8` is much faster on warmed runs; the move-flag and undo-path cleanup materially reduces the remaining overhead around the TT-assisted perft path
+
+### v9
+
+Optimizations applied:
+
+- Replaced pinned-piece ray lookup in `positionAnalysis` with direct `[64]uint64` square-indexed storage instead of scanning a compact side table
+- Simplified `legalMovesInto(...)` so the inner loop reuses `enPassantIdx`, `targetMask`, and `targetPiece` rather than recomputing them across multiple branches
+- Materialized `Move` values directly in the legal-move hot path instead of calling `NewMove` / `classifyMove` for every surviving target
+- Reduced undo overhead in `UnMakeMove` by decoding `packedState` directly instead of going through multiple tiny accessors
+- Switched the plain updater hot path to use direct move fields and mailbox lookups in `MakeMove` / `UnMakeMove`
+
+Benchmark commands:
+
+```bash
+./scripts/bench-perft.sh
+BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+BENCH_DEPTH=7 ./scripts/bench-perft.sh
+BENCH_DEPTH=7 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded outputs:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Perft tricks: true
+Nodes: 11030083
+Elapsed: 90.61035ms
+CPU profile: .codex-tmp/bench-perft-v9.cpu.prof
+
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Perft tricks: false
+Nodes: 11030083
+Elapsed: 575.536727ms
+CPU profile: .codex-tmp/bench-perft-no-tricks-v9-d6.cpu.prof
+
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Perft tricks: true
+Nodes: 178633661
+Elapsed: 715.189908ms
+CPU profile: .codex-tmp/bench-perft-v9-d7.cpu.prof
+
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Perft tricks: false
+Nodes: 178633661
+Elapsed: 9.160036102s
+CPU profile: .codex-tmp/bench-perft-no-tricks-v9.cpu.prof
+```
+
+Interpretation:
+
+- With tricks disabled, `v9` is a clear improvement over `v8` at both depth 6 and depth 7; the gain comes from less work inside `legalMovesInto(...)` and cheaper undo-state restoration
+- With tricks enabled, `v9` improves the depth-7 run but the depth-6 `go run` path is still too noisy to read as a clean regression or improvement signal
 
 ## Update Rules
 

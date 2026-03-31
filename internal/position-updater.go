@@ -43,21 +43,21 @@ func (updater *PlainPositionUpdater) invalidateKingSafetyCaches(pos *Position) {
 }
 
 func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
-	startPieceIdx := move.StartIdx()
-	endPieceIdx := move.EndIdx()
+	startPieceIdx := move.startIdx
+	endPieceIdx := move.endIdx
 	startPiece := move.piece
 	startPieceType := startPiece.Type()
 	isEnPassant := isEnPassantMove(pos, move)
 
 	captureIdx := endPieceIdx
-	capturedPiece := pos.PieceAt(endPieceIdx)
+	capturedPiece := pos.board[endPieceIdx]
 	if isEnPassant {
 		if pos.activeColor == White {
 			captureIdx = endPieceIdx - 8
 		} else {
 			captureIdx = endPieceIdx + 8
 		}
-		capturedPiece = pos.PieceAt(captureIdx)
+		capturedPiece = pos.board[captureIdx]
 	}
 
 	history := MoveHistory{
@@ -162,22 +162,23 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 
 func (updater *PlainPositionUpdater) UnMakeMove(pos *Position, history MoveHistory) {
 	move := history.move
-	startPieceIdx := move.StartIdx()
-	endPieceIdx := move.EndIdx()
+	startPieceIdx := move.startIdx
+	endPieceIdx := move.endIdx
+	packedState := history.packedState
 
 	pos.activeColor = move.piece.Color()
-	pos.whiteKingIdx = history.whiteKingIdx()
-	pos.blackKingIdx = history.blackKingIdx()
+	pos.whiteKingIdx = int8((packedState >> metaWhiteKingShift) & 0x3F)
+	pos.blackKingIdx = int8((packedState >> metaBlackKingShift) & 0x3F)
 	pos.whiteKingAffectMask = history.whiteKingAffectMask
 	pos.blackKingAffectMask = history.blackKingAffectMask
-	pos.whiteCastleRights = history.whiteCastleRights()
-	pos.blackCastleRights = history.blackCastleRights()
-	pos.whiteKingSafety = history.whiteKingSafety()
-	pos.blackKingSafety = history.blackKingSafety()
-	pos.enPassantIdx = history.enPassantIdx()
+	pos.whiteCastleRights = int8((packedState >> metaWhiteCastleShift) & 0x3)
+	pos.blackCastleRights = int8((packedState >> metaBlackCastleShift) & 0x3)
+	pos.whiteKingSafety = decodeKingSafety((packedState >> metaWhiteSafetyShift) & 0x3)
+	pos.blackKingSafety = decodeKingSafety((packedState >> metaBlackSafetyShift) & 0x3)
+	pos.enPassantIdx = int8((packedState>>metaEnPassantShift)&0x7F) - 1
 
 	if move.flag == QueenPromotion || move.flag == KnightPromotion || move.flag == BishopPromotion || move.flag == RookPromotion {
-		pos.removePieceAt(endPieceIdx, pos.PieceAt(endPieceIdx))
+		pos.removePieceAt(endPieceIdx, pos.board[endPieceIdx])
 		pos.addPieceAt(startPieceIdx, move.piece)
 	} else {
 		pos.movePiece(move.piece, endPieceIdx, startPieceIdx)
