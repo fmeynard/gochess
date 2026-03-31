@@ -3,22 +3,21 @@ package internal
 type moveApplier interface {
 	MakeMove(pos *Position, move Move) MoveHistory
 	UnMakeMove(pos *Position, history MoveHistory)
-	IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool
 }
 
 type PlainPositionUpdater struct {
-	moveGenerator *BitsBoardMoveGenerator
+	moveGenerator *PseudoLegalMoveGenerator
 }
 
 func kingAffectMask(kingIdx int8) uint64 {
 	return queenAttacksMask[kingIdx] | knightAttacksMask[kingIdx] | (uint64(1) << kingIdx)
 }
 
-func NewPositionUpdater(moveGenerator *BitsBoardMoveGenerator) moveApplier {
+func NewPositionUpdater(moveGenerator *PseudoLegalMoveGenerator) moveApplier {
 	return NewZobristPositionUpdater(NewPlainPositionUpdater(moveGenerator))
 }
 
-func NewPlainPositionUpdater(moveGenerator *BitsBoardMoveGenerator) *PlainPositionUpdater {
+func NewPlainPositionUpdater(moveGenerator *PseudoLegalMoveGenerator) *PlainPositionUpdater {
 	return &PlainPositionUpdater{moveGenerator: moveGenerator}
 }
 
@@ -495,19 +494,4 @@ func (updater *PlainPositionUpdater) UnMakeMove(pos *Position, history MoveHisto
 		pos.board[rookStartIdx] = Piece(pos.activeColor | Rook)
 		pos.board[rookEndIdx] = NoPiece
 	}
-}
-
-// IsMoveAffectsKing
-// The goal here is to trigger king safety recalculation as less as possible,
-// but it's a balance, if detection is less performant than the recalculation it's better to recalculate
-func (updater *PlainPositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool {
-	var kingAffectMask uint64
-	if kingColor == White {
-		kingAffectMask = pos.whiteKingAffectMask
-	} else {
-		kingAffectMask = pos.blackKingAffectMask
-	}
-
-	movePiecesMask := uint64(1<<m.startIdx | 1<<m.endIdx)
-	return (kingAffectMask & movePiecesMask) != 0
 }

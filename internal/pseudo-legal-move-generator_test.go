@@ -79,7 +79,7 @@ func TestSliderPseudoLegalMoves(t *testing.T) {
 		},
 	}
 
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	for tName, d := range data {
 		t.Run(tName, func(t *testing.T) {
@@ -127,7 +127,7 @@ func TestKnightPseudoLegalMoves(t *testing.T) {
 		},
 	}
 
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	for tName, d := range data {
 		t.Run(tName, func(t *testing.T) {
@@ -198,7 +198,7 @@ func TestKingPseudoLegalMoves(t *testing.T) {
 		},
 	}
 
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	for tName, d := range data {
 		t.Run(tName, func(t *testing.T) {
@@ -294,7 +294,7 @@ func TestPawnPseudoLegalMoves(t *testing.T) {
 		},
 	}
 
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	for tName, d := range data {
 		t.Run(tName, func(t *testing.T) {
@@ -325,7 +325,7 @@ func TestPawnPseudoLegalMoves(t *testing.T) {
 
 func BenchmarkRookPseudoLegalMoves(b *testing.B) {
 	pos, _ := NewPositionFromFEN("3p4/8/8/8/3R3P/3p4/8/8 w - - 0 1")
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	b.ResetTimer()
 
@@ -337,7 +337,7 @@ func BenchmarkRookPseudoLegalMoves(b *testing.B) {
 func BenchmarkQueenPseudoLegalMoves(b *testing.B) {
 	// queen
 	pos, _ := NewPositionFromFEN("3p4/8/8/4b3/2pq3P/3P4/8/P5p1 b - - 0 1")
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	b.ResetTimer()
 
@@ -348,7 +348,7 @@ func BenchmarkQueenPseudoLegalMoves(b *testing.B) {
 
 func BenchmarkKingPseudoLegalMoves(b *testing.B) {
 	pos, _ := NewPositionFromFEN("8/8/8/3P4/3K4/2p5/8/8 w KQkq - 0 1")
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	b.ResetTimer()
 
@@ -359,7 +359,7 @@ func BenchmarkKingPseudoLegalMoves(b *testing.B) {
 
 func BenchmarkKnightPseudoLegalMoves(b *testing.B) {
 	pos, _ := NewPositionFromFEN("8/8/8/8/4N3/2P5/3p4/8 w - - 0 1")
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	b.ResetTimer()
 
@@ -370,7 +370,7 @@ func BenchmarkKnightPseudoLegalMoves(b *testing.B) {
 
 func BenchmarkPawnPseudoLegalMoves(b *testing.B) {
 	pos, _ := NewPositionFromFEN("rnbqkbnr/p1p1ppp1/7p/1pPp4/8/8/PP1PPPPP/RNBQKBNR w KQkq d6 0 1")
-	generator := NewBitsBoardMoveGenerator()
+	generator := NewPseudoLegalMoveGenerator()
 
 	b.ResetTimer()
 

@@ -57,14 +57,15 @@ func TestComputePositionAnalysis(t *testing.T) {
 				enemyOcc = pos.whiteOccupied
 			}
 
-			analysis := computePositionAnalysis(pos, kingIdx, friendlyOcc, enemyOcc)
+			var analysis positionAnalysis
+			computePositionAnalysis(pos, kingIdx, friendlyOcc, enemyOcc, &analysis)
 			assert.Equal(t, d.expectedInCheck, analysis.inCheck)
-			assert.Equal(t, d.expectedCheckers, analysis.checkerCount)
+			assert.Equal(t, uint8(d.expectedCheckers), analysis.checkerCount)
 			assert.Equal(t, d.expectedPinned, analysis.pinnedMask)
 			assert.Equal(t, d.expectedEvasion, analysis.evasionMask)
 
 			if d.expectedPinSquare != NoEnPassant {
-				assert.NotZero(t, analysis.pinRayFor(d.expectedPinSquare))
+				assert.NotZero(t, analysis.pinRayBySq[d.expectedPinSquare])
 			}
 		})
 	}

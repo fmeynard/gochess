@@ -14,7 +14,7 @@ const (
 )
 
 var (
-	attackTablesOnce            sync.Once
+	attackTablesOnce sync.Once
 	QueenDirections  = []int8{West, East, South, North, SouthWest, SouthEast, NorthWest, NorthEast}
 	RookDirections   = []int8{South, North, West, East}
 	BishopDirections = []int8{SouthWest, SouthEast, NorthWest, NorthEast}
@@ -35,7 +35,7 @@ var (
 	betweenMasks                [64][64]uint64
 )
 
-type BitsBoardMoveGenerator struct {
+type PseudoLegalMoveGenerator struct {
 	bishopMasks            [64][4][7]int8
 	bishopMaskLens         [64][4]int8
 	rookMasks              [64][4][7]int8
@@ -53,9 +53,9 @@ func init() {
 	ensureAttackTables()
 }
 
-func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
+func NewPseudoLegalMoveGenerator() *PseudoLegalMoveGenerator {
 	ensureAttackTables()
-	bitsBoardMoveGenerator := &BitsBoardMoveGenerator{}
+	bitsBoardMoveGenerator := &PseudoLegalMoveGenerator{}
 	bitsBoardMoveGenerator.initPieceMasks()
 
 	return bitsBoardMoveGenerator
@@ -63,7 +63,7 @@ func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
 
 func ensureAttackTables() {
 	attackTablesOnce.Do(func() {
-		g := &BitsBoardMoveGenerator{}
+		g := &PseudoLegalMoveGenerator{}
 		g.initPieceMasks()
 		g.initSliderAttackMasks()
 		g.initKnightAttacksMasks()
@@ -73,7 +73,7 @@ func ensureAttackTables() {
 	})
 }
 
-func (g *BitsBoardMoveGenerator) initPieceMasks() {
+func (g *PseudoLegalMoveGenerator) initPieceMasks() {
 	for squareIdx := int8(0); squareIdx < 64; squareIdx++ {
 		g.initBishopMaskForSquare(squareIdx)
 		g.initRookMaskForSquare(squareIdx)
@@ -83,7 +83,7 @@ func (g *BitsBoardMoveGenerator) initPieceMasks() {
 	}
 }
 
-func (g *BitsBoardMoveGenerator) initDiagonalAttacksMasks() {
+func (g *PseudoLegalMoveGenerator) initDiagonalAttacksMasks() {
 	for idx := int8(0); idx < 64; idx++ {
 		for dirIdx, dir := range BishopDirections {
 			mask := uint64(0)
@@ -100,7 +100,7 @@ func (g *BitsBoardMoveGenerator) initDiagonalAttacksMasks() {
 	}
 }
 
-func (g *BitsBoardMoveGenerator) initSliderAttackMasks() {
+func (g *PseudoLegalMoveGenerator) initSliderAttackMasks() {
 	for idx := int8(0); idx < 64; idx++ {
 		for dirIdx, dir := range QueenDirections {
 			mask := uint64(0)
@@ -148,7 +148,7 @@ func initBetweenMasks() {
 	}
 }
 
-func (g *BitsBoardMoveGenerator) initKnightAttacksMasks() {
+func (g *PseudoLegalMoveGenerator) initKnightAttacksMasks() {
 
 	knightMoves := [8][2]int8{
 		{2, 1}, {1, 2}, {-1, 2}, {-2, 1},
@@ -167,7 +167,7 @@ func (g *BitsBoardMoveGenerator) initKnightAttacksMasks() {
 	}
 }
 
-func (g *BitsBoardMoveGenerator) initKingAttacksMasks() {
+func (g *PseudoLegalMoveGenerator) initKingAttacksMasks() {
 	kingMoves := [8][2]int8{{0, 1}, {1, 0}, {0, -1}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
 
 	for idx := int8(0); idx < 64; idx++ {
@@ -186,7 +186,7 @@ func (g *BitsBoardMoveGenerator) initKingAttacksMasks() {
 // initPawnMasksForSquare
 // Pawns only moves forward and their capture patterns are different from their move patterns
 // En Passant needs to be checked separately as its tight to the position
-func (g *BitsBoardMoveGenerator) initPawnMasksForSquare(squareIdx int8) {
+func (g *PseudoLegalMoveGenerator) initPawnMasksForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
 
 	// White pawn single move
@@ -222,7 +222,7 @@ func (g *BitsBoardMoveGenerator) initPawnMasksForSquare(squareIdx int8) {
 	}
 }
 
-func (g *BitsBoardMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
+func (g *PseudoLegalMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
 	n := int8(0)
 	for r, f := squareRank+1, squareFile-1; r < 8 && f >= 0; r, f = r+1, f-1 {
@@ -253,7 +253,7 @@ func (g *BitsBoardMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
 	g.bishopMaskLens[squareIdx][3] = n
 }
 
-func (g *BitsBoardMoveGenerator) initRookMaskForSquare(squareIdx int8) {
+func (g *PseudoLegalMoveGenerator) initRookMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
 	n := int8(0)
 	for r := squareRank + 1; r < 8; r++ {
@@ -284,7 +284,7 @@ func (g *BitsBoardMoveGenerator) initRookMaskForSquare(squareIdx int8) {
 	g.rookMaskLens[squareIdx][3] = n
 }
 
-func (g *BitsBoardMoveGenerator) initKnightMaskForSquare(squareIdx int8) {
+func (g *PseudoLegalMoveGenerator) initKnightMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
 	for _, offset := range KnightOffsets {
 		targetIdx := squareIdx + offset
@@ -299,7 +299,7 @@ func (g *BitsBoardMoveGenerator) initKnightMaskForSquare(squareIdx int8) {
 	}
 }
 
-func (g *BitsBoardMoveGenerator) initKingMaskForSquare(squareIdx int8) {
+func (g *PseudoLegalMoveGenerator) initKingMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
 	for _, offset := range KingOffsets {
 		targetIdx := squareIdx + offset
@@ -315,7 +315,7 @@ func (g *BitsBoardMoveGenerator) initKingMaskForSquare(squareIdx int8) {
 }
 
 // PawnPseudoLegalMoves Generate pawn moves using bitboards
-func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) ([]int8, int8) {
+func (g *PseudoLegalMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) ([]int8, int8) {
 	var buf [4]int8
 	count, promotionIdx := g.PawnPseudoLegalMovesInto(pos, idx, buf[:])
 	moves := make([]int8, count)
@@ -323,7 +323,7 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 	return moves, promotionIdx
 }
 
-func (g *BitsBoardMoveGenerator) PawnPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) (int, int8) {
+func (g *PseudoLegalMoveGenerator) PawnPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) (int, int8) {
 	count := 0
 	promotionIdx := int8(-1)
 	isWhite := pos.activeColor == White
@@ -382,7 +382,7 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMovesInto(pos *Position, idx int
 	return count, promotionIdx
 }
 
-func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) []int8 {
+func (g *PseudoLegalMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) []int8 {
 	var buf [8]int8
 	count := g.KingPseudoLegalMovesInto(pos, idx, buf[:])
 	moves := make([]int8, count)
@@ -390,7 +390,7 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) [
 	return moves
 }
 
-func (g *BitsBoardMoveGenerator) KingPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int {
+func (g *PseudoLegalMoveGenerator) KingPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int {
 	count := 0
 	opponentOccupiedMask := pos.OpponentOccupiedMask()
 	castleRights := pos.CastleRights()
@@ -463,7 +463,7 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMovesInto(pos *Position, idx int
 	return count
 }
 
-func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos *Position, idx int8) []int8 {
+func (g *PseudoLegalMoveGenerator) KnightPseudoLegalMoves(pos *Position, idx int8) []int8 {
 	var buf [8]int8
 	count := g.KnightPseudoLegalMovesInto(pos, idx, buf[:])
 	moves := make([]int8, count)
@@ -471,7 +471,7 @@ func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos *Position, idx int8)
 	return moves
 }
 
-func (g *BitsBoardMoveGenerator) KnightPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int {
+func (g *PseudoLegalMoveGenerator) KnightPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int {
 	count := 0
 	knightMask := g.knightMasks[idx]
 	opponentOccupiedMask := pos.OpponentOccupiedMask()
@@ -489,7 +489,7 @@ func (g *BitsBoardMoveGenerator) KnightPseudoLegalMovesInto(pos *Position, idx i
 	return count
 }
 
-func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8, pieceType int8) []int8 {
+func (g *PseudoLegalMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8, pieceType int8) []int8 {
 	var buf [28]int8
 	count := g.SliderPseudoLegalMovesInto(pos, idx, pieceType, buf[:])
 	moves := make([]int8, count)
@@ -497,7 +497,7 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8,
 	return moves
 }
 
-func (g *BitsBoardMoveGenerator) SliderPseudoLegalMovesInto(pos *Position, idx int8, pieceType int8, dst []int8) int {
+func (g *PseudoLegalMoveGenerator) SliderPseudoLegalMovesInto(pos *Position, idx int8, pieceType int8, dst []int8) int {
 	var (
 		processBishopDirections = false
 		processRookDirections   = false

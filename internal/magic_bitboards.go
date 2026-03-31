@@ -41,11 +41,11 @@ var bishopMagicNumbers = [64]uint64{
 }
 
 var (
-	rookMagicMasks   [64]uint64
-	bishopMagicMasks [64]uint64
-	rookMagicShifts  [64]uint8
-	bishopMagicShifts [64]uint8
-	rookMagicAttacks [64][]uint64
+	rookMagicMasks     [64]uint64
+	bishopMagicMasks   [64]uint64
+	rookMagicShifts    [64]uint8
+	bishopMagicShifts  [64]uint8
+	rookMagicAttacks   [64][]uint64
 	bishopMagicAttacks [64][]uint64
 )
 

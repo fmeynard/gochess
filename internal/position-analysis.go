@@ -4,14 +4,14 @@ import "math/bits"
 
 type positionAnalysis struct {
 	inCheck      bool
-	checkerCount int
+	checkerCount uint8
 	evasionMask  uint64
 	pinnedMask   uint64
 	pinRayBySq   [64]uint64
 }
 
-func computePositionAnalysis(pos *Position, kingIdx int8, friendlyOcc, enemyOcc uint64) positionAnalysis {
-	var info positionAnalysis
+func computePositionAnalysis(pos *Position, kingIdx int8, friendlyOcc, enemyOcc uint64, info *positionAnalysis) {
+	*info = positionAnalysis{}
 	checkers := uint64(0)
 	blockMask := uint64(0)
 
@@ -53,14 +53,9 @@ func computePositionAnalysis(pos *Position, kingIdx int8, friendlyOcc, enemyOcc 
 	processCandidates(orthogonalAttacksMask[kingIdx] & rookQueens)
 	processCandidates(diagonalCombinedAttacksMask[kingIdx] & bishopQueens)
 
-	info.checkerCount = bits.OnesCount64(checkers)
+	info.checkerCount = uint8(bits.OnesCount64(checkers))
 	info.inCheck = info.checkerCount > 0
 	if info.checkerCount == 1 {
 		info.evasionMask = checkers | blockMask
 	}
-	return info
-}
-
-func (pa *positionAnalysis) pinRayFor(sq int8) uint64 {
-	return pa.pinRayBySq[sq]
 }

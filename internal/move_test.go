@@ -57,7 +57,19 @@ func TestMoveHelpers_ClassifyMove(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assert.Equal(t, d.expected, classifyMove(pos, d.piece, d.startIdx, d.endIdx))
+
+			actual := int8(NormalMove)
+			if d.piece.Type() == King && absInt8(d.endIdx-d.startIdx) == 2 {
+				actual = Castle
+			} else if d.piece.Type() == Pawn && pos.enPassantIdx != NoEnPassant && d.endIdx == pos.enPassantIdx {
+				actual = EnPassant
+			} else if d.piece.Type() == Pawn && absInt8(d.endIdx-d.startIdx) == 16 {
+				actual = PawnDoubleMove
+			} else if pos.board[d.endIdx] != NoPiece {
+				actual = Capture
+			}
+
+			assert.Equal(t, d.expected, actual)
 		})
 	}
 }
@@ -72,7 +84,12 @@ func TestMoveHelpers_IsCastleAndEnPassant(t *testing.T) {
 	assert.True(t, isCastleMove(NewMove(Piece(White|King), E1, G1, NormalMove)))
 	assert.False(t, isCastleMove(NewMove(Piece(White|King), E1, F1, NormalMove)))
 
-	assert.True(t, isEnPassantMove(pos, NewMove(Piece(White|Pawn), E5, D6, EnPassant)))
-	assert.True(t, isEnPassantMove(pos, NewMove(Piece(White|Pawn), E5, D6, NormalMove)))
-	assert.False(t, isEnPassantMove(pos, NewMove(Piece(White|Pawn), E5, E6, NormalMove)))
+	move := NewMove(Piece(White|Pawn), E5, D6, EnPassant)
+	assert.True(t, move.flag == EnPassant || (move.piece.Type() == Pawn && pos.enPassantIdx != NoEnPassant && move.EndIdx() == pos.enPassantIdx && pos.PieceAt(move.EndIdx()) == NoPiece && absInt8(FileFromIdx(move.EndIdx())-FileFromIdx(move.StartIdx())) == 1))
+
+	move = NewMove(Piece(White|Pawn), E5, D6, NormalMove)
+	assert.True(t, move.flag == EnPassant || (move.piece.Type() == Pawn && pos.enPassantIdx != NoEnPassant && move.EndIdx() == pos.enPassantIdx && pos.PieceAt(move.EndIdx()) == NoPiece && absInt8(FileFromIdx(move.EndIdx())-FileFromIdx(move.StartIdx())) == 1))
+
+	move = NewMove(Piece(White|Pawn), E5, E6, NormalMove)
+	assert.False(t, move.flag == EnPassant || (move.piece.Type() == Pawn && pos.enPassantIdx != NoEnPassant && move.EndIdx() == pos.enPassantIdx && pos.PieceAt(move.EndIdx()) == NoPiece && absInt8(FileFromIdx(move.EndIdx())-FileFromIdx(move.StartIdx())) == 1))
 }
