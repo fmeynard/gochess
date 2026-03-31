@@ -49,8 +49,8 @@ That keeps the mutable board layer independent from the higher-level generation/
   Simple perft divide entrypoint.
 - `cmd/benchperft/main.go`
   Benchmark entrypoint used by `scripts/bench-perft.sh`.
-- `cmd/main.go`
-  Placeholder.
+- `cmd/uci/main.go`
+  UCI entrypoint for GUI integration and external engine tooling.
 
 ## Board Layer
 

@@ -5,6 +5,7 @@ import (
 	"chessV2/internal/eval"
 	"chessV2/internal/movegen"
 	"chessV2/internal/search"
+	"fmt"
 	"time"
 )
 
@@ -53,19 +54,55 @@ func (e *Engine) StartGame() {
 func (e *Engine) Move() {}
 
 func (e *Engine) BestMoveDepth(pos *board.Position, depth int) (board.Move, error) {
-	result, err := e.searcher.Search(pos, search.Limits{Depth: depth})
+	result, err := e.SearchDepth(pos, depth)
 	if err != nil {
 		return board.Move{}, err
 	}
 	return result.BestMove, nil
 }
 
+func (e *Engine) SearchDepth(pos *board.Position, depth int) (search.Result, error) {
+	return e.searcher.Search(pos, search.Limits{Depth: depth})
+}
+
 func (e *Engine) BestMoveTime(pos *board.Position, moveTime time.Duration) (board.Move, error) {
-	result, err := e.searcher.Search(pos, search.Limits{MoveTime: moveTime})
+	result, err := e.SearchTime(pos, moveTime)
 	if err != nil {
 		return board.Move{}, err
 	}
 	return result.BestMove, nil
+}
+
+func (e *Engine) SearchTime(pos *board.Position, moveTime time.Duration) (search.Result, error) {
+	return e.searcher.Search(pos, search.Limits{MoveTime: moveTime})
+}
+
+func (e *Engine) FindMoveByUCI(pos *board.Position, uci string) (board.Move, error) {
+	moves := e.LegalMoves(pos)
+	for _, move := range moves {
+		if move.UCI() == uci {
+			return move, nil
+		}
+	}
+	return board.Move{}, fmt.Errorf("illegal move: %s", uci)
+}
+
+func (e *Engine) ApplyUCIMove(pos *board.Position, uci string) error {
+	move, err := e.FindMoveByUCI(pos, uci)
+	if err != nil {
+		return err
+	}
+	e.positionUpdater.MakeMove(pos, move)
+	return nil
+}
+
+func (e *Engine) ApplyUCIMoves(pos *board.Position, moves []string) error {
+	for _, uci := range moves {
+		if err := e.ApplyUCIMove(pos, uci); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (e *Engine) LegalMoves(pos *board.Position) []board.Move {
