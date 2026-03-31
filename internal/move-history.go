@@ -13,6 +13,7 @@ type MoveHistory struct {
 	activeColor       int8
 	whiteKingSafety   int8
 	blackKingSafety   int8
+	zobristKey        uint64
 }
 
 func NewMoveHistory(pos *Position, move Move, movedPiece, capturedPiece Piece, captureIdx int8) MoveHistory {
@@ -29,5 +30,6 @@ func NewMoveHistory(pos *Position, move Move, movedPiece, capturedPiece Piece, c
 		activeColor:       pos.activeColor,
 		blackKingSafety:   pos.blackKingSafety,
 		whiteKingSafety:   pos.whiteKingSafety,
+		zobristKey:        pos.zobristKey,
 	}
 }

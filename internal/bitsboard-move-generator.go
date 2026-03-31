@@ -30,8 +30,10 @@ var (
 )
 
 type BitsBoardMoveGenerator struct {
-	bishopMasks            [64][4][]int8
-	rookMasks              [64][4][]int8
+	bishopMasks            [64][4][7]int8
+	bishopMaskLens         [64][4]int8
+	rookMasks              [64][4][7]int8
+	rookMaskLens           [64][4]int8
 	knightMasks            [64]uint64
 	kingMasks              [64]uint64
 	whitePawnMovesMasks    [64]uint64
@@ -56,11 +58,11 @@ func (g *BitsBoardMoveGenerator) initMasks() {
 		g.initKnightMaskForSquare(squareIdx)
 		g.initKingMaskForSquare(squareIdx)
 		g.initPawnMasksForSquare(squareIdx)
-		g.initSliderAttackMasks()
-		g.initKnightAttacksMasks()
-		g.initKingAttacksMasks()
-		g.initDiagonalAttacksMasks()
 	}
+	g.initSliderAttackMasks()
+	g.initKnightAttacksMasks()
+	g.initKingAttacksMasks()
+	g.initDiagonalAttacksMasks()
 }
 
 func (g *BitsBoardMoveGenerator) initDiagonalAttacksMasks() {
@@ -175,42 +177,64 @@ func (g *BitsBoardMoveGenerator) initPawnMasksForSquare(squareIdx int8) {
 
 func (g *BitsBoardMoveGenerator) initBishopMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
-	// SouthWest direction
+	n := int8(0)
 	for r, f := squareRank+1, squareFile-1; r < 8 && f >= 0; r, f = r+1, f-1 {
-		g.bishopMasks[squareIdx][0] = append(g.bishopMasks[squareIdx][0], r*8+f)
+		g.bishopMasks[squareIdx][0][n] = r*8 + f
+		n++
 	}
-	// SouthEast direction
+	g.bishopMaskLens[squareIdx][0] = n
+
+	n = 0
 	for r, f := squareRank+1, squareFile+1; r < 8 && f < 8; r, f = r+1, f+1 {
-		g.bishopMasks[squareIdx][1] = append(g.bishopMasks[squareIdx][1], r*8+f)
+		g.bishopMasks[squareIdx][1][n] = r*8 + f
+		n++
 	}
-	// NorthWest direction
+	g.bishopMaskLens[squareIdx][1] = n
+
+	n = 0
 	for r, f := squareRank-1, squareFile-1; r >= 0 && f >= 0; r, f = r-1, f-1 {
-		g.bishopMasks[squareIdx][2] = append(g.bishopMasks[squareIdx][2], r*8+f)
+		g.bishopMasks[squareIdx][2][n] = r*8 + f
+		n++
 	}
-	// NorthEast direction
+	g.bishopMaskLens[squareIdx][2] = n
+
+	n = 0
 	for r, f := squareRank-1, squareFile+1; r >= 0 && f < 8; r, f = r-1, f+1 {
-		g.bishopMasks[squareIdx][3] = append(g.bishopMasks[squareIdx][3], r*8+f)
+		g.bishopMasks[squareIdx][3][n] = r*8 + f
+		n++
 	}
+	g.bishopMaskLens[squareIdx][3] = n
 }
 
 func (g *BitsBoardMoveGenerator) initRookMaskForSquare(squareIdx int8) {
 	squareRank, squareFile := RankAndFile(squareIdx)
-	// Up direction
+	n := int8(0)
 	for r := squareRank + 1; r < 8; r++ {
-		g.rookMasks[squareIdx][0] = append(g.rookMasks[squareIdx][0], r*8+squareFile)
+		g.rookMasks[squareIdx][0][n] = r*8 + squareFile
+		n++
 	}
-	// Down direction
+	g.rookMaskLens[squareIdx][0] = n
+
+	n = 0
 	for r := squareRank - 1; r >= 0; r-- {
-		g.rookMasks[squareIdx][1] = append(g.rookMasks[squareIdx][1], r*8+squareFile)
+		g.rookMasks[squareIdx][1][n] = r*8 + squareFile
+		n++
 	}
-	// Left direction
+	g.rookMaskLens[squareIdx][1] = n
+
+	n = 0
 	for f := squareFile - 1; f >= 0; f-- {
-		g.rookMasks[squareIdx][2] = append(g.rookMasks[squareIdx][2], squareRank*8+f)
+		g.rookMasks[squareIdx][2][n] = squareRank*8 + f
+		n++
 	}
-	// Right direction
+	g.rookMaskLens[squareIdx][2] = n
+
+	n = 0
 	for f := squareFile + 1; f < 8; f++ {
-		g.rookMasks[squareIdx][3] = append(g.rookMasks[squareIdx][3], squareRank*8+f)
+		g.rookMasks[squareIdx][3][n] = squareRank*8 + f
+		n++
 	}
+	g.rookMaskLens[squareIdx][3] = n
 }
 
 func (g *BitsBoardMoveGenerator) initKnightMaskForSquare(squareIdx int8) {
@@ -450,7 +474,9 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMovesInto(pos *Position, idx i
 	opponentOccupiedMask := pos.OpponentOccupiedMask()
 	for dir := 0; dir < 4; dir++ {
 		if processRookDirections {
-			for _, targetIdx := range g.rookMasks[idx][dir] {
+			rayLen := int(g.rookMaskLens[idx][dir])
+			for j := 0; j < rayLen; j++ {
+				targetIdx := g.rookMasks[idx][dir][j]
 				targetMask := uint64(1 << targetIdx)
 				if pos.occupied&targetMask == 0 {
 					dst[count] = targetIdx
@@ -468,7 +494,9 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMovesInto(pos *Position, idx i
 		}
 
 		if processBishopDirections {
-			for _, targetIdx := range g.bishopMasks[idx][dir] {
+			rayLen := int(g.bishopMaskLens[idx][dir])
+			for j := 0; j < rayLen; j++ {
+				targetIdx := g.bishopMasks[idx][dir][j]
 				targetMask := uint64(1 << targetIdx)
 				if pos.occupied&targetMask == 0 {
 					dst[count] = targetIdx

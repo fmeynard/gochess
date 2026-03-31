@@ -34,6 +34,7 @@ type Position struct {
 	blackKingSafety     int8
 	whiteKingAffectMask uint64
 	blackKingAffectMask uint64
+	zobristKey          uint64
 
 	queenBoard  uint64
 	kingBoard   uint64
@@ -188,6 +189,7 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 
 	// full move number
 
+	pos.zobristKey = computeZobristKey(pos)
 	pos.isInit = true
 
 	return pos, nil

@@ -68,6 +68,18 @@ BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof
 | v4 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 2.28s | -3.19s (-58.3%) |
 | v5 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 1.67s | -0.61s (-26.5%) |
 
+## Experimental Tiers On v5 Base
+
+These measurements were run on top of the `benchmark-v5` code line and are not directly comparable to the earlier `v0..v5` table above. They measure the staged integration of ideas from the external `diff.txt`.
+
+| Stage | Time | Speedup vs tier baseline | Notes |
+| --- | ---: | ---: | --- |
+| Tier baseline | 1.515s | 1.00x | Current `benchmark-v5` baseline before external tier experiments |
+| Tier 1 | 808ms | 1.88x | Bulk counting at `depth==2`, concrete generator/updater types, fully lazy king cache invalidation |
+| Tier 2 | 766ms | 1.98x | Fixed-size rook/bishop rays, corrected mask initialization, pawn attack lookup table, compact sliding attack checks |
+| Tier 3 | 394ms | 3.84x | Pinned-piece bitboard fast path in `legalMovesInto` |
+| Tier 4 | 206ms | 7.36x | Incremental Zobrist hashing plus perft transposition table |
+
 ## Optimization Log
 
 ### v0

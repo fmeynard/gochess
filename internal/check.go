@@ -8,35 +8,35 @@ const (
 	RookSlider   = 2
 )
 
-func isSquareAttackedByPawn(pos *Position, idx int8, kingColor int8) bool {
-	rank := RankFromIdx(idx)
+var pawnAttacksBy [2][64]uint64
 
-	var (
-		mask         uint64
-		opponentMask uint64
-	)
-
-	if kingColor == Black {
-		rank--
-		if rank == 0 || rank == -1 {
-			return false
+func init() {
+	for sq := int8(0); sq < 64; sq++ {
+		rank, file := RankAndFile(sq)
+		if rank > 0 {
+			if file > 0 {
+				pawnAttacksBy[0][sq] |= 1 << (sq - 9)
+			}
+			if file < 7 {
+				pawnAttacksBy[0][sq] |= 1 << (sq - 7)
+			}
 		}
-		mask |= 1 << (idx - 7)
-		mask |= 1 << (idx - 9)
-		opponentMask = pos.OccupancyMask(White)
-	} else {
-		rank++
-		if rank == 8 || rank == 9 {
-			return false
+		if rank < 7 {
+			if file > 0 {
+				pawnAttacksBy[1][sq] |= 1 << (sq + 7)
+			}
+			if file < 7 {
+				pawnAttacksBy[1][sq] |= 1 << (sq + 9)
+			}
 		}
-		mask |= 1 << (idx + 7)
-		mask |= 1 << (idx + 9)
-		opponentMask = pos.OccupancyMask(Black)
 	}
+}
 
-	rankMask := uint64(0xFF) << (rank * 8)
-
-	return (mask & pos.pawnBoard & rankMask & opponentMask) != 0
+func isSquareAttackedByPawn(pos *Position, idx int8, kingColor int8) bool {
+	if kingColor == White {
+		return (pawnAttacksBy[1][idx] & pos.pawnBoard & pos.blackOccupied) != 0
+	}
+	return (pawnAttacksBy[0][idx] & pos.pawnBoard & pos.whiteOccupied) != 0
 }
 
 // verify if the square is attacked by knight
@@ -45,27 +45,31 @@ func isSquareAttackedByKnight(pos *Position, idx int8, kingColor int8) bool {
 }
 
 func isSquareAttackedBySlidingPiece(pos *Position, squareIdx int8, kingColor int8) bool {
-	// Bitboards for enemy pieces
-	var (
-		enemyColor int8
-	)
-
+	var enemyOcc uint64
 	if kingColor == White {
-		enemyColor = Black
+		enemyOcc = pos.blackOccupied
 	} else {
-		enemyColor = White
+		enemyOcc = pos.whiteOccupied
 	}
 
-	if isRankAttackedByEnemy(pos, squareIdx, enemyColor) {
-		return true
+	rookQueenTargets := (pos.rookBoard | pos.queenBoard) & enemyOcc
+	if rookQueenTargets != 0 {
+		if scanRayForAttack(pos, squareIdx, 0, West, rookQueenTargets) ||
+			scanRayForAttack(pos, squareIdx, 1, East, rookQueenTargets) ||
+			scanRayForAttack(pos, squareIdx, 2, South, rookQueenTargets) ||
+			scanRayForAttack(pos, squareIdx, 3, North, rookQueenTargets) {
+			return true
+		}
 	}
 
-	if isFileAttackedByEnemy(pos, squareIdx, enemyColor) {
-		return true
-	}
-
-	if isDiagonallyAttacked(pos, squareIdx, enemyColor) {
-		return true
+	bishopQueenTargets := (pos.bishopBoard | pos.queenBoard) & enemyOcc
+	if bishopQueenTargets != 0 {
+		if scanRayForAttack(pos, squareIdx, 4, SouthWest, bishopQueenTargets) ||
+			scanRayForAttack(pos, squareIdx, 5, SouthEast, bishopQueenTargets) ||
+			scanRayForAttack(pos, squareIdx, 6, NorthWest, bishopQueenTargets) ||
+			scanRayForAttack(pos, squareIdx, 7, NorthEast, bishopQueenTargets) {
+			return true
+		}
 	}
 
 	return false

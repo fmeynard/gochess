@@ -3,25 +3,8 @@ package internal
 import "math/bits"
 
 type Engine struct {
-	moveGenerator   IMoveGenerator
-	positionUpdater IPositionUpdater
-}
-
-type IPositionUpdater interface {
-	MakeMove(pos *Position, move Move) MoveHistory
-	UnMakeMove(pos *Position, history MoveHistory)
-	IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool
-}
-
-type IMoveGenerator interface {
-	PawnPseudoLegalMoves(pos *Position, idx int8) ([]int8, int8)
-	SliderPseudoLegalMoves(pos *Position, idx int8, pieceType int8) []int8
-	KingPseudoLegalMoves(pos *Position, idx int8) []int8
-	KnightPseudoLegalMoves(pos *Position, idx int8) []int8
-	PawnPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) (int, int8)
-	SliderPseudoLegalMovesInto(pos *Position, idx int8, pieceType int8, dst []int8) int
-	KingPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int
-	KnightPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int
+	moveGenerator   *BitsBoardMoveGenerator
+	positionUpdater *PositionUpdater
 }
 
 const (
@@ -29,6 +12,10 @@ const (
 	MaxLegalMoves = 256
 	MaxTargets    = 28
 )
+
+var promotionFlags = [4]int8{QueenPromotion, KnightPromotion, BishopPromotion, RookPromotion}
+
+var rayDirections = [8]int8{West, East, South, North, SouthWest, SouthEast, NorthWest, NorthEast}
 
 func NewEngine() *Engine {
 	moveGenerator := NewBitsBoardMoveGenerator()
@@ -67,10 +54,68 @@ func (e *Engine) isCastlePathSafe(pos *Position, move Move) bool {
 	return isIntermediateSquareSafe
 }
 
+func computePins(pos *Position, kingIdx int8, friendlyOcc, enemyOcc uint64) (uint64, [64]uint64) {
+	var (
+		pinnedMask uint64
+		pinRays    [64]uint64
+	)
+
+	rookQueens := (pos.rookBoard | pos.queenBoard) & enemyOcc
+	bishopQueens := (pos.bishopBoard | pos.queenBoard) & enemyOcc
+
+	for dirIdx := 0; dirIdx < 8; dirIdx++ {
+		var sliders uint64
+		if dirIdx < 4 {
+			sliders = rookQueens
+		} else {
+			sliders = bishopQueens
+		}
+		if sliders == 0 {
+			continue
+		}
+
+		ray := sliderAttackMasks[kingIdx][dirIdx]
+		if ray == 0 {
+			continue
+		}
+
+		dir := rayDirections[dirIdx]
+		first := firstBlockerOnRay(pos.occupied, ray, dir)
+		if first == 0 || first&friendlyOcc == 0 {
+			continue
+		}
+
+		second := firstBlockerOnRay(pos.occupied&^first, ray, dir)
+		if second == 0 || second&sliders == 0 {
+			continue
+		}
+
+		pinnedMask |= first
+		pinRays[bits.TrailingZeros64(first)] = ray
+	}
+
+	return pinnedMask, pinRays
+}
+
 func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	count := 0
 	var targets [MaxTargets]int8
 	positionCheck := pos.IsCheck()
+	initialColor := pos.activeColor
+
+	var (
+		pinnedMask uint64
+		pinRays    [64]uint64
+		kingIdx    int8
+	)
+	if pos.activeColor == White {
+		kingIdx = pos.whiteKingIdx
+	} else {
+		kingIdx = pos.blackKingIdx
+	}
+	if !positionCheck {
+		pinnedMask, pinRays = computePins(pos, kingIdx, pos.OccupancyMask(pos.activeColor), pos.OpponentOccupiedMask())
+	}
 
 	piecesMask := pos.OccupancyMask(pos.activeColor)
 	for piecesMask != 0 {
@@ -78,10 +123,9 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 
 		pieceMask := uint64(1 << idx)
 		var (
-			pseudoCount  int
-			pieceType    int8
-			piece        Piece
-			initialColor = pos.activeColor
+			pseudoCount int
+			pieceType   int8
+			piece       Piece
 		)
 
 		switch {
@@ -106,13 +150,24 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 		}
 
 		piece = Piece(pos.activeColor | pieceType)
+		isPinned := !positionCheck && pinnedMask&pieceMask != 0
+
 		for i := 0; i < pseudoCount; i++ {
 			targetIdx := targets[i]
 			if pieceType == Pawn && isPromotionSquare(pos.activeColor, targetIdx) {
-				flags := [4]int8{QueenPromotion, KnightPromotion, BishopPromotion, RookPromotion}
-				for _, flag := range flags {
+				for _, flag := range promotionFlags {
 					move := NewMove(piece, idx, targetIdx, flag)
-					if e.isCastleMove(pieceType, move) && !e.isCastlePathSafe(pos, move) {
+					if !positionCheck && pieceType != King {
+						if !isPinned {
+							dst[count] = move
+							count++
+							continue
+						}
+						if pinRays[idx]&(1<<targetIdx) != 0 {
+							dst[count] = move
+							count++
+							continue
+						}
 						continue
 					}
 					if !positionCheck && !e.positionUpdater.IsMoveAffectsKing(pos, move, pos.activeColor) {
@@ -131,8 +186,27 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 			}
 
 			move := NewMove(piece, idx, targetIdx, NormalMove)
-			if e.isCastleMove(pieceType, move) && !e.isCastlePathSafe(pos, move) {
-				continue
+			if pieceType == King && absInt8(targetIdx-idx) == 2 {
+				if !e.isCastlePathSafe(pos, move) {
+					continue
+				}
+			}
+
+			if !positionCheck && pieceType != King {
+				isEP := pieceType == Pawn && pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx
+				if !isEP {
+					if !isPinned {
+						dst[count] = move
+						count++
+						continue
+					}
+					if pinRays[idx]&(1<<targetIdx) != 0 {
+						dst[count] = move
+						count++
+						continue
+					}
+					continue
+				}
 			}
 
 			if !positionCheck && !e.positionUpdater.IsMoveAffectsKing(pos, move, pos.activeColor) {
@@ -165,6 +239,7 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 
 func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint64) {
 	var moveBuffers [MaxPerftPly][MaxLegalMoves]Move
+	tt := newPerftTT()
 	res := make(map[string]uint64)
 	total := uint64(0)
 
@@ -173,8 +248,9 @@ func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint6
 	for i := 0; i < rootCount; i++ {
 		move := rootMoves[i]
 		history := e.positionUpdater.MakeMove(pos, move)
-		res[move.UCI()] = e.moveGenerationTestWithBuffers(pos, depth, 1, &moveBuffers)
-		total += res[move.UCI()]
+		uci := move.UCI()
+		res[uci] = e.moveGenerationTestWithBuffers(pos, depth, 1, &moveBuffers, tt)
+		total += res[uci]
 		e.positionUpdater.UnMakeMove(pos, history)
 	}
 
@@ -183,12 +259,19 @@ func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint6
 
 func (e *Engine) MoveGenerationTest(pos *Position, depth int) uint64 {
 	var moveBuffers [MaxPerftPly][MaxLegalMoves]Move
-	return e.moveGenerationTestWithBuffers(pos, depth, 0, &moveBuffers)
+	tt := newPerftTT()
+	return e.moveGenerationTestWithBuffers(pos, depth, 0, &moveBuffers, tt)
 }
 
-func (e *Engine) moveGenerationTestWithBuffers(pos *Position, depth int, ply int, moveBuffers *[MaxPerftPly][MaxLegalMoves]Move) uint64 {
+func (e *Engine) moveGenerationTestWithBuffers(pos *Position, depth int, ply int, moveBuffers *[MaxPerftPly][MaxLegalMoves]Move, tt *perftTT) uint64 {
 	if depth == 1 {
 		return uint64(1)
+	}
+	if depth == 2 {
+		return uint64(e.legalMovesInto(pos, moveBuffers[ply][:]))
+	}
+	if count, ok := tt.probe(pos.zobristKey, int8(depth)); ok {
+		return count
 	}
 
 	moves := moveBuffers[ply][:]
@@ -199,11 +282,12 @@ func (e *Engine) moveGenerationTestWithBuffers(pos *Position, depth int, ply int
 		history := e.positionUpdater.MakeMove(pos, move)
 
 		nextDepth := depth - 1
-		nextDepthResult := e.moveGenerationTestWithBuffers(pos, nextDepth, ply+1, moveBuffers)
+		nextDepthResult := e.moveGenerationTestWithBuffers(pos, nextDepth, ply+1, moveBuffers, tt)
 		e.positionUpdater.UnMakeMove(pos, history)
 
 		posCount += nextDepthResult
 	}
 
+	tt.store(pos.zobristKey, int8(depth), posCount)
 	return posCount
 }
