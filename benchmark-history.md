@@ -67,6 +67,7 @@ BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof
 | v3 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 5.47s | -2.99s (-35.4%) |
 | v4 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 2.28s | -3.19s (-58.3%) |
 | v5 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 1.67s | -0.61s (-26.5%) |
+| v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 206ms | includes perft TT |
 
 ## Experimental Tiers On v5 Base
 
@@ -242,6 +243,33 @@ Nodes: 11030083
 Elapsed: 1.674778152s
 CPU profile: .codex-tmp/bench-perft.cpu.prof
 ```
+
+### v6
+
+Optimizations applied:
+
+- Tier 1: concrete generator/updater types, bulk counting at `depth==2`, fully lazy king safety invalidation
+- Tier 2: fixed-size rook/bishop ray storage, one-time mask initialization, pawn attack lookup table, compact sliding attack checks
+- Tier 3: pinned-piece bitboard fast path in `legalMovesInto`
+- Tier 4: incremental Zobrist hashing and perft transposition table
+
+Benchmark command:
+
+```bash
+./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Nodes: 11030083
+Elapsed: 205.999375ms
+CPU profile: .codex-tmp/bench-perft.cpu.prof
+```
+
+Note: `v6` includes a perft transposition table, so it is not a pure raw movegen/make-unmake comparison against earlier versions without TT.
 
 ## Update Rules
 
