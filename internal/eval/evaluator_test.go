@@ -47,6 +47,24 @@ func TestStaticEvaluatorEvaluate(t *testing.T) {
 				assert.Greater(t, score, DrawScore)
 			},
 		},
+		"centralized bishop scores better than corner bishop": {
+			fen: "4k3/8/8/8/3B4/8/8/4K3 w - - 0 1",
+			assertion: func(t *testing.T, center Score) {
+				cornerPos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/8/B3K3 w - - 0 1")
+				assert.NoError(t, err)
+				corner := evaluator.Evaluate(cornerPos)
+				assert.Greater(t, center, corner)
+			},
+		},
+		"centralized rook scores better than corner rook": {
+			fen: "4k3/8/8/8/3R4/8/8/4K3 w - - 0 1",
+			assertion: func(t *testing.T, center Score) {
+				cornerPos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/8/R3K3 w - - 0 1")
+				assert.NoError(t, err)
+				corner := evaluator.Evaluate(cornerPos)
+				assert.Greater(t, center, corner)
+			},
+		},
 	}
 
 	for name, tt := range tests {
@@ -59,4 +77,3 @@ func TestStaticEvaluatorEvaluate(t *testing.T) {
 		})
 	}
 }
-

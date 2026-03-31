@@ -67,11 +67,31 @@ Build and run a local self-play smoke match:
 go run ./cmd/match -games 2 -movetime 50 -notes "sample self-play smoke run"
 ```
 
+Equivalent via `make`:
+
+```bash
+make runner MODE=plain GAMES=2 MOVETIME=50 OPPONENT_TAG=
+```
+
 Run the current engine against a tagged revision that already contains `cmd/uci`:
 
 ```bash
 go run ./cmd/match -opponent-tag <tag> -games 4 -movetime 5000
 ```
+
+Default `make` runner command:
+
+```bash
+make runner
+```
+
+That expands to a live TUI run with:
+
+- `MODE=tui`
+- `CONCURRENT=5`
+- `OPPONENT_TAG=score-v0`
+- `GAMES=10`
+- `MOVETIME=1000`
 
 The runner prints a markdown row you can copy manually into `docs/match-history.md`.
 
@@ -79,8 +99,19 @@ Useful flags:
 
 - `-opponent-tag <tag>`: build and play against a tagged revision
 - `-games <n>`: number of games to play, alternating colors automatically
+- `-parallel <n>`: number of games to run concurrently
 - `-movetime <ms>`: per-move time budget in milliseconds
 - `-notes "<text>"`: note included in the printed markdown row
+- `-plain`: line-based progress output instead of the live terminal dashboard
+
+Useful `make` variables:
+
+- `MODE=tui|plain`
+- `CONCURRENT=<n>`
+- `OPPONENT_TAG=<tag>`
+- `GAMES=<n>`
+- `MOVETIME=<ms>`
+- `NOTES="<text>"`
 
 Output shape:
 

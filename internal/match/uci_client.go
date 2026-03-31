@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -13,6 +14,11 @@ type UCIClient struct {
 	cmd   *exec.Cmd
 	stdin io.WriteCloser
 	lines chan string
+}
+
+type SearchStats struct {
+	Nodes uint64
+	Time  time.Duration
 }
 
 func NewUCIClient(binaryPath string) (*UCIClient, error) {
@@ -70,27 +76,27 @@ func (c *UCIClient) NewGame() error {
 	return err
 }
 
-func (c *UCIClient) BestMove(moves []string, moveTime time.Duration) (string, error) {
+func (c *UCIClient) BestMove(moves []string, moveTime time.Duration) (string, SearchStats, error) {
 	position := "position startpos"
 	if len(moves) > 0 {
 		position += " moves " + strings.Join(moves, " ")
 	}
 	if err := c.send(position); err != nil {
-		return "", err
+		return "", SearchStats{}, err
 	}
 	if err := c.send(fmt.Sprintf("go movetime %d", moveTime.Milliseconds())); err != nil {
-		return "", err
+		return "", SearchStats{}, err
 	}
 
-	line, err := c.waitFor("bestmove ", moveTime+5*time.Second)
+	line, stats, err := c.waitForBestMove(moveTime + 5*time.Second)
 	if err != nil {
-		return "", err
+		return "", SearchStats{}, err
 	}
 	fields := strings.Fields(line)
 	if len(fields) < 2 {
-		return "", fmt.Errorf("invalid bestmove response: %q", line)
+		return "", SearchStats{}, fmt.Errorf("invalid bestmove response: %q", line)
 	}
-	return fields[1], nil
+	return fields[1], stats, nil
 }
 
 func (c *UCIClient) Close() error {
@@ -120,6 +126,49 @@ func (c *UCIClient) waitFor(prefix string, timeout time.Duration) (string, error
 			return "", fmt.Errorf("timeout waiting for %q", prefix)
 		}
 	}
+}
+
+func (c *UCIClient) waitForBestMove(timeout time.Duration) (string, SearchStats, error) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	var stats SearchStats
+	for {
+		select {
+		case line, ok := <-c.lines:
+			if !ok {
+				return "", SearchStats{}, fmt.Errorf("uci process ended before %q", "bestmove ")
+			}
+			if strings.HasPrefix(line, "info ") {
+				stats = parseInfoStats(line, stats)
+				continue
+			}
+			if strings.HasPrefix(line, "bestmove ") {
+				return line, stats, nil
+			}
+		case <-timer.C:
+			return "", SearchStats{}, fmt.Errorf("timeout waiting for %q", "bestmove ")
+		}
+	}
+}
+
+func parseInfoStats(line string, stats SearchStats) SearchStats {
+	fields := strings.Fields(line)
+	for i := 0; i < len(fields)-1; i++ {
+		switch fields[i] {
+		case "nodes":
+			if value, err := strconv.ParseUint(fields[i+1], 10, 64); err == nil {
+				stats.Nodes = value
+			}
+			i++
+		case "time":
+			if value, err := strconv.ParseInt(fields[i+1], 10, 64); err == nil {
+				stats.Time = time.Duration(value) * time.Millisecond
+			}
+			i++
+		}
+	}
+	return stats
 }
 
 func scanLines(r io.Reader, out chan<- string) {
