@@ -84,6 +84,7 @@ Older benchmark suites are kept in [Historical Results](#historical-results).
 | [v17](#current-v17) | 2026-03-31 | Perft position 3 | 7 | hot | off | 178,633,661 | 6.21s | -0.09s (-1.4%) |
 | [v18](#current-v18) | 2026-03-31 | Perft position 3 | 7 | hot | off | 178,633,661 | 5.71s | -0.50s (-8.0%) |
 | [v19](#current-v19) | 2026-03-31 | Perft position 3 | 7 | hot | off | 178,633,661 | 5.65s | -0.06s (-1.0%) |
+| [v20](#current-v20) | 2026-03-31 | Perft position 3 | 7 | hot | off | 178,633,661 | 5.54s | -0.11s (-1.9%) |
 
 Recorded samples:
 
@@ -93,8 +94,42 @@ Recorded samples:
 - `v17`: `6.190472756s`, `6.22881615s`
 - `v18`: `5.777905319s`, `5.651284934s`
 - `v19`: `5.650972876s`
+- `v20`: `5.544416355s`
 
 ## Optimization Log
+
+<a id="current-v20"></a>
+### v20
+
+Optimizations applied:
+
+- prefiltered king targets in `appendKingMoves(...)` against enemy pawn, knight, and king attacks before falling back to per-target slider checks
+- replaced pawn quiet-push occupancy checks based on `PieceAt(...)` with direct occupied-bitboard tests
+
+Benchmark command:
+
+```bash
+BENCH_DEPTH=7 BENCH_MODE=hot BENCH_WARMUP=1 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Mode: hot
+Warmup: 1
+Perft tricks: false
+Nodes: 178633661
+Elapsed: 5.544416355s
+CPU profile: .codex-tmp/bench-perft.cpu.prof
+```
+
+Interpretation:
+
+- bulk-filtering obvious non-slider king attacks before the per-target legality loop paid on the benchmark FEN
+- direct occupancy checks for pawn pushes were neutral-to-helpful in this combination
+- this is the new best no-tricks hot reference
 
 <a id="current-v19"></a>
 ### v19

@@ -67,17 +67,60 @@ func sliderTargetsMask(pos *Position, idx int8, pieceType int8, friendlyOcc uint
 	}
 }
 
+const (
+	notAFile uint64 = 0xFEFEFEFEFEFEFEFE
+	notHFile uint64 = 0x7F7F7F7F7F7F7F7F
+)
+
 func (g *PseudoLegalMoveGenerator) appendKingMoves(pos *Position, piece Piece, kingIdx int8, enemyColor int8, enemyKingMask uint64, info *positionAnalysis, dst []Move, count int) int {
 	friendlyOcc := pos.OccupancyMask(pos.ActiveColor())
 	targets := kingAttacksMask[kingIdx] &^ friendlyOcc &^ enemyKingMask
 	occWithoutKing := pos.Occupied() &^ (uint64(1) << kingIdx)
+
+	var enemyOcc uint64
+	if enemyColor == White {
+		enemyOcc = pos.WhiteOccupied()
+	} else {
+		enemyOcc = pos.BlackOccupied()
+	}
+
+	enemyPawns := pos.PawnBoard() & enemyOcc
+	var pawnAttacks uint64
+	if enemyColor == White {
+		pawnAttacks = ((enemyPawns & notAFile) << 7) | ((enemyPawns & notHFile) << 9)
+	} else {
+		pawnAttacks = ((enemyPawns & notHFile) >> 7) | ((enemyPawns & notAFile) >> 9)
+	}
+
+	var knightAttacks uint64
+	enemyKnights := pos.KnightBoard() & enemyOcc
+	for enemyKnights != 0 {
+		sq := int8(bits.TrailingZeros64(enemyKnights))
+		enemyKnights &^= 1 << sq
+		knightAttacks |= knightAttacksMask[sq]
+	}
+
+	var enemyKingIdx int8
+	if enemyColor == White {
+		enemyKingIdx = pos.WhiteKingIdx()
+	} else {
+		enemyKingIdx = pos.BlackKingIdx()
+	}
+
+	targets &^= pawnAttacks | knightAttacks | kingAttacksMask[enemyKingIdx]
+
+	rookQueens := (pos.RookBoard() | pos.QueenBoard()) & enemyOcc
+	bishopQueens := (pos.BishopBoard() | pos.QueenBoard()) & enemyOcc
 
 	for targets != 0 {
 		targetIdx := int8(bits.TrailingZeros64(targets))
 		targets &^= 1 << targetIdx
 
 		occ := occWithoutKing &^ (uint64(1) << targetIdx)
-		if isSquareAttacked(pos, targetIdx, enemyColor, occ) {
+		if rookQueens != 0 && rookAttacksMagic(targetIdx, occ)&rookQueens != 0 {
+			continue
+		}
+		if bishopQueens != 0 && bishopAttacksMagic(targetIdx, occ)&bishopQueens != 0 {
 			continue
 		}
 
@@ -138,11 +181,12 @@ func (g *PseudoLegalMoveGenerator) appendPawnMoves(pos *Position, positionUpdate
 	var promotionTargets uint64
 	var epTarget uint64
 
+	occ := pos.Occupied()
 	if pos.ActiveColor() == White {
 		oneStep := idx + 8
-		if oneStep < 64 && pos.PieceAt(oneStep) == NoPiece {
+		if occ&(uint64(1)<<oneStep) == 0 {
 			quietTargets |= uint64(1) << oneStep
-			if idx >= A2 && idx <= H2 && pos.PieceAt(idx+16) == NoPiece {
+			if idx >= A2 && idx <= H2 && occ&(uint64(1)<<(idx+16)) == 0 {
 				quietTargets |= uint64(1) << (idx + 16)
 			}
 		}
@@ -152,9 +196,9 @@ func (g *PseudoLegalMoveGenerator) appendPawnMoves(pos *Position, positionUpdate
 		}
 	} else {
 		oneStep := idx - 8
-		if oneStep >= 0 && pos.PieceAt(oneStep) == NoPiece {
+		if occ&(uint64(1)<<oneStep) == 0 {
 			quietTargets |= uint64(1) << oneStep
-			if idx >= A7 && idx <= H7 && pos.PieceAt(idx-16) == NoPiece {
+			if idx >= A7 && idx <= H7 && occ&(uint64(1)<<(idx-16)) == 0 {
 				quietTargets |= uint64(1) << (idx - 16)
 			}
 		}
