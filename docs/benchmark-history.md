@@ -329,6 +329,8 @@ This section keeps the older benchmark suites for context. The current optimizat
 
 #### Depth-6 Tricks Off
 
+Older rows come from earlier local benchmark passes. The `v19` row below is a current rerun measured in `hot` mode.
+
 | Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | v0 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 24.83s | baseline |
@@ -341,8 +343,11 @@ This section keeps the older benchmark suites for context. The current optimizat
 | v7 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 809ms | -112ms (-12.2%) |
 | v8 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 776ms | -33ms (-4.1%) |
 | v9 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 576ms | -200ms (-25.8%) |
+| v19 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 368.400657ms | -207.599343ms (-36.0%) |
 
 #### Depth-6 Tricks On
+
+Older rows come from earlier local benchmark passes. The `v19` row below is a current rerun measured in `hot` mode.
 
 | Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
 | --- | --- | --- | --- | ---: | ---: | ---: |
@@ -350,6 +355,7 @@ This section keeps the older benchmark suites for context. The current optimizat
 | v7 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 256ms | +27ms (+11.8%) |
 | v8 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 68ms | -188ms (-73.4%) |
 | v9 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 91ms | +23ms (+33.8%) |
+| v19 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 67.174895ms | -23.825105ms (-26.2%) |
 
 #### Historical Perft(7)
 
