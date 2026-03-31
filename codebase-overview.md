@@ -208,7 +208,7 @@ This is no longer a pure “generate everything then make/unmake everything” d
 
 ## Move Application and Undo
 
-There are now two updater modes.
+There are now two move-application modes.
 
 ### Plain updater
 
@@ -226,7 +226,7 @@ Responsible for:
 - king square updates
 - restoring state from `MoveHistory`
 
-This updater does not maintain Zobrist keys.
+`PlainPositionUpdater` does not maintain Zobrist keys.
 
 ### Zobrist decorator
 
@@ -339,7 +339,7 @@ If returning to this code later, the shortest useful model is:
 - `BitsBoardMoveGenerator` generates pseudo-legal targets
 - `positionAnalysis` computes checks / pins once per node
 - `Engine` turns pseudo-legal targets into legal `Move`s
-- `PositionUpdater` applies and undoes moves
+- `PlainPositionUpdater` applies and undoes moves
 - `ZobristPositionUpdater` decorates that path when hashing is needed
 - perft can run with or without tricks, and the two modes are intentionally different
 

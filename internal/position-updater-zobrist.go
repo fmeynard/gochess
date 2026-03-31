@@ -1,10 +1,10 @@
 package internal
 
 type ZobristPositionUpdater struct {
-	inner *PositionUpdater
+	inner *PlainPositionUpdater
 }
 
-func NewZobristPositionUpdater(inner *PositionUpdater) *ZobristPositionUpdater {
+func NewZobristPositionUpdater(inner *PlainPositionUpdater) *ZobristPositionUpdater {
 	return &ZobristPositionUpdater{inner: inner}
 }
 

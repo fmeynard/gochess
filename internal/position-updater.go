@@ -1,12 +1,12 @@
 package internal
 
-type positionUpdater interface {
+type moveApplier interface {
 	MakeMove(pos *Position, move Move) MoveHistory
 	UnMakeMove(pos *Position, history MoveHistory)
 	IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool
 }
 
-type PositionUpdater struct {
+type PlainPositionUpdater struct {
 	moveGenerator *BitsBoardMoveGenerator
 }
 
@@ -14,12 +14,12 @@ func kingAffectMask(kingIdx int8) uint64 {
 	return queenAttacksMask[kingIdx] | knightAttacksMask[kingIdx] | (uint64(1) << kingIdx)
 }
 
-func NewPositionUpdater(moveGenerator *BitsBoardMoveGenerator) positionUpdater {
+func NewPositionUpdater(moveGenerator *BitsBoardMoveGenerator) moveApplier {
 	return NewZobristPositionUpdater(NewPlainPositionUpdater(moveGenerator))
 }
 
-func NewPlainPositionUpdater(moveGenerator *BitsBoardMoveGenerator) *PositionUpdater {
-	return &PositionUpdater{moveGenerator: moveGenerator}
+func NewPlainPositionUpdater(moveGenerator *BitsBoardMoveGenerator) *PlainPositionUpdater {
+	return &PlainPositionUpdater{moveGenerator: moveGenerator}
 }
 
 func castleRookSquares(activeColor int8, kingEndIdx int8) (int8, int8) {
@@ -37,12 +37,12 @@ func castleRookSquares(activeColor int8, kingEndIdx int8) (int8, int8) {
 	return A8, D8
 }
 
-func (updater *PositionUpdater) updateMovesAfterMove(pos *Position, move Move) {
+func (updater *PlainPositionUpdater) invalidateKingSafetyCaches(pos *Position) {
 	pos.whiteKingSafety = NotCalculated
 	pos.blackKingSafety = NotCalculated
 }
 
-func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
+func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 	startPieceIdx := move.StartIdx()
 	endPieceIdx := move.EndIdx()
 	startPiece := move.piece
@@ -148,7 +148,7 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 		}
 	}
 
-	updater.updateMovesAfterMove(pos, move)
+	updater.invalidateKingSafetyCaches(pos)
 
 	// change side ( important to do it last for previous updates )
 	if pos.activeColor == White {
@@ -160,7 +160,7 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 	return history
 }
 
-func (updater *PositionUpdater) UnMakeMove(pos *Position, history MoveHistory) {
+func (updater *PlainPositionUpdater) UnMakeMove(pos *Position, history MoveHistory) {
 	move := history.move
 	startPieceIdx := move.StartIdx()
 	endPieceIdx := move.EndIdx()
@@ -196,7 +196,7 @@ func (updater *PositionUpdater) UnMakeMove(pos *Position, history MoveHistory) {
 // IsMoveAffectsKing
 // The goal here is to trigger king safety recalculation as less as possible,
 // but it's a balance, if detection is less performant than the recalculation it's better to recalculate
-func (updater *PositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool {
+func (updater *PlainPositionUpdater) IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool {
 	var kingAffectMask uint64
 	if kingColor == White {
 		kingAffectMask = pos.whiteKingAffectMask

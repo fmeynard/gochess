@@ -4,7 +4,7 @@ import "math/bits"
 
 type Engine struct {
 	moveGenerator   *BitsBoardMoveGenerator
-	positionUpdater positionUpdater
+	positionUpdater moveApplier
 	usePerftTricks  bool
 }
 
