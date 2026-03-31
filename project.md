@@ -74,3 +74,27 @@ go run ./cmd/match -opponent-tag <tag> -games 4 -movetime 5000
 ```
 
 The runner prints a markdown row you can copy manually into `docs/match-history.md`.
+
+Useful flags:
+
+- `-opponent-tag <tag>`: build and play against a tagged revision
+- `-games <n>`: number of games to play, alternating colors automatically
+- `-movetime <ms>`: per-move time budget in milliseconds
+- `-notes "<text>"`: note included in the printed markdown row
+
+Output shape:
+
+- `Current: <short-sha>`
+- `Opponent: <label>`
+- `Movetime: <duration>`
+- `Games: <n>`
+- `Score: <points>/<games>`
+- `W/D/L: <wins>/<draws>/<losses>`
+- `Markdown: | ... |`
+
+Typical workflow:
+
+1. Run the match command.
+2. Check the printed `Score` and `W/D/L`.
+3. Copy the printed `Markdown:` row.
+4. Paste it manually into `docs/match-history.md` if you want to keep the result.
