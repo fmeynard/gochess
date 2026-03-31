@@ -212,10 +212,88 @@ func (e *Engine) appendPawnMoves(pos *Position, piece Piece, idx int8, enemyOcc 
 	return count
 }
 
+func (e *Engine) appendNonKingMovesNoCheck(pos *Position, piecesMask uint64, friendlyOcc uint64, enemyOccNoKing uint64, enemyKingMask uint64, info positionAnalysis, dst []Move, count int) int {
+	for piecesMask != 0 {
+		idx := int8(bits.TrailingZeros64(piecesMask))
+		piecesMask &^= 1 << idx
+
+		piece := pos.board[idx]
+		pieceType := piece.Type()
+		pinRay := info.pinRayBySq[idx]
+
+		switch pieceType {
+		case Pawn:
+			count = e.appendPawnMoves(pos, piece, idx, enemyOccNoKing, info, pinRay, info.pinnedMask&(1<<idx) != 0, pos.activeColor, dst, count)
+		case Knight:
+			if pinRay != 0 {
+				continue
+			}
+			targets := knightAttacksMask[idx] &^ friendlyOcc &^ enemyKingMask
+			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
+		case Bishop, Rook, Queen:
+			targets := sliderTargetsMask(pos, idx, pieceType, friendlyOcc) &^ enemyKingMask
+			if pinRay != 0 {
+				targets &= pinRay
+			}
+			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
+		}
+	}
+	return count
+}
+
+func (e *Engine) appendNonKingMovesNoCheckNoPins(pos *Position, piecesMask uint64, friendlyOcc uint64, enemyOccNoKing uint64, enemyKingMask uint64, dst []Move, count int) int {
+	for piecesMask != 0 {
+		idx := int8(bits.TrailingZeros64(piecesMask))
+		piecesMask &^= 1 << idx
+
+		piece := pos.board[idx]
+		switch piece.Type() {
+		case Pawn:
+			count = e.appendPawnMoves(pos, piece, idx, enemyOccNoKing, positionAnalysis{}, 0, false, pos.activeColor, dst, count)
+		case Knight:
+			targets := knightAttacksMask[idx] &^ friendlyOcc &^ enemyKingMask
+			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
+		case Bishop, Rook, Queen:
+			targets := sliderTargetsMask(pos, idx, piece.Type(), friendlyOcc) &^ enemyKingMask
+			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
+		}
+	}
+	return count
+}
+
+func (e *Engine) appendNonKingMovesInCheck(pos *Position, piecesMask uint64, friendlyOcc uint64, enemyOccNoKing uint64, enemyKingMask uint64, info positionAnalysis, dst []Move, count int) int {
+	evasionMask := info.evasionMask
+	for piecesMask != 0 {
+		idx := int8(bits.TrailingZeros64(piecesMask))
+		piecesMask &^= 1 << idx
+
+		piece := pos.board[idx]
+		pieceType := piece.Type()
+		pinRay := info.pinRayBySq[idx]
+
+		switch pieceType {
+		case Pawn:
+			count = e.appendPawnMoves(pos, piece, idx, enemyOccNoKing, info, pinRay, info.pinnedMask&(1<<idx) != 0, pos.activeColor, dst, count)
+		case Knight:
+			if pinRay != 0 {
+				continue
+			}
+			targets := knightAttacksMask[idx] &^ friendlyOcc &^ enemyKingMask & evasionMask
+			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
+		case Bishop, Rook, Queen:
+			targets := sliderTargetsMask(pos, idx, pieceType, friendlyOcc) &^ enemyKingMask & evasionMask
+			if pinRay != 0 {
+				targets &= pinRay
+			}
+			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
+		}
+	}
+	return count
+}
+
 func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	count := 0
 	color := pos.activeColor
-	inCheckColor := color
 	kingIdx := pos.blackKingIdx
 	friendlyOcc := pos.blackOccupied
 	enemyOcc := pos.whiteOccupied
@@ -244,40 +322,14 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	}
 
 	piecesMask := friendlyOcc &^ (uint64(1) << kingIdx)
-	for piecesMask != 0 {
-		idx := int8(bits.TrailingZeros64(piecesMask))
-		piecesMask &^= 1 << idx
-
-		piece := pos.board[idx]
-		pieceType := piece.Type()
-		isPinned := info.pinnedMask&(1<<idx) != 0
-		pinRay := info.pinRayBySq[idx]
-
-		switch pieceType {
-		case Pawn:
-			count = e.appendPawnMoves(pos, piece, idx, enemyOccNoKing, info, pinRay, isPinned, inCheckColor, dst, count)
-		case Knight:
-			if isPinned {
-				continue
-			}
-			targets := knightAttacksMask[idx] &^ friendlyOcc &^ enemyKingMask
-			if info.checkerCount == 1 {
-				targets &= info.evasionMask
-			}
-			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
-		case Bishop, Rook, Queen:
-			targets := sliderTargetsMask(pos, idx, pieceType, friendlyOcc) &^ enemyKingMask
-			if info.checkerCount == 1 {
-				targets &= info.evasionMask
-			}
-			if isPinned {
-				targets &= pinRay
-			}
-			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
+	if info.checkerCount == 0 {
+		if info.pinnedMask == 0 {
+			return e.appendNonKingMovesNoCheckNoPins(pos, piecesMask, friendlyOcc, enemyOccNoKing, enemyKingMask, dst, count)
 		}
+		return e.appendNonKingMovesNoCheck(pos, piecesMask, friendlyOcc, enemyOccNoKing, enemyKingMask, info, dst, count)
 	}
 
-	return count
+	return e.appendNonKingMovesInCheck(pos, piecesMask, friendlyOcc, enemyOccNoKing, enemyKingMask, info, dst, count)
 }
 
 func (e *Engine) LegalMoves(pos *Position) []Move {
