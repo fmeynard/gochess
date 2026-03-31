@@ -55,6 +55,6 @@ Current UCI support includes:
 
 Current notes:
 
-- `stop` is accepted, but search is still implemented synchronously at this stage
+- `stop` interrupts an in-flight search and returns the best move from the last completed work available
 - advanced UCI options are not implemented yet
 - the engine is already usable in a GUI, but the protocol surface will continue to improve

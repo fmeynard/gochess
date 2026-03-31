@@ -494,3 +494,8 @@ func (p *Position) CastleRights() int8 {
 
 	return p.blackCastleRights
 }
+
+func (p *Position) Clone() *Position {
+	cloned := *p
+	return &cloned
+}

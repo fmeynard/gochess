@@ -54,7 +54,7 @@ func (e *Engine) StartGame() {
 func (e *Engine) Move() {}
 
 func (e *Engine) BestMoveDepth(pos *board.Position, depth int) (board.Move, error) {
-	result, err := e.SearchDepth(pos, depth)
+	result, err := e.Search(pos, search.Limits{Depth: depth})
 	if err != nil {
 		return board.Move{}, err
 	}
@@ -62,11 +62,11 @@ func (e *Engine) BestMoveDepth(pos *board.Position, depth int) (board.Move, erro
 }
 
 func (e *Engine) SearchDepth(pos *board.Position, depth int) (search.Result, error) {
-	return e.searcher.Search(pos, search.Limits{Depth: depth})
+	return e.Search(pos, search.Limits{Depth: depth})
 }
 
 func (e *Engine) BestMoveTime(pos *board.Position, moveTime time.Duration) (board.Move, error) {
-	result, err := e.SearchTime(pos, moveTime)
+	result, err := e.Search(pos, search.Limits{MoveTime: moveTime})
 	if err != nil {
 		return board.Move{}, err
 	}
@@ -74,7 +74,11 @@ func (e *Engine) BestMoveTime(pos *board.Position, moveTime time.Duration) (boar
 }
 
 func (e *Engine) SearchTime(pos *board.Position, moveTime time.Duration) (search.Result, error) {
-	return e.searcher.Search(pos, search.Limits{MoveTime: moveTime})
+	return e.Search(pos, search.Limits{MoveTime: moveTime})
+}
+
+func (e *Engine) Search(pos *board.Position, limits search.Limits) (search.Result, error) {
+	return e.searcher.Search(pos, limits)
 }
 
 func (e *Engine) FindMoveByUCI(pos *board.Position, uci string) (board.Move, error) {
@@ -103,6 +107,17 @@ func (e *Engine) ApplyUCIMoves(pos *board.Position, moves []string) error {
 		}
 	}
 	return nil
+}
+
+func (e *Engine) ApplyUCIMovesWithPositionKeys(pos *board.Position, moves []string) ([]uint64, error) {
+	keys := []uint64{pos.ZobristKey()}
+	for _, uci := range moves {
+		if err := e.ApplyUCIMove(pos, uci); err != nil {
+			return nil, err
+		}
+		keys = append(keys, pos.ZobristKey())
+	}
+	return keys, nil
 }
 
 func (e *Engine) LegalMoves(pos *board.Position) []board.Move {

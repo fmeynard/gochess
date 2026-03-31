@@ -24,8 +24,8 @@ func TestAlphaBetaSearcherSearch(t *testing.T) {
 		assertScore  func(t *testing.T, score eval.Score)
 	}{
 		"mate in one is found": {
-			fen:          "7k/5KQ1/8/8/8/8/8/8 w - - 0 1",
-			depth:        1,
+			fen:   "7k/5KQ1/8/8/8/8/8/8 w - - 0 1",
+			depth: 1,
 			assertScore: func(t *testing.T, score eval.Score) {
 				assert.Greater(t, score, eval.Score(29000))
 			},
@@ -107,4 +107,32 @@ func TestAlphaBetaSearcherSearchWithDepthAndMoveTime(t *testing.T) {
 	assert.NotEqual(t, board.Move{}, result.BestMove)
 	assert.GreaterOrEqual(t, result.Stats.Depth, 0)
 	assert.LessOrEqual(t, result.Stats.Depth, 2)
+}
+
+func TestRepetitionTrackerDetectsThreefold(t *testing.T) {
+	pos, err := board.NewPositionFromFEN(board.FenStartPos)
+	assert.NoError(t, err)
+
+	history := []uint64{pos.ZobristKey()}
+	moveGenerator := movegen.NewPseudoLegalMoveGenerator()
+	updater := board.NewPositionUpdater()
+
+	for _, uci := range []string{"g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1", "f6g8"} {
+		var moves [256]board.Move
+		moveCount := moveGenerator.LegalMovesInto(pos, updater, moves[:])
+		var selected board.Move
+		for i := 0; i < moveCount; i++ {
+			if moves[i].UCI() == uci {
+				selected = moves[i]
+				break
+			}
+		}
+
+		assert.NotEqual(t, board.Move{}, selected)
+		updater.MakeMove(pos, selected)
+		history = append(history, pos.ZobristKey())
+	}
+
+	tracker := newRepetitionTracker(pos, history)
+	assert.True(t, tracker.isThreefold())
 }
