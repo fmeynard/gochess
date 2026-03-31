@@ -41,6 +41,12 @@ On the current checkout:
 ./scripts/bench-perft.sh
 ```
 
+Disable perft-only tricks such as bulk counting and TT:
+
+```bash
+BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
 On a tagged benchmark version:
 
 ```bash
@@ -57,6 +63,11 @@ Override the benchmark target if needed:
 BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof ./scripts/bench-perft.sh
 ```
 
+`benchperft` also supports `-no-perft-tricks` directly. In this repository, "perft tricks" currently means:
+
+- bulk counting at `depth == 2`
+- perft transposition-table lookups/stores
+
 ## Results
 
 | Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
@@ -67,7 +78,7 @@ BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof
 | v3 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 5.47s | -2.99s (-35.4%) |
 | v4 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 2.28s | -3.19s (-58.3%) |
 | v5 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 1.67s | -0.61s (-26.5%) |
-| v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 206ms | includes perft TT |
+| v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 229ms / 921ms | tricks on / off |
 
 ## Experimental Tiers On v5 Base
 
@@ -264,12 +275,28 @@ Recorded output:
 ```text
 FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
 Depth: 6
+Perft tricks: true
 Nodes: 11030083
-Elapsed: 205.999375ms
+Elapsed: 228.56469ms
 CPU profile: .codex-tmp/bench-perft.cpu.prof
 ```
 
-Note: `v6` includes a perft transposition table, so it is not a pure raw movegen/make-unmake comparison against earlier versions without TT.
+With tricks disabled:
+
+```bash
+BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Perft tricks: false
+Nodes: 11030083
+Elapsed: 921.093998ms
+CPU profile: .codex-tmp/bench-perft.cpu.prof
+```
+
+Note: `v6` with tricks enabled includes bulk counting and a perft transposition table, so it is not a pure raw movegen/make-unmake comparison against earlier versions without TT. The `-no-perft-tricks` measurement is the closer raw-engine comparison for this codebase state.
 
 ## Update Rules
 

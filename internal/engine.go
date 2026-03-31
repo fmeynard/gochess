@@ -5,6 +5,7 @@ import "math/bits"
 type Engine struct {
 	moveGenerator   *BitsBoardMoveGenerator
 	positionUpdater *PositionUpdater
+	usePerftTricks  bool
 }
 
 const (
@@ -24,7 +25,12 @@ func NewEngine() *Engine {
 	return &Engine{
 		moveGenerator:   moveGenerator,
 		positionUpdater: positionUpdater,
+		usePerftTricks:  true,
 	}
+}
+
+func (e *Engine) SetPerftTricks(enabled bool) {
+	e.usePerftTricks = enabled
 }
 
 func (e *Engine) StartGame() {}
@@ -239,7 +245,10 @@ func (e *Engine) LegalMoves(pos *Position) []Move {
 
 func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint64) {
 	var moveBuffers [MaxPerftPly][MaxLegalMoves]Move
-	tt := newPerftTT()
+	var tt *perftTT
+	if e.usePerftTricks {
+		tt = newPerftTT()
+	}
 	res := make(map[string]uint64)
 	total := uint64(0)
 
@@ -259,7 +268,10 @@ func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint6
 
 func (e *Engine) MoveGenerationTest(pos *Position, depth int) uint64 {
 	var moveBuffers [MaxPerftPly][MaxLegalMoves]Move
-	tt := newPerftTT()
+	var tt *perftTT
+	if e.usePerftTricks {
+		tt = newPerftTT()
+	}
 	return e.moveGenerationTestWithBuffers(pos, depth, 0, &moveBuffers, tt)
 }
 
@@ -267,11 +279,13 @@ func (e *Engine) moveGenerationTestWithBuffers(pos *Position, depth int, ply int
 	if depth == 1 {
 		return uint64(1)
 	}
-	if depth == 2 {
+	if e.usePerftTricks && depth == 2 {
 		return uint64(e.legalMovesInto(pos, moveBuffers[ply][:]))
 	}
-	if count, ok := tt.probe(pos.zobristKey, int8(depth)); ok {
-		return count
+	if tt != nil {
+		if count, ok := tt.probe(pos.zobristKey, int8(depth)); ok {
+			return count
+		}
 	}
 
 	moves := moveBuffers[ply][:]
@@ -288,6 +302,8 @@ func (e *Engine) moveGenerationTestWithBuffers(pos *Position, depth int, ply int
 		posCount += nextDepthResult
 	}
 
-	tt.store(pos.zobristKey, int8(depth), posCount)
+	if tt != nil {
+		tt.store(pos.zobristKey, int8(depth), posCount)
+	}
 	return posCount
 }

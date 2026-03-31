@@ -20,6 +20,7 @@ func main() {
 	fen := flag.String("fen", defaultFEN, "FEN to benchmark")
 	depth := flag.Int("depth", defaultDepth, "perft depth")
 	cpuProfile := flag.String("cpuprofile", ".codex-tmp/bench-perft.cpu.prof", "CPU profile output path")
+	noPerftTricks := flag.Bool("no-perft-tricks", false, "disable perft-only tricks such as bulk counting and transposition table use")
 	flag.Parse()
 
 	if err := os.MkdirAll(filepath.Dir(*cpuProfile), 0o755); err != nil {
@@ -43,12 +44,14 @@ func main() {
 	}
 
 	engine := internal.NewEngine()
+	engine.SetPerftTricks(!*noPerftTricks)
 	start := time.Now()
 	_, nodes := engine.PerftDivide(pos, *depth)
 	elapsed := time.Since(start)
 
 	fmt.Printf("FEN: %s\n", *fen)
 	fmt.Printf("Depth: %d\n", *depth)
+	fmt.Printf("Perft tricks: %t\n", !*noPerftTricks)
 	fmt.Printf("Nodes: %d\n", nodes)
 	fmt.Printf("Elapsed: %s\n", elapsed)
 	fmt.Printf("CPU profile: %s\n", *cpuProfile)
