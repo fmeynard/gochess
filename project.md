@@ -58,3 +58,19 @@ Current notes:
 - `stop` interrupts an in-flight search and returns the best move from the last completed work available
 - advanced UCI options are not implemented yet
 - the engine is already usable in a GUI, but the protocol surface will continue to improve
+
+## Run Local Matches
+
+Build and run a local self-play smoke match:
+
+```bash
+go run ./cmd/match -games 2 -movetime 50 -notes "sample self-play smoke run"
+```
+
+Run the current engine against a tagged revision that already contains `cmd/uci`:
+
+```bash
+go run ./cmd/match -opponent-tag <tag> -games 4 -movetime 5000
+```
+
+The runner prints a markdown row you can copy manually into `docs/match-history.md`.
