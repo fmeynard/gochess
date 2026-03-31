@@ -110,6 +110,7 @@ These depth-7 numbers were taken on the same benchmark FEN on March 31, 2026. Th
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | v8 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 9.83s | baseline |
 | v9 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 9.16s | -0.67s (-6.8%) |
+| v10 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 8.95s | -0.21s (-2.3%) |
 
 ### Tricks On
 
@@ -478,6 +479,37 @@ Interpretation:
 
 - With tricks disabled, `v9` is a clear improvement over `v8` at both depth 6 and depth 7; the gain comes from less work inside `legalMovesInto(...)` and cheaper undo-state restoration
 - With tricks enabled, `v9` improves the depth-7 run but the depth-6 `go run` path is still too noisy to read as a clean regression or improvement signal
+
+### v10
+
+Optimizations applied:
+
+- Added a fast path in `MakeMove` for ordinary quiet moves that updates occupancies, piece boards, and mailbox entries directly without routing through `Position.movePiece(...)`
+- Added a second fast path in `MakeMove` for ordinary captures that updates the mover and captured piece bitboards directly
+- Added matching fast paths in `UnMakeMove` for ordinary quiet moves and ordinary captures, keeping the fallback path only for promotions, en passant, and castling
+- Inlined the `packedState` assembly inside `MakeMove` so the hot path no longer calls `packMoveHistoryMeta(...)`
+
+Benchmark commands:
+
+```bash
+BENCH_DEPTH=7 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Perft tricks: false
+Nodes: 178633661
+Elapsed: 8.946131173s
+CPU profile: .codex-tmp/bench-perft-no-tricks-v10.cpu.prof
+```
+
+Interpretation:
+
+- `v10` keeps the benchmark focus strictly on the no-tricks path and pushes the raw depth-7 benchmark below `9s`
+- The remaining dominant costs are still `MakeMove`, `UnMakeMove`, and `legalMovesInto(...)`, so the next likely wins are either more specialization of the updater hot path or a larger legal-move generation refactor
 
 ## Update Rules
 

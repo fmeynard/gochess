@@ -46,8 +46,10 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 	startPieceIdx := move.startIdx
 	endPieceIdx := move.endIdx
 	startPiece := move.piece
+	startColor := pos.activeColor
 	startPieceType := startPiece.Type()
 	isEnPassant := isEnPassantMove(pos, move)
+	isPromotion := move.flag == QueenPromotion || move.flag == KnightPromotion || move.flag == BishopPromotion || move.flag == RookPromotion
 
 	captureIdx := endPieceIdx
 	capturedPiece := pos.board[endPieceIdx]
@@ -61,15 +63,96 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 	}
 
 	history := MoveHistory{
-		move:                move,
-		capturedPiece:       capturedPiece,
-		captureIdx:          captureIdx,
-		packedState:         packMoveHistoryMeta(pos),
+		move:          move,
+		capturedPiece: capturedPiece,
+		captureIdx:    captureIdx,
+		packedState: uint32(pos.whiteKingIdx)<<metaWhiteKingShift |
+			uint32(pos.blackKingIdx)<<metaBlackKingShift |
+			uint32(pos.enPassantIdx+1)<<metaEnPassantShift |
+			uint32(pos.whiteCastleRights)<<metaWhiteCastleShift |
+			uint32(pos.blackCastleRights)<<metaBlackCastleShift |
+			(uint32(pos.whiteKingSafety)>>3)<<metaWhiteSafetyShift |
+			(uint32(pos.blackKingSafety)>>3)<<metaBlackSafetyShift,
 		whiteKingAffectMask: pos.whiteKingAffectMask,
 		blackKingAffectMask: pos.blackKingAffectMask,
 	}
 
-	if isEnPassant {
+	if !isEnPassant && !isPromotion && capturedPiece == NoPiece {
+		fromMask := uint64(1 << startPieceIdx)
+		toMask := uint64(1 << endPieceIdx)
+		moveMask := fromMask | toMask
+
+		pos.occupied ^= moveMask
+		if startColor == White {
+			pos.whiteOccupied ^= moveMask
+		} else {
+			pos.blackOccupied ^= moveMask
+		}
+
+		switch startPieceType {
+		case King:
+			pos.kingBoard ^= moveMask
+		case Queen:
+			pos.queenBoard ^= moveMask
+		case Rook:
+			pos.rookBoard ^= moveMask
+		case Bishop:
+			pos.bishopBoard ^= moveMask
+		case Knight:
+			pos.knightBoard ^= moveMask
+		case Pawn:
+			pos.pawnBoard ^= moveMask
+		}
+
+		pos.board[startPieceIdx] = NoPiece
+		pos.board[endPieceIdx] = startPiece
+	} else if !isEnPassant && !isPromotion && capturedPiece != NoPiece {
+		fromMask := uint64(1 << startPieceIdx)
+		toMask := uint64(1 << endPieceIdx)
+		moveMask := fromMask | toMask
+
+		pos.occupied &^= fromMask
+		if startColor == White {
+			pos.whiteOccupied ^= moveMask
+			pos.blackOccupied &^= toMask
+		} else {
+			pos.blackOccupied ^= moveMask
+			pos.whiteOccupied &^= toMask
+		}
+
+		switch capturedPiece.Type() {
+		case King:
+			pos.kingBoard &^= toMask
+		case Queen:
+			pos.queenBoard &^= toMask
+		case Rook:
+			pos.rookBoard &^= toMask
+		case Bishop:
+			pos.bishopBoard &^= toMask
+		case Knight:
+			pos.knightBoard &^= toMask
+		case Pawn:
+			pos.pawnBoard &^= toMask
+		}
+
+		switch startPieceType {
+		case King:
+			pos.kingBoard ^= moveMask
+		case Queen:
+			pos.queenBoard ^= moveMask
+		case Rook:
+			pos.rookBoard ^= moveMask
+		case Bishop:
+			pos.bishopBoard ^= moveMask
+		case Knight:
+			pos.knightBoard ^= moveMask
+		case Pawn:
+			pos.pawnBoard ^= moveMask
+		}
+
+		pos.board[startPieceIdx] = NoPiece
+		pos.board[endPieceIdx] = startPiece
+	} else if isEnPassant {
 		pos.removePieceAt(startPieceIdx, startPiece)
 		pos.removePieceAt(captureIdx, capturedPiece)
 		pos.addPieceAt(endPieceIdx, startPiece)
@@ -96,7 +179,7 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 
 	// King move -> update king pos and castleRights
 	if startPieceType == King {
-		if pos.activeColor == White {
+		if startColor == White {
 			pos.whiteKingIdx = endPieceIdx
 			pos.whiteKingAffectMask = kingAffectMask(endPieceIdx)
 			pos.whiteCastleRights = NoCastle
@@ -120,9 +203,9 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 	// en passant
 	if startPieceType == Pawn {
 		diffIdx := endPieceIdx - startPieceIdx
-		if pos.activeColor == White && diffIdx == 16 {
+		if startColor == White && diffIdx == 16 {
 			pos.enPassantIdx = startPieceIdx + 8
-		} else if pos.activeColor == Black && diffIdx == -16 {
+		} else if startColor == Black && diffIdx == -16 {
 			pos.enPassantIdx = startPieceIdx - 8
 		} else {
 			pos.enPassantIdx = NoEnPassant
@@ -133,7 +216,7 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 
 	// knight
 	if startPieceType == Rook {
-		if pos.activeColor == White {
+		if startColor == White {
 			if startPieceIdx == A1 {
 				pos.whiteCastleRights = pos.whiteCastleRights &^ QueenSideCastle
 			} else if startPieceIdx == H1 {
@@ -165,8 +248,11 @@ func (updater *PlainPositionUpdater) UnMakeMove(pos *Position, history MoveHisto
 	startPieceIdx := move.startIdx
 	endPieceIdx := move.endIdx
 	packedState := history.packedState
+	movePiece := move.piece
+	movePieceType := movePiece.Type()
+	isPromotion := move.flag == QueenPromotion || move.flag == KnightPromotion || move.flag == BishopPromotion || move.flag == RookPromotion
 
-	pos.activeColor = move.piece.Color()
+	pos.activeColor = movePiece.Color()
 	pos.whiteKingIdx = int8((packedState >> metaWhiteKingShift) & 0x3F)
 	pos.blackKingIdx = int8((packedState >> metaBlackKingShift) & 0x3F)
 	pos.whiteKingAffectMask = history.whiteKingAffectMask
@@ -177,11 +263,86 @@ func (updater *PlainPositionUpdater) UnMakeMove(pos *Position, history MoveHisto
 	pos.blackKingSafety = decodeKingSafety((packedState >> metaBlackSafetyShift) & 0x3)
 	pos.enPassantIdx = int8((packedState>>metaEnPassantShift)&0x7F) - 1
 
-	if move.flag == QueenPromotion || move.flag == KnightPromotion || move.flag == BishopPromotion || move.flag == RookPromotion {
+	if !isPromotion && move.flag != EnPassant && !isCastleMove(move) && history.capturedPiece == NoPiece {
+		fromMask := uint64(1 << startPieceIdx)
+		toMask := uint64(1 << endPieceIdx)
+		moveMask := fromMask | toMask
+
+		pos.occupied ^= moveMask
+		if pos.activeColor == White {
+			pos.whiteOccupied ^= moveMask
+		} else {
+			pos.blackOccupied ^= moveMask
+		}
+
+		switch movePieceType {
+		case King:
+			pos.kingBoard ^= moveMask
+		case Queen:
+			pos.queenBoard ^= moveMask
+		case Rook:
+			pos.rookBoard ^= moveMask
+		case Bishop:
+			pos.bishopBoard ^= moveMask
+		case Knight:
+			pos.knightBoard ^= moveMask
+		case Pawn:
+			pos.pawnBoard ^= moveMask
+		}
+
+		pos.board[endPieceIdx] = NoPiece
+		pos.board[startPieceIdx] = movePiece
+	} else if !isPromotion && move.flag != EnPassant && !isCastleMove(move) && history.capturedPiece != NoPiece {
+		fromMask := uint64(1 << startPieceIdx)
+		toMask := uint64(1 << endPieceIdx)
+		moveMask := fromMask | toMask
+
+		pos.occupied |= fromMask
+		if pos.activeColor == White {
+			pos.whiteOccupied ^= moveMask
+			pos.blackOccupied |= toMask
+		} else {
+			pos.blackOccupied ^= moveMask
+			pos.whiteOccupied |= toMask
+		}
+
+		switch movePieceType {
+		case King:
+			pos.kingBoard ^= moveMask
+		case Queen:
+			pos.queenBoard ^= moveMask
+		case Rook:
+			pos.rookBoard ^= moveMask
+		case Bishop:
+			pos.bishopBoard ^= moveMask
+		case Knight:
+			pos.knightBoard ^= moveMask
+		case Pawn:
+			pos.pawnBoard ^= moveMask
+		}
+
+		switch history.capturedPiece.Type() {
+		case King:
+			pos.kingBoard |= toMask
+		case Queen:
+			pos.queenBoard |= toMask
+		case Rook:
+			pos.rookBoard |= toMask
+		case Bishop:
+			pos.bishopBoard |= toMask
+		case Knight:
+			pos.knightBoard |= toMask
+		case Pawn:
+			pos.pawnBoard |= toMask
+		}
+
+		pos.board[startPieceIdx] = movePiece
+		pos.board[endPieceIdx] = history.capturedPiece
+	} else if isPromotion {
 		pos.removePieceAt(endPieceIdx, pos.board[endPieceIdx])
-		pos.addPieceAt(startPieceIdx, move.piece)
+		pos.addPieceAt(startPieceIdx, movePiece)
 	} else {
-		pos.movePiece(move.piece, endPieceIdx, startPieceIdx)
+		pos.movePiece(movePiece, endPieceIdx, startPieceIdx)
 	}
 
 	if isCastleMove(move) {
