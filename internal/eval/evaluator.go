@@ -1,6 +1,10 @@
 package eval
 
-import board "chessV2/internal/board"
+import (
+	board "chessV2/internal/board"
+	"chessV2/internal/movegen"
+	"math/bits"
+)
 
 type Evaluator interface {
 	Evaluate(pos *board.Position) Score
@@ -17,6 +21,16 @@ func (e *ZeroEvaluator) Evaluate(pos *board.Position) Score {
 }
 
 type StaticEvaluator struct{}
+
+var mobilityWeights = [7]Score{
+	0, // no piece
+	0, // king
+	1, // queen
+	0, // pawn
+	4, // knight
+	5, // bishop
+	2, // rook
+}
 
 func NewStaticEvaluator() *StaticEvaluator {
 	return &StaticEvaluator{}
@@ -145,8 +159,30 @@ func (e *StaticEvaluator) Evaluate(pos *board.Position) Score {
 		}
 	}
 
+	whiteScore += mobilityScore(pos, board.White)
+	blackScore += mobilityScore(pos, board.Black)
+
 	if pos.ActiveColor() == board.White {
 		return whiteScore - blackScore
 	}
 	return blackScore - whiteScore
+}
+
+func mobilityScore(pos *board.Position, color int8) Score {
+	score := DrawScore
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece == board.NoPiece || piece.Color() != color {
+			continue
+		}
+
+		weight := mobilityWeights[piece.Type()]
+		if weight == 0 {
+			continue
+		}
+
+		targets := movegen.PseudoLegalTargetsMask(pos, piece, idx)
+		score += Score(bits.OnesCount64(targets)) * weight
+	}
+	return score
 }
