@@ -21,6 +21,8 @@ The project is not a full playing engine yet. Search, evaluation, self-play orch
   Simple perft entrypoint.
 - `cmd/benchperft/main.go`
   Benchmark entrypoint used by `scripts/bench-perft.sh`.
+- `cmd/uci/main.go`
+  UCI entrypoint for GUI integration and external engine tooling.
 - `docs/`
   Architecture notes, benchmark history, and optimization notes.
 
@@ -44,9 +46,17 @@ Run a direct perft divide:
 go run ./cmd/perft.go '8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1' 7
 ```
 
+Build the UCI binary:
+
+```bash
+mkdir -p ./bin
+go build -o ./bin/gochess-uci ./cmd/uci
+```
+
 ## Documentation
 
 - [Contributing](./CONTRIBUTING.md)
+- [Project Usage](./project.md)
 - [Docs Index](./docs/README.md)
 - [Codebase Overview](./docs/codebase-overview.md)
 - [Benchmark History](./docs/benchmark-history.md)
