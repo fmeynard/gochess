@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chessV2/internal"
+	chess "chessV2/internal/chess"
 	"fmt"
 	"os"
 	"sort"
@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	fenPos := internal.FenStartPos
+	fenPos := chess.FenStartPos
 	if len(os.Args) != 3 {
 		panic("Invalid number of arguments")
 	}
@@ -20,8 +20,8 @@ func main() {
 		panic(err)
 	}
 
-	engine := internal.NewEngine()
-	pos, _ := internal.NewPositionFromFEN(fenPos)
+	engine := chess.NewEngine()
+	pos, _ := chess.NewPositionFromFEN(fenPos)
 	res, nodesCount := engine.PerftDivide(pos, depth)
 
 	keys := make([]string, 0, len(res))

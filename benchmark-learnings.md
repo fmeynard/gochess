@@ -231,7 +231,7 @@ Cause:
 
 Protection:
 
-- `internal/position-updater_test.go` now contains explicit regression coverage for promotion undo with and without capture.
+- `internal/chess/position-updater_test.go` now contains explicit regression coverage for promotion undo with and without capture.
 
 ### King capture semantics
 
@@ -246,8 +246,8 @@ Correction:
 
 Protection:
 
-- `internal/engine_legal_moves_test.go` now checks that legal moves never capture the enemy king.
-- `internal/engine_perft_test.go` contains a dedicated regression for the promotion/perft case.
+- `internal/chess/engine_legal_moves_test.go` now checks that legal moves never capture the enemy king.
+- `internal/chess/engine_perft_test.go` contains a dedicated regression for the promotion/perft case.
 
 ## Recommended Next Areas
 

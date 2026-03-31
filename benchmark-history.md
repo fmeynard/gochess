@@ -5,7 +5,7 @@ This file tracks the current benchmark reference for engine optimization work, p
 See also:
 
 - `benchmark-learnings.md` for qualitative lessons, failed experiments, and correctness pitfalls
-- `plan.md` for the current optimization target and near-term work order
+- `codebase-overview.md` for the current package layout and architecture notes
 
 ## Methodology
 
@@ -254,7 +254,7 @@ Benchmark commands:
 
 ```bash
 BENCH_DEPTH=7 BENCH_MODE=hot BENCH_WARMUP=1 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
-GOCACHE=/home/fab/Projects/gochess/.codex-tmp/go-build-cache go test ./internal -run '^$' -bench 'BenchmarkPositionUpdaterMakeUnmake' -benchtime=200ms
+GOCACHE=/home/fab/Projects/gochess/.codex-tmp/go-build-cache go test ./internal/chess -run '^$' -bench 'BenchmarkPositionUpdaterMakeUnmake' -benchtime=200ms
 ```
 
 Recorded output:

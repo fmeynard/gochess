@@ -8,7 +8,7 @@ The current slider move generation still walks precomputed square lists one squa
 
 Relevant code:
 
-- `internal/pseudo-legal-move-generator.go`
+- `internal/chess/pseudo-legal-move-generator.go`
 - `SliderPseudoLegalMovesInto(...)`
 
 Likely next step:
@@ -32,7 +32,7 @@ Expected benefit:
 
 Relevant code:
 
-- `internal/engine.go`
+- `internal/chess/legal-move-generator.go`
 - `legalMovesInto(...)`
 
 Likely next step:
@@ -62,7 +62,7 @@ Pawn generation is still one of the hotter pseudo-legal generators because it mi
 
 Relevant code:
 
-- `internal/pseudo-legal-move-generator.go`
+- `internal/chess/pseudo-legal-move-generator.go`
 - `PawnPseudoLegalMovesInto(...)`
 
 Likely next step:
@@ -82,7 +82,7 @@ Expected benefit:
 
 Relevant code:
 
-- `internal/position.go`
+- `internal/chess/position.go`
 - `movePiece(...)`
 - `capturePiece(...)`
 
@@ -106,7 +106,7 @@ Expected benefit:
 
 Relevant code:
 
-- `internal/move.go`
+- `internal/chess/move.go`
 
 Likely next step:
 

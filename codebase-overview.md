@@ -41,52 +41,65 @@ In practice, the hot path is:
 - `cmd/main.go`
   Placeholder.
 
-### Core engine files
+### Current packages
 
-- `internal/position.go`
+- `internal/chess/`
+  Current chess domain package. It contains board state, move generation, legality, make/unmake, hashing, and perft orchestration.
+- `internal/search/`
+  Reserved for future search code.
+- `internal/eval/`
+  Reserved for future evaluation code.
+- `internal/lichess/`
+  Reserved for future Lichess integration.
+
+### Core chess files
+
+- `internal/chess/position.go`
   Mutable board state, FEN parsing, occupancy masks, piece boards, king caches.
-- `internal/position-analysis.go`
+- `internal/chess/position-analysis.go`
   Position-level analysis for checks, pinned pieces, and evasion masks.
-- `internal/pseudo-legal-move-generator.go`
+- `internal/chess/pseudo-legal-move-generator.go`
   Pseudo-legal move generation and precomputed attack / ray tables.
-- `internal/engine.go`
-  Legal move generation entrypoint and recursive perft implementation.
-- `internal/position-updater.go`
+- `internal/chess/legal-move-generator.go`
+  Legal move generation and move emission on top of the pseudo-legal primitives.
+- `internal/chess/engine.go`
+  Engine construction plus recursive perft orchestration.
+- `internal/chess/position-updater.go`
   Plain move application / undo without Zobrist maintenance.
-- `internal/position-updater-zobrist.go`
+- `internal/chess/position-updater-zobrist.go`
   Zobrist decorator layered on top of the plain updater.
-- `internal/check.go`
+- `internal/chess/check.go`
   Attack detection and `IsKingInCheck`.
-- `internal/move.go`
-  `Move` representation plus move classification helpers.
-- `internal/move-history.go`
+- `internal/chess/move.go`
+  `Move` representation.
+- `internal/chess/move-history.go`
   Compact undo record used by `UnMakeMove`.
-- `internal/perft_tt.go`
+- `internal/chess/perft_tt.go`
   Perft transposition table for tricks-enabled perft.
-- `internal/zobrist.go`
+- `internal/chess/zobrist.go`
   Zobrist table initialization and key helpers.
-- `internal/tools.go`
+- `internal/chess/tools.go`
   Generic square / bitboard helpers.
 
 ### Tests
 
-- `internal/engine_legal_moves_test.go`
+- `internal/chess/engine_legal_moves_test.go`
   Exact legal move regressions.
-- `internal/engine_perft_test.go`
+- `internal/chess/engine_perft_test.go`
   Perft regression counts.
-- `internal/position-updater_test.go`
+- `internal/chess/position-updater_test.go`
   Make / unmake, castle rights, en passant, active color.
-- `internal/position_updater_zobrist_test.go`
+- `internal/chess/position-updater-zobrist_test.go`
   Plain updater vs Zobrist decorator behavior.
-- `internal/position_analysis_test.go`
+- `internal/chess/position-analysis_test.go`
   Direct tests for check / pin analysis.
-- `internal/check_test.go`
+- `internal/chess/check_test.go`
   Attack-detection helpers.
-- `internal/pseudo-legal-move-generator_test.go`
+- `internal/chess/pseudo-legal-move-generator_test.go`
   Pseudo-legal move generation tests and microbenchmarks.
-- `internal/move_test.go`
+- `internal/chess/move_test.go`
   `Move` helper tests.
-- `internal/move_history_test.go`
+- `internal/chess/move-history_test.go`
   Packed undo-state tests.
 
 ### Scripts and docs
@@ -99,6 +112,8 @@ In practice, the hot path is:
   Versioned benchmark log and optimization history.
 - `future-optimisations.md`
   Remaining optimization ideas.
+- `codebase-overview.md`
+  Current package layout and architecture notes.
 
 ## Position Model
 
@@ -141,13 +156,7 @@ Flags currently include:
 - `Castle`
 - `Capture`
 
-`internal/move.go` now also owns move-level helpers such as:
-
-- move classification
-- castle detection
-- en passant detection
-
-So special move semantics are more centralized than before.
+`internal/chess/move.go` owns the `Move` value and its public helpers such as `StartIdx()`, `EndIdx()`, and `UCI()`.
 
 ## Pseudo-Legal Move Generation
 
@@ -173,7 +182,7 @@ Current style:
 
 ## Position Analysis
 
-`internal/position-analysis.go` contains the intermediate analysis used by legal move generation.
+`internal/chess/position-analysis.go` contains the intermediate analysis used by legal move generation.
 
 `positionAnalysis` currently computes:
 
@@ -189,7 +198,7 @@ This is used by `Engine.legalMovesInto(...)` to avoid unnecessary `make` / `unma
 
 `Engine.LegalMoves(...)` is the public legal move entrypoint.
 
-`legalMovesInto(...)` is the real hot path.
+`legalMovesInto(...)` in `internal/chess/legal-move-generator.go` is the real hot path.
 
 The current flow is:
 
@@ -212,7 +221,7 @@ There are now two move-application modes.
 
 ### Plain updater
 
-`internal/position-updater.go`
+`internal/chess/position-updater.go`
 
 Responsible for:
 
@@ -230,7 +239,7 @@ Responsible for:
 
 ### Zobrist decorator
 
-`internal/position-updater-zobrist.go`
+`internal/chess/position-updater-zobrist.go`
 
 Responsible for:
 
@@ -272,7 +281,7 @@ This file is intentionally more systems-level than user-facing.
 
 ## Check Detection
 
-`internal/check.go` contains:
+`internal/chess/check.go` contains:
 
 - pawn attack checks
 - knight attack checks
@@ -288,7 +297,7 @@ This code is shared by:
 
 ## Perft Path
 
-Perft lives in `internal/engine.go`.
+Perft orchestration lives in `internal/chess/engine.go`.
 
 There are two relevant modes:
 
@@ -319,9 +328,10 @@ This is why tricks-on and tricks-off timings should be read separately in `bench
 
 These are the main areas to watch in future refactors.
 
-### 1. `Engine` still owns a lot of legal-filtering logic
+### 1. `internal/chess` is still a broad package
 
-`engine.go` is better than before, but the legal filtering loop is still dense.
+The new directory structure is cleaner, but `internal/chess` still groups position state, attack analysis, legal generation, and perft orchestration in one package.
+That is an intentional intermediate step before a later package split.
 
 ### 2. `positionAnalysis` is intentionally internal
 
@@ -347,5 +357,5 @@ If returning to this code later, the shortest useful model is:
 
 - Do not assume `position-updater.go` owns hashing anymore; it does not
 - Do not assume `MoveHistory` is a broad snapshot; it is packed
-- Do not assume `engine.go` is pure orchestration; it still contains the main legal filtering loop
+- Do not assume the future `movegen` package split is already done; today the legal and pseudo-legal generators still live together inside `internal/chess`
 - Read `benchmark-history.md` before making performance claims
