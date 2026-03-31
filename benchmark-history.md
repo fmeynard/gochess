@@ -116,6 +116,7 @@ These depth-7 numbers were taken on the same benchmark FEN on March 31, 2026. Th
 | v11 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 8.09s | -0.86s (-9.6%) |
 | v12 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 7.09s | -1.00s (-12.3%) |
 | v13 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 6.97s | -0.12s (-1.7%) |
+| v14 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 6.86s | -0.11s (-1.6%) |
 
 ### Tricks On
 
@@ -615,6 +616,54 @@ Interpretation:
 
 - `v13` improves the attack-detection and position-analysis side enough to push the raw depth-7 benchmark under `7s`
 - The next bottleneck remains the move updater, but the movegen/attack side is now materially cheaper than in `v12`
+
+### v14
+
+Optimizations applied:
+
+- Added focused updater microbenchmarks covering make/unmake for:
+  - pawn quiet
+  - pawn double
+  - pawn capture
+  - knight quiet
+  - rook quiet
+  - king quiet
+  - castling
+  - promotion
+- Specialized the ordinary quiet/capture updater paths further for the most common piece families (`pawn`, `rook`, `king`) instead of always routing through the generic bitboard switch helper
+- Kept the rare paths unchanged so the optimization stays narrow and measurable
+
+Benchmark commands:
+
+```bash
+BENCH_DEPTH=7 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+GOCACHE=/home/fab/Projects/gochess/.codex-tmp/go-build-cache go test ./internal -run '^$' -bench 'BenchmarkPositionUpdaterMakeUnmake' -benchtime=200ms
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Perft tricks: false
+Nodes: 178633661
+Elapsed: 6.857738422s
+CPU profile: .codex-tmp/bench-perft-no-tricks-v14.cpu.prof
+
+BenchmarkPositionUpdaterMakeUnmakePawnQuiet-16        43.17 ns/op
+BenchmarkPositionUpdaterMakeUnmakePawnDouble-16       77.41 ns/op
+BenchmarkPositionUpdaterMakeUnmakePawnCapture-16      49.84 ns/op
+BenchmarkPositionUpdaterMakeUnmakeKnightQuiet-16      56.64 ns/op
+BenchmarkPositionUpdaterMakeUnmakeRookQuiet-16        66.83 ns/op
+BenchmarkPositionUpdaterMakeUnmakeKingQuiet-16        40.55 ns/op
+BenchmarkPositionUpdaterMakeUnmakeCastle-16           45.25 ns/op
+BenchmarkPositionUpdaterMakeUnmakePromotion-16        42.21 ns/op
+```
+
+Interpretation:
+
+- `v14` is a modest but real updater-only win on top of `v13`
+- The microbenchmarks are now available to guide future updater work instead of relying only on full perft timings
 
 ## Update Rules
 

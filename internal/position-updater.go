@@ -156,7 +156,15 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 			pos.blackOccupied ^= moveMask
 		}
 
-		xorPieceBoard(pos, startPieceType, moveMask)
+		if startPieceType == Pawn {
+			pos.pawnBoard ^= moveMask
+		} else if startPieceType == Rook {
+			pos.rookBoard ^= moveMask
+		} else if startPieceType == King {
+			pos.kingBoard ^= moveMask
+		} else {
+			xorPieceBoard(pos, startPieceType, moveMask)
+		}
 
 		pos.board[startPieceIdx] = NoPiece
 		pos.board[endPieceIdx] = startPiece
@@ -174,8 +182,25 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 			pos.whiteOccupied &^= toMask
 		}
 
-		clearPieceBoard(pos, capturedPiece.Type(), toMask)
-		xorPieceBoard(pos, startPieceType, moveMask)
+		if capturedPiece.Type() == Pawn {
+			pos.pawnBoard &^= toMask
+		} else if capturedPiece.Type() == Rook {
+			pos.rookBoard &^= toMask
+		} else if capturedPiece.Type() == King {
+			pos.kingBoard &^= toMask
+		} else {
+			clearPieceBoard(pos, capturedPiece.Type(), toMask)
+		}
+
+		if startPieceType == Pawn {
+			pos.pawnBoard ^= moveMask
+		} else if startPieceType == Rook {
+			pos.rookBoard ^= moveMask
+		} else if startPieceType == King {
+			pos.kingBoard ^= moveMask
+		} else {
+			xorPieceBoard(pos, startPieceType, moveMask)
+		}
 
 		pos.board[startPieceIdx] = NoPiece
 		pos.board[endPieceIdx] = startPiece
@@ -346,7 +371,15 @@ func (updater *PlainPositionUpdater) UnMakeMove(pos *Position, history MoveHisto
 			pos.blackOccupied ^= moveMask
 		}
 
-		xorPieceBoard(pos, movePieceType, moveMask)
+		if movePieceType == Pawn {
+			pos.pawnBoard ^= moveMask
+		} else if movePieceType == Rook {
+			pos.rookBoard ^= moveMask
+		} else if movePieceType == King {
+			pos.kingBoard ^= moveMask
+		} else {
+			xorPieceBoard(pos, movePieceType, moveMask)
+		}
 
 		pos.board[endPieceIdx] = NoPiece
 		pos.board[startPieceIdx] = movePiece
@@ -364,8 +397,25 @@ func (updater *PlainPositionUpdater) UnMakeMove(pos *Position, history MoveHisto
 			pos.whiteOccupied |= toMask
 		}
 
-		xorPieceBoard(pos, movePieceType, moveMask)
-		setPieceBoard(pos, history.capturedPiece.Type(), toMask)
+		if movePieceType == Pawn {
+			pos.pawnBoard ^= moveMask
+		} else if movePieceType == Rook {
+			pos.rookBoard ^= moveMask
+		} else if movePieceType == King {
+			pos.kingBoard ^= moveMask
+		} else {
+			xorPieceBoard(pos, movePieceType, moveMask)
+		}
+
+		if history.capturedPiece.Type() == Pawn {
+			pos.pawnBoard |= toMask
+		} else if history.capturedPiece.Type() == Rook {
+			pos.rookBoard |= toMask
+		} else if history.capturedPiece.Type() == King {
+			pos.kingBoard |= toMask
+		} else {
+			setPieceBoard(pos, history.capturedPiece.Type(), toMask)
+		}
 
 		pos.board[startPieceIdx] = movePiece
 		pos.board[endPieceIdx] = history.capturedPiece

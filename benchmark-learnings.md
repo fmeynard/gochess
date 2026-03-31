@@ -63,6 +63,16 @@ Takeaway:
 
 - After `v12`, attack detection and king-safety analysis were the right place to look, and small structural simplifications there still had measurable value.
 
+### v14
+
+- Adding updater microbenchmarks was worthwhile.
+- A narrow specialization of the ordinary quiet/capture updater path for `pawn`, `rook`, and `king` still paid.
+- This was much safer than another broad updater rewrite because the benchmark harness made the tradeoff obvious immediately.
+
+Takeaway:
+
+- For updater work, a “microbenchmark first, then narrow specialization” workflow is effective in this repository.
+
 ## What Did Not Pay
 
 ### v13 attempt: movegen split into quiet/capture append helpers
@@ -135,6 +145,7 @@ Preferred next experiments:
 1. Optimize `appendKingMoves(...)` without adding more helper fragmentation.
 2. Optimize `appendPawnMoves(...)` with careful side-specific specialization.
 3. Look for ways to share or cheapen attack computations between `computePositionAnalysis(...)` and `isSquareAttacked(...)`.
+4. Use the new updater microbenchmarks before making further `MakeMove` / `UnMakeMove` changes.
 
 Avoid retrying first:
 
