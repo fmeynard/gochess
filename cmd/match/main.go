@@ -35,7 +35,7 @@ func main() {
 	progress := func(snapshot match.Snapshot) {
 		if plain {
 			fmt.Printf(
-				"[%3d/%3d] running=%d score=%.1f/%d global=%s white=%s black=%s elapsed=%s eta=%s\n",
+				"[%3d/%3d] running=%d score=%.1f/%d global=%s white=%s black=%s nps=%.0f elapsed=%s eta=%s\n",
 				snapshot.CompletedGames,
 				snapshot.TotalGames,
 				snapshot.RunningGames,
@@ -44,6 +44,7 @@ func main() {
 				snapshot.Global.Summary(),
 				snapshot.AsWhite.Summary(),
 				snapshot.AsBlack.Summary(),
+				snapshot.AverageNPS,
 				snapshot.Elapsed.Round(time.Second),
 				snapshot.EstimatedRemain.Round(time.Second),
 			)
@@ -90,6 +91,7 @@ func renderSnapshot(snapshot match.Snapshot) {
 	b.WriteString(fmt.Sprintf("As White  W/D/L %s\n", snapshot.AsWhite.Summary()))
 	b.WriteString(fmt.Sprintf("As Black  W/D/L %s\n", snapshot.AsBlack.Summary()))
 	b.WriteString(fmt.Sprintf("Running   %d\n", snapshot.RunningGames))
+	b.WriteString(fmt.Sprintf("Avg NPS   %.0f\n", snapshot.AverageNPS))
 	b.WriteString(fmt.Sprintf("Elapsed   %s\n", snapshot.Elapsed.Round(time.Second)))
 	b.WriteString(fmt.Sprintf("ETA       %s\n\n", snapshot.EstimatedRemain.Round(time.Second)))
 

@@ -52,6 +52,7 @@ type Snapshot struct {
 	Elapsed         time.Duration
 	EstimatedRemain time.Duration
 	Score           float64
+	AverageNPS      float64
 	Global          Record
 	AsWhite         Record
 	AsBlack         Record
@@ -65,6 +66,8 @@ type gameResult struct {
 	reason         string
 	plies          int
 	duration       time.Duration
+	nodes          uint64
+	searchTime     time.Duration
 }
 
 type matchState struct {
@@ -76,6 +79,8 @@ type matchState struct {
 	asBlack Record
 	games   []GameRecord
 	running int
+	nodes   uint64
+	time    time.Duration
 }
 
 func RunMatch(cfg Config) (Summary, error) {
@@ -185,7 +190,7 @@ func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-
 		state.startGame(gameIndex, currentAsWhite)
 
 		start := time.Now()
-		outcome, plies, reason, err := playSingleGame(currentClient, opponentClient, currentAsWhite, moveTime)
+		outcome, plies, reason, nodes, searchTime, err := playSingleGame(currentClient, opponentClient, currentAsWhite, moveTime)
 		if err != nil {
 			return err
 		}
@@ -197,6 +202,8 @@ func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-
 			reason:         reason,
 			plies:          plies,
 			duration:       time.Since(start),
+			nodes:          nodes,
+			searchTime:     searchTime,
 		}
 	}
 
@@ -252,6 +259,8 @@ func (s *matchState) finish(result gameResult) {
 	record.Duration = result.duration
 
 	s.running--
+	s.nodes += result.nodes
+	s.time += result.searchTime
 	switch result.outcome {
 	case 1:
 		s.summary.CurrentWins++
@@ -311,6 +320,7 @@ func (s *matchState) emitLocked() {
 		Elapsed:         elapsed,
 		EstimatedRemain: eta,
 		Score:           s.summary.Score(),
+		AverageNPS:      averageNPS(s.nodes, s.time),
 		Global: Record{
 			Wins:   s.summary.CurrentWins,
 			Draws:  s.summary.Draws,
@@ -322,19 +332,21 @@ func (s *matchState) emitLocked() {
 	})
 }
 
-func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite bool, moveTime time.Duration) (int, int, string, error) {
+func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite bool, moveTime time.Duration) (int, int, string, uint64, time.Duration, error) {
 	referee := engine.NewEngine()
 	pos, err := board.NewPositionFromFEN(board.FenStartPos)
 	if err != nil {
-		return 0, 0, "", err
+		return 0, 0, "", 0, 0, err
 	}
 
 	moves := make([]string, 0, defaultMaxPlies)
 	repetitionCount := map[uint64]int{pos.ZobristKey(): 1}
+	var totalNodes uint64
+	var totalSearchTime time.Duration
 
 	for ply := 0; ply < defaultMaxPlies; ply++ {
 		if repetitionCount[pos.ZobristKey()] >= 3 {
-			return 0, ply, "draw by repetition", nil
+			return 0, ply, "draw by repetition", totalNodes, totalSearchTime, nil
 		}
 
 		legalMoves := referee.LegalMoves(pos)
@@ -342,36 +354,38 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 			if movegen.IsKingInCheck(pos, pos.ActiveColor()) {
 				currentToMove := (pos.ActiveColor() == board.White) == currentIsWhite
 				if currentToMove {
-					return -1, ply, "checkmate", nil
+					return -1, ply, "checkmate", totalNodes, totalSearchTime, nil
 				}
-				return 1, ply, "checkmate", nil
+				return 1, ply, "checkmate", totalNodes, totalSearchTime, nil
 			}
-			return 0, ply, "stalemate", nil
+			return 0, ply, "stalemate", totalNodes, totalSearchTime, nil
 		}
 
 		client := selectClient(currentClient, opponentClient, pos.ActiveColor(), currentIsWhite)
-		bestMove, err := client.BestMove(moves, moveTime)
+		bestMove, stats, err := client.BestMove(moves, moveTime)
 		if err != nil {
 			currentToMove := (pos.ActiveColor() == board.White) == currentIsWhite
 			if currentToMove {
-				return -1, ply, "search error", nil
+				return -1, ply, "search error", totalNodes, totalSearchTime, nil
 			}
-			return 1, ply, "search error", nil
+			return 1, ply, "search error", totalNodes, totalSearchTime, nil
 		}
+		totalNodes += stats.Nodes
+		totalSearchTime += stats.Time
 
 		if err := referee.ApplyUCIMove(pos, bestMove); err != nil {
 			currentToMove := (pos.ActiveColor() == board.White) == currentIsWhite
 			if currentToMove {
-				return -1, ply, "illegal move", nil
+				return -1, ply, "illegal move", totalNodes, totalSearchTime, nil
 			}
-			return 1, ply, "illegal move", nil
+			return 1, ply, "illegal move", totalNodes, totalSearchTime, nil
 		}
 
 		moves = append(moves, bestMove)
 		repetitionCount[pos.ZobristKey()]++
 	}
 
-	return 0, defaultMaxPlies, "max plies", nil
+	return 0, defaultMaxPlies, "max plies", totalNodes, totalSearchTime, nil
 }
 
 func selectClient(currentClient, opponentClient *UCIClient, activeColor int8, currentIsWhite bool) *UCIClient {
@@ -484,4 +498,11 @@ func outcomeLabel(outcome int) string {
 	default:
 		return "draw"
 	}
+}
+
+func averageNPS(nodes uint64, searchTime time.Duration) float64 {
+	if searchTime <= 0 {
+		return 0
+	}
+	return float64(nodes) / searchTime.Seconds()
 }
