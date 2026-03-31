@@ -115,6 +115,7 @@ These depth-7 numbers were taken on the same benchmark FEN on March 31, 2026. Th
 | v10 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 8.95s | -0.21s (-2.3%) |
 | v11 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 8.09s | -0.86s (-9.6%) |
 | v12 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 7.09s | -1.00s (-12.3%) |
+| v13 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 6.97s | -0.12s (-1.7%) |
 
 ### Tricks On
 
@@ -583,6 +584,37 @@ Interpretation:
 
 - `v12` is a large raw updater win on top of `v11`, cutting another full second from the depth-7 no-tricks benchmark
 - `MakeMove` and `UnMakeMove` still dominate, but they now account for materially less total runtime and the movegen refactor from `v11` remains intact
+
+### v13
+
+Optimizations applied:
+
+- Simplified attacker-color branching in `isSquareAttacked(...)` so pawn attack selection and attacker occupancy are chosen once up front
+- Unrolled the sliding-piece attack checks inside `isSquareAttacked(...)` to remove the small direction loop and repeated array indexing
+- Simplified the pawn-attack preselection in `computePositionAnalysis(...)`
+- Reworked the sliding-check / pin analysis loop in `computePositionAnalysis(...)` into direct per-direction processing to reduce repeated branching in the hot path
+
+Benchmark command:
+
+```bash
+BENCH_DEPTH=7 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Perft tricks: false
+Nodes: 178633661
+Elapsed: 6.966829391s
+CPU profile: .codex-tmp/bench-perft-no-tricks-v13b.cpu.prof
+```
+
+Interpretation:
+
+- `v13` improves the attack-detection and position-analysis side enough to push the raw depth-7 benchmark under `7s`
+- The next bottleneck remains the move updater, but the movegen/attack side is now materially cheaper than in `v12`
 
 ## Update Rules
 

@@ -131,39 +131,62 @@ func isSquareAttackedByKing(pos *Position, idx int8, kingColor int8) bool {
 // isSquareAttacked checks if a square is attacked by pieces of attackerColor.
 // occ is the occupancy used for sliding piece ray calculations.
 func isSquareAttacked(pos *Position, sq int8, attackerColor int8, occ uint64) bool {
-	var attackerOcc uint64
+	attackerOcc := pos.blackOccupied
+	pawnAttackMask := pawnAttacksBy[1][sq]
 	if attackerColor == White {
 		attackerOcc = pos.whiteOccupied
-		if pawnAttacksBy[0][sq]&pos.pawnBoard&attackerOcc != 0 {
-			return true
-		}
-	} else {
-		attackerOcc = pos.blackOccupied
-		if pawnAttacksBy[1][sq]&pos.pawnBoard&attackerOcc != 0 {
-			return true
-		}
+		pawnAttackMask = pawnAttacksBy[0][sq]
+	}
+	if pawnAttackMask&pos.pawnBoard&attackerOcc != 0 {
+		return true
 	}
 	if knightAttacksMask[sq]&pos.knightBoard&attackerOcc != 0 {
 		return true
 	}
 	rookQueens := (pos.rookBoard | pos.queenBoard) & attackerOcc
 	if rookQueens != 0 {
-		for dirIdx := 0; dirIdx < 4; dirIdx++ {
-			ray := sliderAttackMasks[sq][dirIdx]
-			blocker := firstBlockerOnRay(occ, ray, rayDirections[dirIdx])
-			if blocker != 0 && blocker&rookQueens != 0 {
-				return true
-			}
+		ray := sliderAttackMasks[sq][0]
+		blocker := firstBlockerOnRay(occ, ray, West)
+		if blocker != 0 && blocker&rookQueens != 0 {
+			return true
+		}
+		ray = sliderAttackMasks[sq][1]
+		blocker = firstBlockerOnRay(occ, ray, East)
+		if blocker != 0 && blocker&rookQueens != 0 {
+			return true
+		}
+		ray = sliderAttackMasks[sq][2]
+		blocker = firstBlockerOnRay(occ, ray, South)
+		if blocker != 0 && blocker&rookQueens != 0 {
+			return true
+		}
+		ray = sliderAttackMasks[sq][3]
+		blocker = firstBlockerOnRay(occ, ray, North)
+		if blocker != 0 && blocker&rookQueens != 0 {
+			return true
 		}
 	}
 	bishopQueens := (pos.bishopBoard | pos.queenBoard) & attackerOcc
 	if bishopQueens != 0 {
-		for dirIdx := 4; dirIdx < 8; dirIdx++ {
-			ray := sliderAttackMasks[sq][dirIdx]
-			blocker := firstBlockerOnRay(occ, ray, rayDirections[dirIdx])
-			if blocker != 0 && blocker&bishopQueens != 0 {
-				return true
-			}
+		ray := sliderAttackMasks[sq][4]
+		blocker := firstBlockerOnRay(occ, ray, SouthWest)
+		if blocker != 0 && blocker&bishopQueens != 0 {
+			return true
+		}
+		ray = sliderAttackMasks[sq][5]
+		blocker = firstBlockerOnRay(occ, ray, SouthEast)
+		if blocker != 0 && blocker&bishopQueens != 0 {
+			return true
+		}
+		ray = sliderAttackMasks[sq][6]
+		blocker = firstBlockerOnRay(occ, ray, NorthWest)
+		if blocker != 0 && blocker&bishopQueens != 0 {
+			return true
+		}
+		ray = sliderAttackMasks[sq][7]
+		blocker = firstBlockerOnRay(occ, ray, NorthEast)
+		if blocker != 0 && blocker&bishopQueens != 0 {
+			return true
 		}
 	}
 	return kingAttacksMask[sq]&pos.kingBoard&attackerOcc != 0

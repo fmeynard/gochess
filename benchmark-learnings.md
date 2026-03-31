@@ -53,6 +53,16 @@ Takeaway:
 
 - Once move generation was cheaper, eliminating hot-path rediscovery in the updater produced another large gain.
 
+### v13
+
+- Optimizing `computePositionAnalysis(...)` and `isSquareAttacked(...)` paid.
+- Simplifying attacker-color setup and unrolling sliding attack checks helped.
+- Direct per-direction processing in position analysis helped without requiring a larger architectural refactor.
+
+Takeaway:
+
+- After `v12`, attack detection and king-safety analysis were the right place to look, and small structural simplifications there still had measurable value.
+
 ## What Did Not Pay
 
 ### v13 attempt: movegen split into quiet/capture append helpers
@@ -130,3 +140,8 @@ Avoid retrying first:
 
 1. Splitting the generic move append loop into separate quiet/capture helper families.
 2. Replacing board-update switch helpers with pointer indirection.
+
+Successful direction to revisit later:
+
+1. Small, targeted reductions in attack-detection branching.
+2. Small, targeted reductions in position-analysis branching.

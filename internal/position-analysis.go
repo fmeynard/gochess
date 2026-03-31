@@ -15,36 +15,27 @@ func computePositionAnalysis(pos *Position, kingIdx int8, friendlyOcc, enemyOcc 
 	checkers := uint64(0)
 	blockMask := uint64(0)
 
-	var pawnColorIdx int
+	pawnAttackMask := pawnAttacksBy[0][kingIdx]
 	if pos.activeColor == White {
-		pawnColorIdx = 1
-	} else {
-		pawnColorIdx = 0
+		pawnAttackMask = pawnAttacksBy[1][kingIdx]
 	}
-	checkers |= pawnAttacksBy[pawnColorIdx][kingIdx] & pos.pawnBoard & enemyOcc
+	checkers |= pawnAttackMask & pos.pawnBoard & enemyOcc
 	checkers |= knightAttacksMask[kingIdx] & pos.knightBoard & enemyOcc
 
 	rookQueens := (pos.rookBoard | pos.queenBoard) & enemyOcc
 	bishopQueens := (pos.bishopBoard | pos.queenBoard) & enemyOcc
 
-	for dirIdx := 0; dirIdx < 8; dirIdx++ {
-		var sliders uint64
-		if dirIdx < 4 {
-			sliders = rookQueens
-		} else {
-			sliders = bishopQueens
-		}
+	processDir := func(dirIdx int, sliders uint64, dir int8) {
 		if sliders == 0 {
-			continue
+			return
 		}
 		ray := sliderAttackMasks[kingIdx][dirIdx]
 		if ray == 0 {
-			continue
+			return
 		}
-		dir := rayDirections[dirIdx]
 		first := firstBlockerOnRay(pos.occupied, ray, dir)
 		if first == 0 {
-			continue
+			return
 		}
 		if first&enemyOcc != 0 {
 			if first&sliders != 0 {
@@ -60,6 +51,15 @@ func computePositionAnalysis(pos *Position, kingIdx int8, friendlyOcc, enemyOcc 
 			}
 		}
 	}
+
+	processDir(0, rookQueens, West)
+	processDir(1, rookQueens, East)
+	processDir(2, rookQueens, South)
+	processDir(3, rookQueens, North)
+	processDir(4, bishopQueens, SouthWest)
+	processDir(5, bishopQueens, SouthEast)
+	processDir(6, bishopQueens, NorthWest)
+	processDir(7, bishopQueens, NorthEast)
 
 	info.checkerCount = bits.OnesCount64(checkers)
 	info.inCheck = info.checkerCount > 0
