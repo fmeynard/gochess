@@ -5,12 +5,19 @@ This file records practical lessons from the perft optimization work so future s
 ## Current Best Known Result
 
 - Best raw benchmark so far: `benchmark-v14`
+- Best hot benchmark so far: `benchmark-v15`
 - Target: `Perft position 3`
 - FEN: `8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1`
 - Mode: `BENCH_NO_PERFT_TRICKS=1`
 - Depth: `7`
 - Nodes: `178,633,661`
 - Time: `6.857738422s`
+
+Current preferred reference:
+
+- Harness: `hot`
+- Samples: `6.533347471s`, `6.462752555s`
+- Recorded reference: `6.50s`
 
 ## Strategy Context
 
@@ -93,6 +100,17 @@ Takeaway:
 
 - For updater work, a “microbenchmark first, then narrow specialization” workflow is effective in this repository.
 - The benchmark can still move materially with careful hot-path specialization, but broad structural rewrites are no longer automatically wins.
+
+### v15
+
+- Replacing slider first-blocker scans with magic-bitboard rook/bishop attack lookups paid under the corrected `hot` benchmark.
+- The same magic lookups helped both legal move generation and attack detection.
+- The corrected benchmark harness made the improvement much easier to judge than the older `go run`-based timing.
+
+Takeaway:
+
+- Magic-style slider indexing is a promising direction in this codebase when the index computation is just `(occ&mask)*magic >> shift`.
+- Reusing the same slider lookup path across movegen and attack checks is a good multiplier.
 
 ## What Did Not Pay
 
@@ -203,6 +221,7 @@ Preferred next experiments:
 4. Use the new updater microbenchmarks before making further `MakeMove` / `UnMakeMove` changes.
 5. Explore slider attack generation upgrades that are useful beyond perft, including denser lookup schemes or magic-style indexing.
 6. Reduce move materialization overhead in legal generation without splitting the code into many tiny helpers.
+7. Extend magic-based attacks into `computePositionAnalysis(...)` so check and pin discovery also stop paying repeated directional scans.
 
 ## Architectural Guardrails
 

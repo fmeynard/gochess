@@ -70,39 +70,14 @@ func appendPromotionMoves(piece Piece, startIdx int8, targets uint64, dst []Move
 }
 
 func sliderTargetsMask(pos *Position, idx int8, pieceType int8, friendlyOcc uint64) uint64 {
-	var attacks uint64
-	var startDir, endDir int
-
 	switch pieceType {
 	case Bishop:
-		startDir, endDir = 4, 8
+		return bishopAttacksMagic(idx, pos.occupied) &^ friendlyOcc
 	case Rook:
-		startDir, endDir = 0, 4
+		return rookAttacksMagic(idx, pos.occupied) &^ friendlyOcc
 	default:
-		startDir, endDir = 0, 8
+		return (rookAttacksMagic(idx, pos.occupied) | bishopAttacksMagic(idx, pos.occupied)) &^ friendlyOcc
 	}
-
-	for dirIdx := startDir; dirIdx < endDir; dirIdx++ {
-		ray := sliderAttackMasks[idx][dirIdx]
-		if ray == 0 {
-			continue
-		}
-
-		blocker := firstBlockerOnRay(pos.occupied, ray, rayDirections[dirIdx])
-		if blocker == 0 {
-			attacks |= ray
-			continue
-		}
-
-		blockerIdx := int8(bits.TrailingZeros64(blocker))
-		segment := ray ^ sliderAttackMasks[blockerIdx][dirIdx]
-		if blocker&friendlyOcc != 0 {
-			segment &^= blocker
-		}
-		attacks |= segment
-	}
-
-	return attacks
 }
 
 func (e *Engine) appendKingMoves(pos *Position, piece Piece, kingIdx int8, enemyColor int8, enemyKingMask uint64, info positionAnalysis, dst []Move, count int) int {

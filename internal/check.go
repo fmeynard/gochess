@@ -53,26 +53,12 @@ func isSquareAttackedBySlidingPiece(pos *Position, squareIdx int8, kingColor int
 	}
 
 	rookQueenTargets := (pos.rookBoard | pos.queenBoard) & enemyOcc
-	if rookQueenTargets != 0 {
-		if scanRayForAttack(pos, squareIdx, 0, West, rookQueenTargets) ||
-			scanRayForAttack(pos, squareIdx, 1, East, rookQueenTargets) ||
-			scanRayForAttack(pos, squareIdx, 2, South, rookQueenTargets) ||
-			scanRayForAttack(pos, squareIdx, 3, North, rookQueenTargets) {
-			return true
-		}
+	if rookQueenTargets != 0 && rookAttacksMagic(squareIdx, pos.occupied)&rookQueenTargets != 0 {
+		return true
 	}
 
 	bishopQueenTargets := (pos.bishopBoard | pos.queenBoard) & enemyOcc
-	if bishopQueenTargets != 0 {
-		if scanRayForAttack(pos, squareIdx, 4, SouthWest, bishopQueenTargets) ||
-			scanRayForAttack(pos, squareIdx, 5, SouthEast, bishopQueenTargets) ||
-			scanRayForAttack(pos, squareIdx, 6, NorthWest, bishopQueenTargets) ||
-			scanRayForAttack(pos, squareIdx, 7, NorthEast, bishopQueenTargets) {
-			return true
-		}
-	}
-
-	return false
+	return bishopQueenTargets != 0 && bishopAttacksMagic(squareIdx, pos.occupied)&bishopQueenTargets != 0
 }
 
 func firstBlockerOnRay(occupied, ray uint64, direction int8) uint64 {
@@ -144,50 +130,12 @@ func isSquareAttacked(pos *Position, sq int8, attackerColor int8, occ uint64) bo
 		return true
 	}
 	rookQueens := (pos.rookBoard | pos.queenBoard) & attackerOcc
-	if rookQueens != 0 {
-		ray := sliderAttackMasks[sq][0]
-		blocker := firstBlockerOnRay(occ, ray, West)
-		if blocker != 0 && blocker&rookQueens != 0 {
-			return true
-		}
-		ray = sliderAttackMasks[sq][1]
-		blocker = firstBlockerOnRay(occ, ray, East)
-		if blocker != 0 && blocker&rookQueens != 0 {
-			return true
-		}
-		ray = sliderAttackMasks[sq][2]
-		blocker = firstBlockerOnRay(occ, ray, South)
-		if blocker != 0 && blocker&rookQueens != 0 {
-			return true
-		}
-		ray = sliderAttackMasks[sq][3]
-		blocker = firstBlockerOnRay(occ, ray, North)
-		if blocker != 0 && blocker&rookQueens != 0 {
-			return true
-		}
+	if rookQueens != 0 && rookAttacksMagic(sq, occ)&rookQueens != 0 {
+		return true
 	}
 	bishopQueens := (pos.bishopBoard | pos.queenBoard) & attackerOcc
-	if bishopQueens != 0 {
-		ray := sliderAttackMasks[sq][4]
-		blocker := firstBlockerOnRay(occ, ray, SouthWest)
-		if blocker != 0 && blocker&bishopQueens != 0 {
-			return true
-		}
-		ray = sliderAttackMasks[sq][5]
-		blocker = firstBlockerOnRay(occ, ray, SouthEast)
-		if blocker != 0 && blocker&bishopQueens != 0 {
-			return true
-		}
-		ray = sliderAttackMasks[sq][6]
-		blocker = firstBlockerOnRay(occ, ray, NorthWest)
-		if blocker != 0 && blocker&bishopQueens != 0 {
-			return true
-		}
-		ray = sliderAttackMasks[sq][7]
-		blocker = firstBlockerOnRay(occ, ray, NorthEast)
-		if blocker != 0 && blocker&bishopQueens != 0 {
-			return true
-		}
+	if bishopQueens != 0 && bishopAttacksMagic(sq, occ)&bishopQueens != 0 {
+		return true
 	}
 	return kingAttacksMask[sq]&pos.kingBoard&attackerOcc != 0
 }

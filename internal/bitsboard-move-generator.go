@@ -1,5 +1,7 @@
 package internal
 
+import "sync"
+
 const (
 	West      int8 = -1
 	East      int8 = 1
@@ -12,6 +14,7 @@ const (
 )
 
 var (
+	attackTablesOnce            sync.Once
 	QueenDirections  = []int8{West, East, South, North, SouthWest, SouthEast, NorthWest, NorthEast}
 	RookDirections   = []int8{South, North, West, East}
 	BishopDirections = []int8{SouthWest, SouthEast, NorthWest, NorthEast}
@@ -44,15 +47,31 @@ type BitsBoardMoveGenerator struct {
 	sliderAttackMasks      [64][8]uint64
 }
 
+func init() {
+	ensureAttackTables()
+}
+
 func NewBitsBoardMoveGenerator() *BitsBoardMoveGenerator {
+	ensureAttackTables()
 	bitsBoardMoveGenerator := &BitsBoardMoveGenerator{}
-	bitsBoardMoveGenerator.initMasks()
+	bitsBoardMoveGenerator.initPieceMasks()
 
 	return bitsBoardMoveGenerator
 }
 
-// Initialize the attack masks
-func (g *BitsBoardMoveGenerator) initMasks() {
+func ensureAttackTables() {
+	attackTablesOnce.Do(func() {
+		g := &BitsBoardMoveGenerator{}
+		g.initPieceMasks()
+		g.initSliderAttackMasks()
+		g.initKnightAttacksMasks()
+		g.initKingAttacksMasks()
+		g.initDiagonalAttacksMasks()
+		initMagicBitboards()
+	})
+}
+
+func (g *BitsBoardMoveGenerator) initPieceMasks() {
 	for squareIdx := int8(0); squareIdx < 64; squareIdx++ {
 		g.initBishopMaskForSquare(squareIdx)
 		g.initRookMaskForSquare(squareIdx)
@@ -60,10 +79,6 @@ func (g *BitsBoardMoveGenerator) initMasks() {
 		g.initKingMaskForSquare(squareIdx)
 		g.initPawnMasksForSquare(squareIdx)
 	}
-	g.initSliderAttackMasks()
-	g.initKnightAttacksMasks()
-	g.initKingAttacksMasks()
-	g.initDiagonalAttacksMasks()
 }
 
 func (g *BitsBoardMoveGenerator) initDiagonalAttacksMasks() {

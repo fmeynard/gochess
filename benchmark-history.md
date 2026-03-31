@@ -138,6 +138,24 @@ These depth-7 numbers were taken on the same benchmark FEN on March 31, 2026. Th
 | v8 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 895ms | baseline |
 | v9 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 715ms | -180ms (-20.1%) |
 
+## Perft(7) Hot Benchmark
+
+These numbers use the corrected `hot` harness, which excludes FEN parsing and engine construction from the timed section and runs on the compiled `benchperft` binary instead of `go run`.
+
+### Tricks Off
+
+The first `hot` baseline was taken on `benchmark-v14`. Because the harness changed, these numbers should not be mixed directly with the older `Perft(7) Snapshot` table above.
+
+| Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
+| --- | --- | --- | --- | ---: | ---: | ---: |
+| v14 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 6.78s | hot baseline |
+| v15 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 6.50s | -0.28s (-4.1%) |
+
+Recorded samples:
+
+- `v14`: `6.822986189s`, `6.745086913s`
+- `v15`: `6.533347471s`, `6.462752555s`
+
 Note: `v7` timings were noisy in single-shot runs because `./scripts/bench-perft.sh` uses `go run`. The recorded `v7` numbers above are medians from four local samples taken on March 31, 2026:
 
 - Tricks on: `252ms`, `260ms`, `69ms`, `277ms` -> recorded median `256ms`
