@@ -4,10 +4,12 @@ import (
 	"bufio"
 	board "chessV2/internal/board"
 	"chessV2/internal/engine"
+	"chessV2/internal/search"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,8 +19,18 @@ const (
 )
 
 type Server struct {
-	engine   *engine.Engine
-	position *board.Position
+	mu           sync.Mutex
+	writeMu      sync.Mutex
+	engine       *engine.Engine
+	position     *board.Position
+	positionKeys []uint64
+	activeSearch *activeSearch
+}
+
+type activeSearch struct {
+	stop chan struct{}
+	done chan struct{}
+	once sync.Once
 }
 
 func NewServer(e *engine.Engine) (*Server, error) {
@@ -28,8 +40,9 @@ func NewServer(e *engine.Engine) (*Server, error) {
 	}
 
 	return &Server{
-		engine:   e,
-		position: pos,
+		engine:       e,
+		position:     pos,
+		positionKeys: []uint64{pos.ZobristKey()},
 	}, nil
 }
 
@@ -65,17 +78,22 @@ func (s *Server) handleCommand(line string, out io.Writer) (bool, error) {
 		fmt.Fprintf(out, "id author %s\n", engineAuthor)
 		fmt.Fprintln(out, "uciok")
 	case "isready":
+		s.stopSearch(true)
 		fmt.Fprintln(out, "readyok")
 	case "ucinewgame":
+		s.stopSearch(true)
 		s.engine.StartGame()
 		return false, s.resetToStartPos()
 	case "position":
+		s.stopSearch(true)
 		return false, s.handlePosition(fields[1:])
 	case "go":
 		return false, s.handleGo(fields[1:], out)
 	case "stop":
+		s.stopSearch(false)
 		return false, nil
 	case "quit":
+		s.stopSearch(true)
 		return true, nil
 	}
 
@@ -116,12 +134,17 @@ func (s *Server) handlePosition(args []string) error {
 		if args[i] != "moves" {
 			return fmt.Errorf("unexpected token in position command: %s", args[i])
 		}
-		if err := s.engine.ApplyUCIMoves(pos, args[i+1:]); err != nil {
+		positionKeys, err := s.engine.ApplyUCIMovesWithPositionKeys(pos, args[i+1:])
+		if err != nil {
 			return err
 		}
+		s.position = pos
+		s.positionKeys = positionKeys
+		return nil
 	}
 
 	s.position = pos
+	s.positionKeys = []uint64{pos.ZobristKey()}
 	return nil
 }
 
@@ -131,22 +154,19 @@ func (s *Server) handleGo(args []string, out io.Writer) error {
 		return err
 	}
 
-	if limits.MoveTime > 0 {
-		result, err := s.engine.SearchTime(s.position, limits.MoveTime)
-		if err != nil {
-			return err
-		}
-		writeInfo(out, adaptResult(result))
-		fmt.Fprintf(out, "bestmove %s\n", result.BestMove.UCI())
-		return nil
+	s.stopSearch(true)
+
+	snapshot, history := s.searchSnapshot()
+	active := &activeSearch{
+		stop: make(chan struct{}),
+		done: make(chan struct{}),
 	}
 
-	result, err := s.engine.SearchDepth(s.position, limits.Depth)
-	if err != nil {
-		return err
-	}
-	writeInfo(out, adaptResult(result))
-	fmt.Fprintf(out, "bestmove %s\n", result.BestMove.UCI())
+	s.mu.Lock()
+	s.activeSearch = active
+	s.mu.Unlock()
+
+	go s.runSearch(active, snapshot, history, limits, out)
 	return nil
 }
 
@@ -156,7 +176,80 @@ func (s *Server) resetToStartPos() error {
 		return err
 	}
 	s.position = pos
+	s.positionKeys = []uint64{pos.ZobristKey()}
 	return nil
+}
+
+func (s *Server) searchSnapshot() (*board.Position, []uint64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	history := make([]uint64, len(s.positionKeys))
+	copy(history, s.positionKeys)
+	return s.position.Clone(), history
+}
+
+func (s *Server) runSearch(active *activeSearch, pos *board.Position, history []uint64, parsedLimits struct {
+	Depth    int
+	MoveTime time.Duration
+}, out io.Writer) {
+	defer close(active.done)
+
+	result, err := s.engine.Search(pos, search.Limits{
+		Depth:    parsedLimits.Depth,
+		MoveTime: parsedLimits.MoveTime,
+		Stop:     active.stop,
+		History:  history,
+	})
+
+	s.mu.Lock()
+	if s.activeSearch == active {
+		s.activeSearch = nil
+	}
+	s.mu.Unlock()
+
+	if err != nil {
+		s.writef(out, "info string error %s\n", sanitizeInfo(err.Error()))
+		return
+	}
+
+	s.writeResult(out, result)
+}
+
+func (s *Server) stopSearch(wait bool) {
+	s.mu.Lock()
+	active := s.activeSearch
+	s.mu.Unlock()
+
+	if active == nil {
+		return
+	}
+
+	active.once.Do(func() {
+		close(active.stop)
+	})
+
+	if wait {
+		<-active.done
+	}
+}
+
+func (s *Server) writeResult(out io.Writer, result search.Result) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	writeInfo(out, adaptResult(result))
+	bestMove := result.BestMove.UCI()
+	if bestMove == "" {
+		bestMove = "0000"
+	}
+	fmt.Fprintf(out, "bestmove %s\n", bestMove)
+}
+
+func (s *Server) writef(out io.Writer, format string, args ...any) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	fmt.Fprintf(out, format, args...)
 }
 
 func parseGoLimits(args []string) (limits struct {

@@ -52,6 +52,18 @@ func TestServerPositionFenAndMoveTime(t *testing.T) {
 	assert.Contains(t, out.String(), "bestmove ")
 }
 
+func TestServerStopCancelsRunningSearch(t *testing.T) {
+	e := engine.NewEngine()
+	server, err := NewServer(e)
+	assert.NoError(t, err)
+
+	var out bytes.Buffer
+	input := "position startpos\ngo movetime 1000\nstop\nquit\n"
+	err = server.Run(strings.NewReader(input), &out)
+	assert.NoError(t, err)
+	assert.Contains(t, out.String(), "bestmove ")
+}
+
 func TestParseGoLimitsDefaultsDepthOne(t *testing.T) {
 	limits, err := parseGoLimits(nil)
 	assert.NoError(t, err)
