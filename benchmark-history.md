@@ -112,6 +112,7 @@ These depth-7 numbers were taken on the same benchmark FEN on March 31, 2026. Th
 | v9 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 9.16s | -0.67s (-6.8%) |
 | v10 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 8.95s | -0.21s (-2.3%) |
 | v11 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 8.09s | -0.86s (-9.6%) |
+| v12 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 7.09s | -1.00s (-12.3%) |
 
 ### Tricks On
 
@@ -543,6 +544,43 @@ Interpretation:
 
 - `v11` is the first version where the heavy legal-move refactor lands cleanly and produces a large depth-7 no-tricks gain
 - The profile now shows `legalMovesInto(...)` much lower than before; the raw move application path is once again the main limit
+
+### v12
+
+Optimizations applied:
+
+- Reworked `MakeMove` / `UnMakeMove` to dispatch directly on `move.flag` instead of rediscovering en passant and castling from board state
+- Added dedicated specialized updater paths for:
+  - quiet moves
+  - captures
+  - en passant
+  - promotions
+  - castling
+- Replaced repeated per-piece switch blocks in the hot path with compact board-update helpers for xor/set/clear on the piece bitboards
+- Removed `decodeKingSafety(...)` from the undo hot path by restoring cached king safety directly from the packed bits
+- Added explicit regression coverage for promotion undo state restoration so deep perft catches mailbox / occupancy mismatches immediately
+
+Benchmark command:
+
+```bash
+BENCH_DEPTH=7 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Perft tricks: false
+Nodes: 178633661
+Elapsed: 7.08912363s
+CPU profile: .codex-tmp/bench-perft-no-tricks-v12.cpu.prof
+```
+
+Interpretation:
+
+- `v12` is a large raw updater win on top of `v11`, cutting another full second from the depth-7 no-tricks benchmark
+- `MakeMove` and `UnMakeMove` still dominate, but they now account for materially less total runtime and the movegen refactor from `v11` remains intact
 
 ## Update Rules
 

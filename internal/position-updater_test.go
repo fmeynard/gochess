@@ -395,4 +395,50 @@ func TestPositionUpdater_UnMakeMove(t *testing.T) {
 		assert.Equal(t, whiteKingSafety, pos.whiteKingSafety)
 		assert.Equal(t, blackKingSafety, pos.blackKingSafety)
 	})
+
+	t.Run("Promotion without capture restores occupancy", func(t *testing.T) {
+		pos, _ := NewPositionFromFEN("4k3/3P4/8/8/8/8/8/4K3 w - - 0 1")
+		move := NewMove(Piece(White|Pawn), D7, D8, QueenPromotion)
+
+		beforeBoard := pos.board
+		beforeOccupied := pos.occupied
+		beforeWhiteOccupied := pos.whiteOccupied
+		beforeBlackOccupied := pos.blackOccupied
+		beforeQueenBoard := pos.queenBoard
+		beforePawnBoard := pos.pawnBoard
+
+		history := engine.positionUpdater.MakeMove(pos, move)
+		engine.positionUpdater.UnMakeMove(pos, history)
+
+		assert.Equal(t, beforeBoard, pos.board)
+		assert.Equal(t, beforeOccupied, pos.occupied)
+		assert.Equal(t, beforeWhiteOccupied, pos.whiteOccupied)
+		assert.Equal(t, beforeBlackOccupied, pos.blackOccupied)
+		assert.Equal(t, beforeQueenBoard, pos.queenBoard)
+		assert.Equal(t, beforePawnBoard, pos.pawnBoard)
+	})
+
+	t.Run("Promotion with capture restores occupancy", func(t *testing.T) {
+		pos, _ := NewPositionFromFEN("2r1k3/3P4/8/8/8/8/8/4K3 w - - 0 1")
+		move := NewMove(Piece(White|Pawn), D7, C8, QueenPromotion)
+
+		beforeBoard := pos.board
+		beforeOccupied := pos.occupied
+		beforeWhiteOccupied := pos.whiteOccupied
+		beforeBlackOccupied := pos.blackOccupied
+		beforeQueenBoard := pos.queenBoard
+		beforeRookBoard := pos.rookBoard
+		beforePawnBoard := pos.pawnBoard
+
+		history := engine.positionUpdater.MakeMove(pos, move)
+		engine.positionUpdater.UnMakeMove(pos, history)
+
+		assert.Equal(t, beforeBoard, pos.board)
+		assert.Equal(t, beforeOccupied, pos.occupied)
+		assert.Equal(t, beforeWhiteOccupied, pos.whiteOccupied)
+		assert.Equal(t, beforeBlackOccupied, pos.blackOccupied)
+		assert.Equal(t, beforeQueenBoard, pos.queenBoard)
+		assert.Equal(t, beforeRookBoard, pos.rookBoard)
+		assert.Equal(t, beforePawnBoard, pos.pawnBoard)
+	})
 }
