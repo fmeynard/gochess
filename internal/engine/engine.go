@@ -2,12 +2,17 @@ package engine
 
 import (
 	board "chessV2/internal/board"
+	"chessV2/internal/eval"
 	"chessV2/internal/movegen"
+	"chessV2/internal/search"
+	"time"
 )
 
 type Engine struct {
 	moveGenerator   *movegen.PseudoLegalMoveGenerator
 	positionUpdater board.MoveApplier
+	evaluator       eval.Evaluator
+	searcher        search.Searcher
 	usePerftTricks  bool
 }
 
@@ -20,10 +25,14 @@ const (
 func NewEngine() *Engine {
 	moveGenerator := movegen.NewPseudoLegalMoveGenerator()
 	positionUpdater := board.NewPositionUpdater()
+	evaluator := eval.NewZeroEvaluator()
+	searcher := search.NewAlphaBetaSearcher(moveGenerator, positionUpdater, evaluator)
 
 	return &Engine{
 		moveGenerator:   moveGenerator,
 		positionUpdater: positionUpdater,
+		evaluator:       evaluator,
+		searcher:        searcher,
 		usePerftTricks:  true,
 	}
 }
@@ -37,9 +46,27 @@ func (e *Engine) SetPerftTricks(enabled bool) {
 	e.positionUpdater = board.NewPlainPositionUpdater()
 }
 
-func (e *Engine) StartGame() {}
+func (e *Engine) StartGame() {
+	e.searcher.NewGame()
+}
 
 func (e *Engine) Move() {}
+
+func (e *Engine) BestMoveDepth(pos *board.Position, depth int) (board.Move, error) {
+	result, err := e.searcher.Search(pos, search.Limits{Depth: depth})
+	if err != nil {
+		return board.Move{}, err
+	}
+	return result.BestMove, nil
+}
+
+func (e *Engine) BestMoveTime(pos *board.Position, moveTime time.Duration) (board.Move, error) {
+	result, err := e.searcher.Search(pos, search.Limits{MoveTime: moveTime})
+	if err != nil {
+		return board.Move{}, err
+	}
+	return result.BestMove, nil
+}
 
 func (e *Engine) LegalMoves(pos *board.Position) []board.Move {
 	var buf [MaxLegalMoves]board.Move
