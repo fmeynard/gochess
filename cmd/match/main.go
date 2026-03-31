@@ -113,11 +113,7 @@ func renderSnapshot(snapshot match.Snapshot) {
 	b.WriteString("│ Game │ Color │ Status  │ Reason              │ Plies │ Time   │\n")
 	b.WriteString("├──────┼───────┼─────────┼─────────────────────┼───────┼────────┤\n")
 
-	start := 0
-	if len(snapshot.Games) > maxDisplayedGames {
-		start = len(snapshot.Games) - maxDisplayedGames
-	}
-	for _, game := range snapshot.Games[start:] {
+	for _, game := range displayedGames(snapshot.Games) {
 		b.WriteString(fmt.Sprintf(
 			"│ %4d │ %-5s │ %-7s │ %-19s │ %5d │ %6s │\n",
 			game.GameIndex,
@@ -159,6 +155,41 @@ func truncate(s string, max int) string {
 		return s[:max]
 	}
 	return s[:max-3] + "..."
+}
+
+func displayedGames(games []match.GameRecord) []match.GameRecord {
+	selected := make([]match.GameRecord, 0, maxDisplayedGames)
+
+	for _, game := range games {
+		if game.Status == "running" {
+			selected = append(selected, game)
+		}
+	}
+
+	if len(selected) < maxDisplayedGames {
+		for _, game := range games {
+			if game.Status == "pending" {
+				selected = append(selected, game)
+				if len(selected) == maxDisplayedGames {
+					return selected
+				}
+			}
+		}
+	}
+
+	if len(selected) == 0 {
+		start := 0
+		if len(games) > maxDisplayedGames {
+			start = len(games) - maxDisplayedGames
+		}
+		return games[start:]
+	}
+
+	if len(selected) > maxDisplayedGames {
+		return selected[:maxDisplayedGames]
+	}
+
+	return selected
 }
 
 func box(title string, lines []string) string {
