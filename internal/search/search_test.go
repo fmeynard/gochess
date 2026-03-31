@@ -5,6 +5,7 @@ import (
 	"chessV2/internal/eval"
 	"chessV2/internal/movegen"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -74,4 +75,36 @@ func TestAlphaBetaSearcherSearchRejectsInvalidDepth(t *testing.T) {
 
 	_, err = searcher.Search(pos, Limits{Depth: 0})
 	assert.ErrorIs(t, err, ErrInvalidLimits)
+}
+
+func TestAlphaBetaSearcherSearchWithMoveTime(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN(board.FenStartPos)
+	assert.NoError(t, err)
+
+	result, err := searcher.Search(pos, Limits{MoveTime: 20 * time.Millisecond})
+	assert.NoError(t, err)
+	assert.NotEqual(t, board.Move{}, result.BestMove)
+	assert.GreaterOrEqual(t, result.Stats.Depth, 0)
+	assert.GreaterOrEqual(t, result.Stats.Time, time.Duration(0))
+}
+
+func TestAlphaBetaSearcherSearchWithDepthAndMoveTime(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN("3qk3/8/8/8/8/8/3Q4/4K3 w - - 0 1")
+	assert.NoError(t, err)
+
+	result, err := searcher.Search(pos, Limits{Depth: 2, MoveTime: 50 * time.Millisecond})
+	assert.NoError(t, err)
+	assert.NotEqual(t, board.Move{}, result.BestMove)
+	assert.GreaterOrEqual(t, result.Stats.Depth, 0)
+	assert.LessOrEqual(t, result.Stats.Depth, 2)
 }
