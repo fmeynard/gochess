@@ -150,11 +150,13 @@ The first `hot` baseline was taken on `benchmark-v14`. Because the harness chang
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | v14 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 6.78s | hot baseline |
 | v15 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 6.50s | -0.28s (-4.1%) |
+| v16 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 6.30s | -0.20s (-3.1%) |
 
 Recorded samples:
 
 - `v14`: `6.822986189s`, `6.745086913s`
 - `v15`: `6.533347471s`, `6.462752555s`
+- `v16`: `6.319541638s`, `6.295790877s`
 
 Note: `v7` timings were noisy in single-shot runs because `./scripts/bench-perft.sh` uses `go run`. The recorded `v7` numbers above are medians from four local samples taken on March 31, 2026:
 

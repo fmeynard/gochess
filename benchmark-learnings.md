@@ -5,7 +5,7 @@ This file records practical lessons from the perft optimization work so future s
 ## Current Best Known Result
 
 - Best raw benchmark so far: `benchmark-v14`
-- Best hot benchmark so far: `benchmark-v15`
+- Best hot benchmark so far: `benchmark-v16`
 - Target: `Perft position 3`
 - FEN: `8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1`
 - Mode: `BENCH_NO_PERFT_TRICKS=1`
@@ -16,8 +16,8 @@ This file records practical lessons from the perft optimization work so future s
 Current preferred reference:
 
 - Harness: `hot`
-- Samples: `6.533347471s`, `6.462752555s`
-- Recorded reference: `6.50s`
+- Samples: `6.319541638s`, `6.295790877s`
+- Recorded reference: `6.30s`
 
 ## Strategy Context
 
@@ -111,6 +111,20 @@ Takeaway:
 
 - Magic-style slider indexing is a promising direction in this codebase when the index computation is just `(occ&mask)*magic >> shift`.
 - Reusing the same slider lookup path across movegen and attack checks is a good multiplier.
+
+### v16
+
+- Replacing directional king-ray scans in `computePositionAnalysis(...)` with candidate pinner iteration over `betweenMasks` paid.
+- The combination of:
+  - magic slider lookups from `v15`
+  - precomputed `betweenMasks`
+  - pin/check discovery by candidate iteration
+  produced another measurable win.
+
+Takeaway:
+
+- Once slider lookups are cheap, the next good target is to remove repeated directional first-blocker scans from pin/check analysis.
+- `betweenMasks[from][to]` is a useful primitive and should be reused in later legality work.
 
 ## What Did Not Pay
 
@@ -222,6 +236,10 @@ Preferred next experiments:
 5. Explore slider attack generation upgrades that are useful beyond perft, including denser lookup schemes or magic-style indexing.
 6. Reduce move materialization overhead in legal generation without splitting the code into many tiny helpers.
 7. Extend magic-based attacks into `computePositionAnalysis(...)` so check and pin discovery also stop paying repeated directional scans.
+
+Completed:
+
+- `computePositionAnalysis(...)` now uses `betweenMasks` and candidate pinner iteration.
 
 ## Architectural Guardrails
 

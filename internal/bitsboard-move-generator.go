@@ -27,10 +27,12 @@ var (
 	rayDirections               = [8]int8{West, East, South, North, SouthWest, SouthEast, NorthWest, NorthEast}
 	sliderAttackMasks           [64][8]uint64
 	queenAttacksMask            [64]uint64
+	orthogonalAttacksMask       [64]uint64
 	knightAttacksMask           [64]uint64
 	kingAttacksMask             [64]uint64
 	diagonalAttacksMask         [64][4]uint64
 	diagonalCombinedAttacksMask [64]uint64
+	betweenMasks                [64][64]uint64
 )
 
 type BitsBoardMoveGenerator struct {
@@ -111,10 +113,39 @@ func (g *BitsBoardMoveGenerator) initSliderAttackMasks() {
 			}
 			g.sliderAttackMasks[idx][dirIdx] = mask
 			queenAttacksMask[idx] |= mask
+			if dirIdx < 4 {
+				orthogonalAttacksMask[idx] |= mask
+			}
 		}
 	}
 
 	sliderAttackMasks = g.sliderAttackMasks
+	initBetweenMasks()
+}
+
+func initBetweenMasks() {
+	for from := int8(0); from < 64; from++ {
+		for to := int8(0); to < 64; to++ {
+			if from == to {
+				continue
+			}
+			mask := uint64(0)
+			for dirIdx, dir := range rayDirections {
+				ray := sliderAttackMasks[from][dirIdx]
+				if ray&(uint64(1)<<to) == 0 {
+					continue
+				}
+				next := from + dir
+				for next != to {
+					mask |= uint64(1) << next
+					next += dir
+				}
+				mask &^= uint64(1) << to
+				betweenMasks[from][to] = mask
+				break
+			}
+		}
+	}
 }
 
 func (g *BitsBoardMoveGenerator) initKnightAttacksMasks() {
