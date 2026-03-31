@@ -70,6 +70,10 @@ BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof
 
 ## Results
 
+### Tricks Off
+
+These results are the closest raw movegen / make-unmake comparison across versions.
+
 | Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | v0 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 24.83s | baseline |
@@ -78,7 +82,15 @@ BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof
 | v3 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 5.47s | -2.99s (-35.4%) |
 | v4 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 2.28s | -3.19s (-58.3%) |
 | v5 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 1.67s | -0.61s (-26.5%) |
-| v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 229ms / 921ms | tricks on / off |
+| v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 921ms | -0.75s (-45.0%) |
+
+### Tricks On
+
+These results include perft-only tricks such as bulk counting and TT. `v6` is the first baseline in this category.
+
+| Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
+| --- | --- | --- | --- | ---: | ---: | ---: |
+| v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 229ms | baseline |
 
 ## Experimental Tiers On v5 Base
 
