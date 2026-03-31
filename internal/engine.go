@@ -4,7 +4,7 @@ import "math/bits"
 
 type Engine struct {
 	moveGenerator   *BitsBoardMoveGenerator
-	positionUpdater *PositionUpdater
+	positionUpdater positionUpdater
 	usePerftTricks  bool
 }
 
@@ -13,10 +13,6 @@ const (
 	MaxLegalMoves = 256
 	MaxTargets    = 28
 )
-
-var promotionFlags = [4]int8{QueenPromotion, KnightPromotion, BishopPromotion, RookPromotion}
-
-var rayDirections = [8]int8{West, East, South, North, SouthWest, SouthEast, NorthWest, NorthEast}
 
 func NewEngine() *Engine {
 	moveGenerator := NewBitsBoardMoveGenerator()
@@ -31,110 +27,16 @@ func NewEngine() *Engine {
 
 func (e *Engine) SetPerftTricks(enabled bool) {
 	e.usePerftTricks = enabled
-	e.positionUpdater.SetTrackZobrist(enabled)
+	if enabled {
+		e.positionUpdater = NewPositionUpdater(e.moveGenerator)
+		return
+	}
+	e.positionUpdater = NewPlainPositionUpdater(e.moveGenerator)
 }
 
 func (e *Engine) StartGame() {}
 
 func (e *Engine) Move() {}
-
-type posInfo struct {
-	inCheck      bool
-	checkerCount int
-	evasionMask  uint64
-	pinnedMask   uint64
-	pinCount     int
-	pinSquares   [8]int8
-	pinRayMasks  [8]uint64
-}
-
-func computePosInfo(pos *Position, kingIdx int8, friendlyOcc, enemyOcc uint64) posInfo {
-	var info posInfo
-	checkers := uint64(0)
-	blockMask := uint64(0)
-
-	var pawnColorIdx int
-	if pos.activeColor == White {
-		pawnColorIdx = 1
-	} else {
-		pawnColorIdx = 0
-	}
-	checkers |= pawnAttacksBy[pawnColorIdx][kingIdx] & pos.pawnBoard & enemyOcc
-	checkers |= knightAttacksMask[kingIdx] & pos.knightBoard & enemyOcc
-
-	rookQueens := (pos.rookBoard | pos.queenBoard) & enemyOcc
-	bishopQueens := (pos.bishopBoard | pos.queenBoard) & enemyOcc
-
-	for dirIdx := 0; dirIdx < 8; dirIdx++ {
-		var sliders uint64
-		if dirIdx < 4 {
-			sliders = rookQueens
-		} else {
-			sliders = bishopQueens
-		}
-		if sliders == 0 {
-			continue
-		}
-		ray := sliderAttackMasks[kingIdx][dirIdx]
-		if ray == 0 {
-			continue
-		}
-		dir := rayDirections[dirIdx]
-		first := firstBlockerOnRay(pos.occupied, ray, dir)
-		if first == 0 {
-			continue
-		}
-		if first&enemyOcc != 0 {
-			if first&sliders != 0 {
-				checkers |= first
-				checkerIdx := int8(bits.TrailingZeros64(first))
-				blockMask |= ray ^ sliderAttackMasks[checkerIdx][dirIdx]
-			}
-		} else if first&friendlyOcc != 0 {
-			second := firstBlockerOnRay(pos.occupied&^first, ray, dir)
-			if second != 0 && second&sliders != 0 {
-				info.pinnedMask |= first
-				info.pinSquares[info.pinCount] = int8(bits.TrailingZeros64(first))
-				info.pinRayMasks[info.pinCount] = ray
-				info.pinCount++
-			}
-		}
-	}
-
-	info.checkerCount = bits.OnesCount64(checkers)
-	info.inCheck = info.checkerCount > 0
-	if info.checkerCount == 1 {
-		info.evasionMask = checkers | blockMask
-	}
-	return info
-}
-
-func (pi *posInfo) pinRayFor(sq int8) uint64 {
-	for i := 0; i < pi.pinCount; i++ {
-		if pi.pinSquares[i] == sq {
-			return pi.pinRayMasks[i]
-		}
-	}
-	return 0
-}
-
-func classifyMove(pos *Position, piece Piece, startIdx, targetIdx int8) int8 {
-	if piece.Type() == King && absInt8(targetIdx-startIdx) == 2 {
-		return Castle
-	}
-	if piece.Type() == Pawn {
-		if pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx {
-			return EnPassant
-		}
-		if absInt8(targetIdx-startIdx) == 16 {
-			return PawnDoubleMove
-		}
-	}
-	if pos.board[targetIdx] != NoPiece {
-		return Capture
-	}
-	return NormalMove
-}
 
 func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	count := 0
@@ -152,7 +54,7 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	enemyOcc := pos.OpponentOccupiedMask()
 	enemyColor := pos.OpponentColor()
 
-	info := computePosInfo(pos, kingIdx, friendlyOcc, enemyOcc)
+	info := computePositionAnalysis(pos, kingIdx, friendlyOcc, enemyOcc)
 	occWithoutKing := pos.occupied &^ (1 << kingIdx)
 
 	piecesMask := friendlyOcc

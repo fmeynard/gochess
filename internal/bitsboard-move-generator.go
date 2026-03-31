@@ -21,6 +21,7 @@ var (
 	KingOffsets   = []int8{-9, -8, -7, -1, 1, 7, 8, 9}
 	KnightOffsets = []int8{-17, -15, -10, -6, 6, 10, 15, 17}
 
+	rayDirections               = [8]int8{West, East, South, North, SouthWest, SouthEast, NorthWest, NorthEast}
 	sliderAttackMasks           [64][8]uint64
 	queenAttacksMask            [64]uint64
 	knightAttacksMask           [64]uint64

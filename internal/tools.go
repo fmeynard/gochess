@@ -59,6 +59,28 @@ func leastSignificantOne(bb uint64) int8 {
 	return int8(bits.TrailingZeros64(bb))
 }
 
+func encodeKingSafety(v int8) uint32 {
+	switch v {
+	case KingIsSafe:
+		return 1
+	case KingIsCheck:
+		return 2
+	default:
+		return 0
+	}
+}
+
+func decodeKingSafety(v uint32) int8 {
+	switch v {
+	case 1:
+		return KingIsSafe
+	case 2:
+		return KingIsCheck
+	default:
+		return NotCalculated
+	}
+}
+
 // mostSignificantBit returns the position of the highest set bit (most significant bit)
 func mostSignificantBit(x uint64) int8 {
 	return int8(63 - bits.LeadingZeros64(x))

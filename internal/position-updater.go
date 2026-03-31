@@ -1,37 +1,25 @@
 package internal
 
+type positionUpdater interface {
+	MakeMove(pos *Position, move Move) MoveHistory
+	UnMakeMove(pos *Position, history MoveHistory)
+	IsMoveAffectsKing(pos *Position, m Move, kingColor int8) bool
+}
+
 type PositionUpdater struct {
 	moveGenerator *BitsBoardMoveGenerator
-	trackZobrist  bool
 }
 
 func kingAffectMask(kingIdx int8) uint64 {
 	return queenAttacksMask[kingIdx] | knightAttacksMask[kingIdx] | (uint64(1) << kingIdx)
 }
 
-func NewPositionUpdater(moveGenerator *BitsBoardMoveGenerator) *PositionUpdater {
-	return &PositionUpdater{
-		moveGenerator: moveGenerator,
-		trackZobrist:  true,
-	}
+func NewPositionUpdater(moveGenerator *BitsBoardMoveGenerator) positionUpdater {
+	return NewZobristPositionUpdater(NewPlainPositionUpdater(moveGenerator))
 }
 
-func (updater *PositionUpdater) SetTrackZobrist(enabled bool) {
-	updater.trackZobrist = enabled
-}
-
-func isCastleMove(move Move) bool {
-	return move.flag == Castle || (move.piece.Type() == King && absInt8(move.EndIdx()-move.StartIdx()) == 2)
-}
-
-func isEnPassantMove(pos *Position, move Move) bool {
-	if move.flag == EnPassant {
-		return true
-	}
-	if move.piece.Type() != Pawn || pos.enPassantIdx == NoEnPassant || move.EndIdx() != pos.enPassantIdx {
-		return false
-	}
-	return pos.PieceAt(move.EndIdx()) == NoPiece && absInt8(FileFromIdx(move.EndIdx())-FileFromIdx(move.StartIdx())) == 1
+func NewPlainPositionUpdater(moveGenerator *BitsBoardMoveGenerator) *PositionUpdater {
+	return &PositionUpdater{moveGenerator: moveGenerator}
 }
 
 func castleRookSquares(activeColor int8, kingEndIdx int8) (int8, int8) {
@@ -76,12 +64,9 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 		move:                move,
 		capturedPiece:       capturedPiece,
 		captureIdx:          captureIdx,
-		meta:                packMoveHistoryMeta(pos),
+		packedState:         packMoveHistoryMeta(pos),
 		whiteKingAffectMask: pos.whiteKingAffectMask,
 		blackKingAffectMask: pos.blackKingAffectMask,
-	}
-	if updater.trackZobrist {
-		history.zobristKey = pos.zobristKey
 	}
 
 	if isEnPassant {
@@ -172,41 +157,6 @@ func (updater *PositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 		pos.activeColor = White
 	}
 
-	if updater.trackZobrist {
-		key := history.zobristKey
-		key ^= zobristPieceKey(startPiece, startPieceIdx)
-		if capturedPiece != NoPiece {
-			key ^= zobristPieceKey(capturedPiece, captureIdx)
-		}
-
-		finalPiece := startPiece
-		switch move.flag {
-		case QueenPromotion:
-			finalPiece = Piece(startPiece.Color() | Queen)
-		case KnightPromotion:
-			finalPiece = Piece(startPiece.Color() | Knight)
-		case BishopPromotion:
-			finalPiece = Piece(startPiece.Color() | Bishop)
-		case RookPromotion:
-			finalPiece = Piece(startPiece.Color() | Rook)
-		}
-		key ^= zobristPieceKey(finalPiece, endPieceIdx)
-
-		if isCastleMove(move) {
-			rookStartIdx, rookEndIdx := castleRookSquares(startPiece.Color(), endPieceIdx)
-			rook := Piece(startPiece.Color() | Rook)
-			key ^= zobristPieceKey(rook, rookStartIdx)
-			key ^= zobristPieceKey(rook, rookEndIdx)
-		}
-
-		key ^= zobristCastleKey(history.whiteCastleRights(), history.blackCastleRights())
-		key ^= zobristCastleKey(pos.whiteCastleRights, pos.blackCastleRights)
-		key ^= zobristEPKey(history.enPassantIdx())
-		key ^= zobristEPKey(pos.enPassantIdx)
-		key ^= zobristSideToMove
-		pos.zobristKey = key
-	}
-
 	return history
 }
 
@@ -240,10 +190,6 @@ func (updater *PositionUpdater) UnMakeMove(pos *Position, history MoveHistory) {
 
 	if history.capturedPiece != NoPiece {
 		pos.addPieceAt(history.captureIdx, history.capturedPiece)
-	}
-
-	if updater.trackZobrist {
-		pos.zobristKey = history.zobristKey
 	}
 }
 

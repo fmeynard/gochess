@@ -7,7 +7,15 @@ type MoveHistory struct {
 	move                Move
 	capturedPiece       Piece
 	captureIdx          int8
-	meta                uint32
+	// packedState layout:
+	// bits  0.. 5: previous white king square
+	// bits  6..11: previous black king square
+	// bits 12..18: previous en-passant square encoded as idx+1, 0 means "none"
+	// bits 19..20: previous white castle rights
+	// bits 21..22: previous black castle rights
+	// bits 23..24: previous white king safety cache encoded via encodeKingSafety
+	// bits 25..26: previous black king safety cache encoded via encodeKingSafety
+	packedState uint32
 }
 
 const (
@@ -19,28 +27,6 @@ const (
 	metaWhiteSafetyShift = 23
 	metaBlackSafetyShift = 25
 )
-
-func encodeKingSafety(v int8) uint32 {
-	switch v {
-	case KingIsSafe:
-		return 1
-	case KingIsCheck:
-		return 2
-	default:
-		return 0
-	}
-}
-
-func decodeKingSafety(v uint32) int8 {
-	switch v {
-	case 1:
-		return KingIsSafe
-	case 2:
-		return KingIsCheck
-	default:
-		return NotCalculated
-	}
-}
 
 func packMoveHistoryMeta(pos *Position) uint32 {
 	ep := uint32(pos.enPassantIdx + 1)
@@ -54,29 +40,29 @@ func packMoveHistoryMeta(pos *Position) uint32 {
 }
 
 func (h MoveHistory) whiteKingIdx() int8 {
-	return int8((h.meta >> metaWhiteKingShift) & 0x3F)
+	return int8((h.packedState >> metaWhiteKingShift) & 0x3F)
 }
 
 func (h MoveHistory) blackKingIdx() int8 {
-	return int8((h.meta >> metaBlackKingShift) & 0x3F)
+	return int8((h.packedState >> metaBlackKingShift) & 0x3F)
 }
 
 func (h MoveHistory) enPassantIdx() int8 {
-	return int8((h.meta>>metaEnPassantShift)&0x7F) - 1
+	return int8((h.packedState>>metaEnPassantShift)&0x7F) - 1
 }
 
 func (h MoveHistory) whiteCastleRights() int8 {
-	return int8((h.meta >> metaWhiteCastleShift) & 0x3)
+	return int8((h.packedState >> metaWhiteCastleShift) & 0x3)
 }
 
 func (h MoveHistory) blackCastleRights() int8 {
-	return int8((h.meta >> metaBlackCastleShift) & 0x3)
+	return int8((h.packedState >> metaBlackCastleShift) & 0x3)
 }
 
 func (h MoveHistory) whiteKingSafety() int8 {
-	return decodeKingSafety((h.meta >> metaWhiteSafetyShift) & 0x3)
+	return decodeKingSafety((h.packedState >> metaWhiteSafetyShift) & 0x3)
 }
 
 func (h MoveHistory) blackKingSafety() int8 {
-	return decodeKingSafety((h.meta >> metaBlackSafetyShift) & 0x3)
+	return decodeKingSafety((h.packedState >> metaBlackSafetyShift) & 0x3)
 }

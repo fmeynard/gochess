@@ -1,5 +1,7 @@
 package internal
 
+var promotionFlags = [4]int8{QueenPromotion, KnightPromotion, BishopPromotion, RookPromotion}
+
 // Move
 // for later
 // [ 8bits chunks]
@@ -31,6 +33,38 @@ const (
 
 func NewMove(piece Piece, startIdx int8, endIdx int8, flag int8) Move {
 	return Move{piece, startIdx, endIdx, flag}
+}
+
+func isCastleMove(move Move) bool {
+	return move.flag == Castle || (move.piece.Type() == King && absInt8(move.EndIdx()-move.StartIdx()) == 2)
+}
+
+func isEnPassantMove(pos *Position, move Move) bool {
+	if move.flag == EnPassant {
+		return true
+	}
+	if move.piece.Type() != Pawn || pos.enPassantIdx == NoEnPassant || move.EndIdx() != pos.enPassantIdx {
+		return false
+	}
+	return pos.PieceAt(move.EndIdx()) == NoPiece && absInt8(FileFromIdx(move.EndIdx())-FileFromIdx(move.StartIdx())) == 1
+}
+
+func classifyMove(pos *Position, piece Piece, startIdx, targetIdx int8) int8 {
+	if piece.Type() == King && absInt8(targetIdx-startIdx) == 2 {
+		return Castle
+	}
+	if piece.Type() == Pawn {
+		if pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx {
+			return EnPassant
+		}
+		if absInt8(targetIdx-startIdx) == 16 {
+			return PawnDoubleMove
+		}
+	}
+	if pos.board[targetIdx] != NoPiece {
+		return Capture
+	}
+	return NormalMove
 }
 
 func (m Move) StartIdx() int8 {

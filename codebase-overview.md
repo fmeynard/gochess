@@ -1,194 +1,351 @@
 # Codebase Overview
 
-## Project purpose
+## Purpose
 
-This repository is a small Go chess engine prototype focused on legal move generation and perft-style validation.
+This repository is a small Go chess engine focused on:
 
-The code is centered around:
+- legal move generation
+- `make` / `unmake`
+- attack detection
+- perft-style correctness and performance benchmarking
 
-- bitboard-backed position representation
-- pseudo-legal move generation
-- legal move filtering through `make` / `unmake`
-- attack detection and check validation
+It is not a full playing engine yet. There is no search, evaluation, time management, or full UCI game loop.
 
-There is no full search, evaluation, UCI loop, or user-facing game loop yet.
+## High-Level Architecture
 
-## Repository layout
+The current architecture is centered around five layers:
 
-- `cmd/perft.go`: current executable entry point; runs perft divide from a FEN and depth
-- `cmd/main.go`: effectively unused placeholder
-- `internal/position.go`: board state, FEN parsing, occupancy and piece queries
-- `internal/bitsboard-move-generator.go`: pseudo-legal move generation and precomputed masks
-- `internal/engine.go`: legal move generation and recursive perft
-- `internal/position-updater.go`: `MakeMove`, `UnMakeMove`, and king-safety invalidation
-- `internal/check.go`: attack detection and check evaluation
-- `internal/move.go`: move representation
-- `internal/move-history.go`: undo snapshot used by `UnMakeMove`
-- `internal/tools.go`: square/index conversion and bit helpers
-- `internal/*_test.go`: rule-specific tests
+1. `Position`: mutable board state and cached state
+2. pseudo-legal move generation
+3. position analysis for checks / pins / evasions
+4. move application and undo
+5. perft recursion and optional perft-only tricks
 
-## Core design
+In practice, the hot path is:
 
-### Position
+1. generate pseudo-legal targets for a piece
+2. analyze the position once for checks and pins
+3. filter legal moves in `Engine`
+4. apply moves through `PositionUpdater`
+5. recurse for perft
+6. undo with `MoveHistory`
 
-`Position` is the main mutable board state.
+## Repository Layout
+
+### Entrypoints
+
+- `cmd/perft.go`
+  Legacy perft entrypoint.
+- `cmd/benchperft/main.go`
+  Main benchmark executable used by `scripts/bench-perft.sh`.
+- `cmd/main.go`
+  Placeholder.
+
+### Core engine files
+
+- `internal/position.go`
+  Mutable board state, FEN parsing, occupancy masks, piece boards, king caches.
+- `internal/position-analysis.go`
+  Position-level analysis for checks, pinned pieces, and evasion masks.
+- `internal/bitsboard-move-generator.go`
+  Pseudo-legal move generation and precomputed attack / ray tables.
+- `internal/engine.go`
+  Legal move generation entrypoint and recursive perft implementation.
+- `internal/position-updater.go`
+  Plain move application / undo without Zobrist maintenance.
+- `internal/position-updater-zobrist.go`
+  Zobrist decorator layered on top of the plain updater.
+- `internal/check.go`
+  Attack detection and `IsKingInCheck`.
+- `internal/move.go`
+  `Move` representation plus move classification helpers.
+- `internal/move-history.go`
+  Compact undo record used by `UnMakeMove`.
+- `internal/perft_tt.go`
+  Perft transposition table for tricks-enabled perft.
+- `internal/zobrist.go`
+  Zobrist table initialization and key helpers.
+- `internal/tools.go`
+  Generic square / bitboard helpers.
+
+### Tests
+
+- `internal/engine_legal_moves_test.go`
+  Exact legal move regressions.
+- `internal/engine_perft_test.go`
+  Perft regression counts.
+- `internal/position-updater_test.go`
+  Make / unmake, castle rights, en passant, active color.
+- `internal/position_updater_zobrist_test.go`
+  Plain updater vs Zobrist decorator behavior.
+- `internal/position_analysis_test.go`
+  Direct tests for check / pin analysis.
+- `internal/check_test.go`
+  Attack-detection helpers.
+- `internal/bitsboard-move-generator_test.go`
+  Pseudo-legal move generation tests and microbenchmarks.
+- `internal/move_test.go`
+  `Move` helper tests.
+- `internal/move_history_test.go`
+  Packed undo-state tests.
+
+### Scripts and docs
+
+- `scripts/bench-perft.sh`
+  Standard benchmark wrapper.
+- `scripts/perft-diff.sh`
+  Root-move diffing against Stockfish.
+- `benchmark-history.md`
+  Versioned benchmark log and optimization history.
+- `future-optimisations.md`
+  Remaining optimization ideas.
+
+## Position Model
+
+`Position` is a single mutable board object.
 
 It stores:
 
 - active color
 - castling rights for both sides
-- en passant target square
+- en passant square
 - white and black king squares
 - aggregate occupancy bitboards
+- color occupancy bitboards
 - per-piece-type bitboards
-- cached king safety state
+- board mailbox as `[64]Piece`
+- cached king safety values
+- cached king affect masks
+- Zobrist key
 
-The board is not stored as a `[64]Piece` array. Piece lookup is derived from occupancy plus piece-type bitboards.
+Important point:
 
-### Move generator
+- the engine now keeps both bitboards and a `[64]Piece` mailbox
+- hot code often uses the mailbox for direct piece lookup and the bitboards for attacks / occupancy
 
-`BitsBoardMoveGenerator` precomputes masks for:
-
-- king attacks
-- knight attacks
-- pawn pushes and captures
-- slider rays for bishops, rooks, and queens
-- diagonal attack masks used by check detection
-
-Pseudo-legal generation is split by piece family:
-
-- `PawnPseudoLegalMoves`
-- `KnightPseudoLegalMoves`
-- `KingPseudoLegalMoves`
-- `SliderPseudoLegalMoves`
-
-Castling path emptiness is handled in king pseudo-legal generation.
-
-### Engine
-
-`Engine.LegalMoves` is the main move-generation entry point.
-
-Flow:
-
-1. Iterate active-side pieces from the occupancy bitboard.
-2. Detect piece type from the per-piece bitboards.
-3. Generate pseudo-legal targets.
-4. Build a `Move`.
-5. If the side is not currently in check and the move does not affect king lines, accept it early.
-6. Otherwise `MakeMove`, test if the moving side king is still in check, then `UnMakeMove`.
-
-This is a standard pseudo-legal plus legality-filtering design.
-
-### Make / unmake
-
-`PositionUpdater` mutates a shared `*Position`.
-
-`MakeMove` currently handles:
-
-- normal piece movement
-- captures by overwriting destination square
-- castling rook movement
-- en passant capture resolution
-- en passant target updates after double pawn moves
-- castling-right updates when king or rook moves
-- king position updates
-- king-safety cache refresh when needed
-- active color toggle
-
-`UnMakeMove` restores state from `MoveHistory`, which is currently a near-full snapshot of the mutable position.
-
-## Check detection
-
-`check.go` implements attack tests for:
-
-- pawns
-- knights
-- kings
-- sliding pieces
-
-Sliding attacks are split into:
-
-- rank attacks
-- file attacks
-- diagonal attacks
-
-`IsKingInCheck` uses these helpers and also updates the cached king-safety fields in `Position`.
-
-## Current move / state model
+## Move Model
 
 `Move` stores:
 
-- moved piece
+- moving piece
 - start square
 - end square
 - flag
 
-Flags exist for:
+Flags currently include:
 
-- normal moves
+- `NormalMove`
+- promotion flags
+- `EnPassant`
+- `PawnDoubleMove`
+- `Castle`
+- `Capture`
+
+`internal/move.go` now also owns move-level helpers such as:
+
+- move classification
+- castle detection
+- en passant detection
+
+So special move semantics are more centralized than before.
+
+## Pseudo-Legal Move Generation
+
+`BitsBoardMoveGenerator` precomputes:
+
+- slider rays
+- knight attacks
+- king attacks
+- pawn push masks
+- pawn capture masks
+
+Pseudo-legal generation is split by piece family:
+
+- `PawnPseudoLegalMovesInto`
+- `KnightPseudoLegalMovesInto`
+- `KingPseudoLegalMovesInto`
+- `SliderPseudoLegalMovesInto`
+
+Current style:
+
+- generate target squares into caller-owned buffers
+- let `Engine` apply legality filtering
+
+## Position Analysis
+
+`internal/position-analysis.go` contains the intermediate analysis used by legal move generation.
+
+`positionAnalysis` currently computes:
+
+- whether the side to move is in check
+- number of checkers
+- evasion mask for single-check positions
+- pinned piece mask
+- per-piece pin rays
+
+This is used by `Engine.legalMovesInto(...)` to avoid unnecessary `make` / `unmake`.
+
+## Legal Move Generation
+
+`Engine.LegalMoves(...)` is the public legal move entrypoint.
+
+`legalMovesInto(...)` is the real hot path.
+
+The current flow is:
+
+1. Identify the moving side king square
+2. Compute one `positionAnalysis`
+3. Iterate friendly pieces from occupancy
+4. Generate pseudo-legal targets into a fixed buffer
+5. Filter by:
+   - double-check constraints
+   - single-check evasion mask
+   - pin ray restrictions
+   - direct king-square attack checks
+6. Fall back to `MakeMove` / `UnMakeMove` only for tricky cases that still need validation
+
+This is no longer a pure “generate everything then make/unmake everything” design.
+
+## Move Application and Undo
+
+There are now two updater modes.
+
+### Plain updater
+
+`internal/position-updater.go`
+
+Responsible for:
+
+- board mutation
+- captures
 - promotions
-- en passant
-- double pawn move
-- castle
-- capture
+- castling rook movement
+- en passant resolution
+- en passant target updates
+- castling-right updates
+- king square updates
+- restoring state from `MoveHistory`
 
-In practice, much of the current code infers move behavior from board state and squares rather than using the flag consistently.
+This updater does not maintain Zobrist keys.
 
-## Current strengths
+### Zobrist decorator
 
-- The architecture is already suitable for perft and search-oriented evolution.
-- Bitboard occupancy and per-piece boards are in place.
-- `make` / `unmake` already exists.
-- There is a decent set of tests for move generation, checks, en passant, castling, and undo behavior.
-- The code is small enough to refactor safely.
+`internal/position-updater-zobrist.go`
 
-## Current limitations and likely incomplete areas
+Responsible for:
 
-### Promotions
+- wrapping the plain updater
+- storing the previous Zobrist key in the undo record
+- applying incremental Zobrist updates on `MakeMove`
+- restoring the previous key on `UnMakeMove`
 
-Promotions are not fully integrated.
+This is effectively a decorator over the plain updater.
 
-`PawnPseudoLegalMoves` returns a `promotionIdx`, but `Engine.LegalMoves` currently ignores it and does not emit promotion move variants.
+### Constructor behavior
 
-### Move flags are underused
+- `NewPositionUpdater(...)` returns the Zobrist-decorated updater
+- `NewPlainPositionUpdater(...)` returns the plain updater
 
-The move flag exists, but the codebase does not yet rely on it as the single source of truth for special move handling.
+`Engine.SetPerftTricks(false)` switches to the plain updater because perft without TT does not need Zobrist maintenance.
 
-### Undo path is correct but heavy
+## MoveHistory
 
-`MoveHistory` stores most mutable position fields. This is simple and safe, but probably heavier than necessary for a hot perft/search path.
+`MoveHistory` is now a compact undo record, not a broad state snapshot.
 
-### Entrypoints are minimal
+It stores:
 
-The only practical executable today is `cmd/perft.go`.
+- previous Zobrist key
+- previous king affect masks
+- move
+- captured piece
+- capture square
+- packed previous state
 
-## Tests and execution notes
+The packed state includes:
 
-The repository includes tests for:
+- previous king squares
+- previous en passant square
+- previous castle rights
+- previous king safety caches
 
-- position parsing
-- piece helpers
-- pseudo-legal move generation
-- attack detection
-- make/unmake behavior
-- castling rights
-- en passant updates
+This file is intentionally more systems-level than user-facing.
 
-I was not able to run `go test ./...` in this environment because `go` is not installed on `PATH`.
+## Check Detection
 
-## Short mental model
+`internal/check.go` contains:
 
-The current engine is:
+- pawn attack checks
+- knight attack checks
+- slider attack checks
+- general square attack helper
+- `IsKingInCheck`
 
-- one mutable bitboard-based `Position`
-- pseudo-legal generators per piece family
-- legality filtering by `MakeMove` / `UnMakeMove`
-- attack-based king safety checks
-- perft-oriented validation tooling
+This code is shared by:
 
-If continuing work, the most natural next engine-level improvements are:
+- king legality checks
+- castling path checks
+- cached king safety updates
 
-- complete promotion handling
-- shrink `MoveHistory` into a compact undo record
-- make move flags authoritative for special move behavior
-- benchmark and reduce hot-path copying / allocations
+## Perft Path
+
+Perft lives in `internal/engine.go`.
+
+There are two relevant modes:
+
+### Tricks off
+
+- plain updater
+- no perft transposition table
+- no bulk-count caching benefits beyond the current control flow
+- closest to raw movegen / make-unmake performance
+
+### Tricks on
+
+- Zobrist updater
+- depth-2 bulk counting
+- perft transposition table
+
+This is why tricks-on and tricks-off timings should be read separately in `benchmark-history.md`.
+
+## Current Design Strengths
+
+- Clear split between pseudo-legal generation and legal filtering
+- `Position` is compact enough to mutate in place
+- direct tests exist for the refactor-sensitive helpers
+- perft-only tricks are now separated from the plain updater path
+- undo state is much lighter than earlier versions
+
+## Current Design Tensions
+
+These are the main areas to watch in future refactors.
+
+### 1. `Engine` still owns a lot of legal-filtering logic
+
+`engine.go` is better than before, but the legal filtering loop is still dense.
+
+### 2. `positionAnalysis` is intentionally internal
+
+It is not a method on `Position`; it is a derived analysis object used by legal move generation. That is a good separation, but it means analysis logic is spread across files rather than living directly on `Position`.
+
+### 3. `MoveHistory` is efficient but more opaque
+
+The packed representation is good for performance, but needs comments and tests to stay maintainable.
+
+## Short Mental Model
+
+If returning to this code later, the shortest useful model is:
+
+- `Position` is the mutable board and cache container
+- `BitsBoardMoveGenerator` generates pseudo-legal targets
+- `positionAnalysis` computes checks / pins once per node
+- `Engine` turns pseudo-legal targets into legal `Move`s
+- `PositionUpdater` applies and undoes moves
+- `ZobristPositionUpdater` decorates that path when hashing is needed
+- perft can run with or without tricks, and the two modes are intentionally different
+
+## Notes For Future Sessions
+
+- Do not assume `position-updater.go` owns hashing anymore; it does not
+- Do not assume `MoveHistory` is a broad snapshot; it is packed
+- Do not assume `engine.go` is pure orchestration; it still contains the main legal filtering loop
+- Read `benchmark-history.md` before making performance claims
