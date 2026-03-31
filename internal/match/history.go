@@ -18,6 +18,16 @@ type Summary struct {
 	Notes         string
 }
 
+type Record struct {
+	Wins   int
+	Draws  int
+	Losses int
+}
+
+func (r Record) Summary() string {
+	return fmt.Sprintf("%d/%d/%d", r.Wins, r.Draws, r.Losses)
+}
+
 func (s Summary) Score() float64 {
 	return float64(s.CurrentWins) + 0.5*float64(s.Draws)
 }

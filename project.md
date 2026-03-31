@@ -79,8 +79,10 @@ Useful flags:
 
 - `-opponent-tag <tag>`: build and play against a tagged revision
 - `-games <n>`: number of games to play, alternating colors automatically
+- `-parallel <n>`: number of games to run concurrently
 - `-movetime <ms>`: per-move time budget in milliseconds
 - `-notes "<text>"`: note included in the printed markdown row
+- `-plain`: line-based progress output instead of the live terminal dashboard
 
 Output shape:
 
