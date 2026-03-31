@@ -21,17 +21,19 @@ const FenStartPos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 const EmptyBoard = "8/8/8/8/8/8/8/8 w - - 0 1"
 
 type Position struct {
-	activeColor       int8
-	whiteCastleRights int8
-	blackCastleRights int8
-	enPassantIdx      int8
-	blackKingIdx      int8
-	whiteKingIdx      int8
-	occupied          uint64
-	blackOccupied     uint64
-	whiteOccupied     uint64
-	whiteKingSafety   int8
-	blackKingSafety   int8
+	activeColor         int8
+	whiteCastleRights   int8
+	blackCastleRights   int8
+	enPassantIdx        int8
+	blackKingIdx        int8
+	whiteKingIdx        int8
+	occupied            uint64
+	blackOccupied       uint64
+	whiteOccupied       uint64
+	whiteKingSafety     int8
+	blackKingSafety     int8
+	whiteKingAffectMask uint64
+	blackKingAffectMask uint64
 
 	queenBoard  uint64
 	kingBoard   uint64
@@ -165,6 +167,7 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 	pos.whiteKingSafety = NotCalculated
 	pos.blackKingSafety = NotCalculated
 	if hasWhiteKing {
+		pos.whiteKingAffectMask = kingAffectMask(pos.whiteKingIdx)
 		if IsKingInCheck(pos, White) {
 			pos.whiteKingSafety = KingIsCheck
 		} else {
@@ -173,6 +176,7 @@ func NewPositionFromFEN(fen string) (*Position, error) {
 	}
 
 	if hasBlackKing {
+		pos.blackKingAffectMask = kingAffectMask(pos.blackKingIdx)
 		if IsKingInCheck(pos, Black) {
 			pos.blackKingSafety = KingIsCheck
 		} else {
@@ -255,6 +259,103 @@ func (p *Position) addPieceAt(idx int8, piece Piece) {
 	}
 
 	p.board[idx] = piece
+}
+
+func (p *Position) movePiece(piece Piece, fromIdx, toIdx int8) {
+	if piece == NoPiece || fromIdx == toIdx {
+		return
+	}
+
+	fromMask := uint64(1 << fromIdx)
+	toMask := uint64(1 << toIdx)
+	moveMask := fromMask | toMask
+
+	p.occupied ^= moveMask
+
+	if piece.Color() == White {
+		p.whiteOccupied ^= moveMask
+	} else {
+		p.blackOccupied ^= moveMask
+	}
+
+	switch piece.Type() {
+	case King:
+		p.kingBoard ^= moveMask
+	case Queen:
+		p.queenBoard ^= moveMask
+	case Rook:
+		p.rookBoard ^= moveMask
+	case Bishop:
+		p.bishopBoard ^= moveMask
+	case Knight:
+		p.knightBoard ^= moveMask
+	case Pawn:
+		p.pawnBoard ^= moveMask
+	}
+
+	p.board[fromIdx] = NoPiece
+	p.board[toIdx] = piece
+}
+
+func (p *Position) capturePiece(movingPiece, capturedPiece Piece, fromIdx, toIdx int8) {
+	if movingPiece == NoPiece {
+		return
+	}
+
+	fromMask := uint64(1 << fromIdx)
+	toMask := uint64(1 << toIdx)
+
+	p.occupied &^= fromMask
+	p.occupied |= toMask
+
+	if movingPiece.Color() == White {
+		p.whiteOccupied &^= fromMask
+		p.whiteOccupied |= toMask
+		p.blackOccupied &^= toMask
+	} else {
+		p.blackOccupied &^= fromMask
+		p.blackOccupied |= toMask
+		p.whiteOccupied &^= toMask
+	}
+
+	switch capturedPiece.Type() {
+	case King:
+		p.kingBoard &^= toMask
+	case Queen:
+		p.queenBoard &^= toMask
+	case Rook:
+		p.rookBoard &^= toMask
+	case Bishop:
+		p.bishopBoard &^= toMask
+	case Knight:
+		p.knightBoard &^= toMask
+	case Pawn:
+		p.pawnBoard &^= toMask
+	}
+
+	switch movingPiece.Type() {
+	case King:
+		p.kingBoard &^= fromMask
+		p.kingBoard |= toMask
+	case Queen:
+		p.queenBoard &^= fromMask
+		p.queenBoard |= toMask
+	case Rook:
+		p.rookBoard &^= fromMask
+		p.rookBoard |= toMask
+	case Bishop:
+		p.bishopBoard &^= fromMask
+		p.bishopBoard |= toMask
+	case Knight:
+		p.knightBoard &^= fromMask
+		p.knightBoard |= toMask
+	case Pawn:
+		p.pawnBoard &^= fromMask
+		p.pawnBoard |= toMask
+	}
+
+	p.board[fromIdx] = NoPiece
+	p.board[toIdx] = movingPiece
 }
 
 func (p *Position) setPieceAt(idx int8, piece Piece) {

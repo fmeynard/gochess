@@ -66,6 +66,7 @@ BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof
 | v2 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 8.46s | -6.65s (-44.0%) |
 | v3 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 5.47s | -2.99s (-35.4%) |
 | v4 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 2.28s | -3.19s (-58.3%) |
+| v5 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 1.67s | -0.61s (-26.5%) |
 
 ## Optimization Log
 
@@ -180,6 +181,53 @@ FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
 Depth: 6
 Nodes: 11030083
 Elapsed: 2.281543999s
+CPU profile: .codex-tmp/bench-perft.cpu.prof
+```
+
+### v5
+
+Optimizations applied:
+
+- Changed king-safety maintenance in `MakeMove` from eager recomputation to lazy invalidation
+- Kept the existing king safety cache, but now mark it `NotCalculated` when a move may affect a king and defer the actual `IsKingInCheck` work until it is needed
+- Reduced immediate work inside `updateMovesAfterMove`, which was still showing up prominently after the v4 move-buffer pass
+- Specialized hot board updates in `MakeMove` / `UnMakeMove` with direct `movePiece` / `capturePiece` operations
+- Removed more generic remove/add sequences and unnecessary destination lookups from the move application hot path
+- Added a lightweight cached `kingAffectMask` per king so `IsMoveAffectsKing` can do a single mask test instead of recomputing per-call king attack influence
+
+Benchmark command:
+
+```bash
+./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Nodes: 11030083
+Elapsed: 2.122609595s
+CPU profile: .codex-tmp/bench-perft.cpu.prof
+```
+
+Updated after specializing hot board updates:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Nodes: 11030083
+Elapsed: 2.044383617s
+CPU profile: .codex-tmp/bench-perft.cpu.prof
+```
+
+Updated after adding cached king affect masks:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 6
+Nodes: 11030083
+Elapsed: 1.674778152s
 CPU profile: .codex-tmp/bench-perft.cpu.prof
 ```
 
