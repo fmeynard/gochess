@@ -2,6 +2,8 @@
 
 This file tracks repeatable performance measurements for the engine and the optimizations introduced between versions.
 
+See also: `benchmark-learnings.md` for qualitative lessons, failed experiments, and correctness pitfalls discovered during the benchmark work.
+
 ## Methodology
 
 Baseline profiling and timing were recorded on March 31, 2026 from the local repository using:
