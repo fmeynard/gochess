@@ -38,12 +38,209 @@ func (e *Engine) StartGame() {}
 
 func (e *Engine) Move() {}
 
+func appendMovesFromMask(pos *Position, piece Piece, startIdx int8, targets uint64, dst []Move, count int) int {
+	for targets != 0 {
+		targetIdx := int8(bits.TrailingZeros64(targets))
+		targets &^= 1 << targetIdx
+
+		flag := int8(NormalMove)
+		if piece.Type() == Pawn && absInt8(targetIdx-startIdx) == 16 {
+			flag = PawnDoubleMove
+		} else if pos.board[targetIdx] != NoPiece {
+			flag = Capture
+		}
+
+		dst[count] = Move{piece: piece, startIdx: startIdx, endIdx: targetIdx, flag: flag}
+		count++
+	}
+
+	return count
+}
+
+func appendPromotionMoves(piece Piece, startIdx int8, targets uint64, dst []Move, count int) int {
+	for targets != 0 {
+		targetIdx := int8(bits.TrailingZeros64(targets))
+		targets &^= 1 << targetIdx
+		for _, flag := range promotionFlags {
+			dst[count] = Move{piece: piece, startIdx: startIdx, endIdx: targetIdx, flag: flag}
+			count++
+		}
+	}
+	return count
+}
+
+func sliderTargetsMask(pos *Position, idx int8, pieceType int8, friendlyOcc uint64) uint64 {
+	var attacks uint64
+	var startDir, endDir int
+
+	switch pieceType {
+	case Bishop:
+		startDir, endDir = 4, 8
+	case Rook:
+		startDir, endDir = 0, 4
+	default:
+		startDir, endDir = 0, 8
+	}
+
+	for dirIdx := startDir; dirIdx < endDir; dirIdx++ {
+		ray := sliderAttackMasks[idx][dirIdx]
+		if ray == 0 {
+			continue
+		}
+
+		blocker := firstBlockerOnRay(pos.occupied, ray, rayDirections[dirIdx])
+		if blocker == 0 {
+			attacks |= ray
+			continue
+		}
+
+		blockerIdx := int8(bits.TrailingZeros64(blocker))
+		segment := ray ^ sliderAttackMasks[blockerIdx][dirIdx]
+		if blocker&friendlyOcc != 0 {
+			segment &^= blocker
+		}
+		attacks |= segment
+	}
+
+	return attacks
+}
+
+func (e *Engine) appendKingMoves(pos *Position, piece Piece, kingIdx int8, enemyColor int8, info positionAnalysis, dst []Move, count int) int {
+	friendlyOcc := pos.OccupancyMask(pos.activeColor)
+	targets := kingAttacksMask[kingIdx] &^ friendlyOcc
+	occWithoutKing := pos.occupied &^ (uint64(1) << kingIdx)
+
+	for targets != 0 {
+		targetIdx := int8(bits.TrailingZeros64(targets))
+		targets &^= 1 << targetIdx
+
+		occ := occWithoutKing &^ (uint64(1) << targetIdx)
+		if isSquareAttacked(pos, targetIdx, enemyColor, occ) {
+			continue
+		}
+
+		flag := int8(NormalMove)
+		if pos.board[targetIdx] != NoPiece {
+			flag = Capture
+		}
+		dst[count] = Move{piece: piece, startIdx: kingIdx, endIdx: targetIdx, flag: flag}
+		count++
+	}
+
+	if info.inCheck {
+		return count
+	}
+
+	castleRights := pos.CastleRights()
+	if pos.activeColor == White && kingIdx == E1 {
+		if castleRights&KingSideCastle != 0 &&
+			pos.board[F1] == NoPiece && pos.board[G1] == NoPiece &&
+			!isSquareAttacked(pos, F1, enemyColor, occWithoutKing) &&
+			!isSquareAttacked(pos, G1, enemyColor, occWithoutKing&^(uint64(1)<<G1)) {
+			dst[count] = Move{piece: piece, startIdx: E1, endIdx: G1, flag: Castle}
+			count++
+		}
+		if castleRights&QueenSideCastle != 0 &&
+			pos.board[B1] == NoPiece && pos.board[C1] == NoPiece && pos.board[D1] == NoPiece &&
+			!isSquareAttacked(pos, D1, enemyColor, occWithoutKing) &&
+			!isSquareAttacked(pos, C1, enemyColor, occWithoutKing&^(uint64(1)<<C1)) {
+			dst[count] = Move{piece: piece, startIdx: E1, endIdx: C1, flag: Castle}
+			count++
+		}
+		return count
+	}
+
+	if pos.activeColor == Black && kingIdx == E8 {
+		if castleRights&KingSideCastle != 0 &&
+			pos.board[F8] == NoPiece && pos.board[G8] == NoPiece &&
+			!isSquareAttacked(pos, F8, enemyColor, occWithoutKing) &&
+			!isSquareAttacked(pos, G8, enemyColor, occWithoutKing&^(uint64(1)<<G8)) {
+			dst[count] = Move{piece: piece, startIdx: E8, endIdx: G8, flag: Castle}
+			count++
+		}
+		if castleRights&QueenSideCastle != 0 &&
+			pos.board[B8] == NoPiece && pos.board[C8] == NoPiece && pos.board[D8] == NoPiece &&
+			!isSquareAttacked(pos, D8, enemyColor, occWithoutKing) &&
+			!isSquareAttacked(pos, C8, enemyColor, occWithoutKing&^(uint64(1)<<C8)) {
+			dst[count] = Move{piece: piece, startIdx: E8, endIdx: C8, flag: Castle}
+			count++
+		}
+	}
+
+	return count
+}
+
+func (e *Engine) appendPawnMoves(pos *Position, piece Piece, idx int8, info positionAnalysis, pinRay uint64, isPinned bool, inCheckColor int8, dst []Move, count int) int {
+	var quietTargets uint64
+	var captureTargets uint64
+	var promotionTargets uint64
+	var epTarget uint64
+
+	enemyOcc := pos.OpponentOccupiedMask()
+	if pos.activeColor == White {
+		oneStep := idx + 8
+		if oneStep < 64 && pos.board[oneStep] == NoPiece {
+			quietTargets |= uint64(1) << oneStep
+			if idx >= A2 && idx <= H2 && pos.board[idx+16] == NoPiece {
+				quietTargets |= uint64(1) << (idx + 16)
+			}
+		}
+		captureTargets = e.moveGenerator.whitePawnCapturesMasks[idx] & enemyOcc
+		if pos.enPassantIdx != NoEnPassant && e.moveGenerator.whitePawnCapturesMasks[idx]&(uint64(1)<<pos.enPassantIdx) != 0 {
+			epTarget = uint64(1) << pos.enPassantIdx
+		}
+	} else {
+		oneStep := idx - 8
+		if oneStep >= 0 && pos.board[oneStep] == NoPiece {
+			quietTargets |= uint64(1) << oneStep
+			if idx >= A7 && idx <= H7 && pos.board[idx-16] == NoPiece {
+				quietTargets |= uint64(1) << (idx - 16)
+			}
+		}
+		captureTargets = e.moveGenerator.blackPawnCapturesMasks[idx] & enemyOcc
+		if pos.enPassantIdx != NoEnPassant && e.moveGenerator.blackPawnCapturesMasks[idx]&(uint64(1)<<pos.enPassantIdx) != 0 {
+			epTarget = uint64(1) << pos.enPassantIdx
+		}
+	}
+
+	allTargets := quietTargets | captureTargets
+	if info.checkerCount == 1 {
+		allTargets &= info.evasionMask
+	}
+	if isPinned {
+		allTargets &= pinRay
+	}
+
+	if pos.activeColor == White {
+		promotionTargets = allTargets & (uint64(0xFF) << 56)
+	} else {
+		promotionTargets = allTargets & uint64(0xFF)
+	}
+	allTargets &^= promotionTargets
+
+	count = appendMovesFromMask(pos, piece, idx, allTargets, dst, count)
+	count = appendPromotionMoves(piece, idx, promotionTargets, dst, count)
+
+	if epTarget == 0 {
+		return count
+	}
+	if isPinned && pinRay&epTarget == 0 {
+		return count
+	}
+
+	move := Move{piece: piece, startIdx: idx, endIdx: int8(bits.TrailingZeros64(epTarget)), flag: EnPassant}
+	history := e.positionUpdater.MakeMove(pos, move)
+	if !IsKingInCheck(pos, inCheckColor) {
+		dst[count] = move
+		count++
+	}
+	e.positionUpdater.UnMakeMove(pos, history)
+	return count
+}
+
 func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	count := 0
-	var targets [MaxTargets]int8
-	initialColor := pos.activeColor
-	inCheckColor := initialColor
-	enPassantIdx := pos.enPassantIdx
+	inCheckColor := pos.activeColor
 
 	var kingIdx int8
 	if pos.activeColor == White {
@@ -55,160 +252,49 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	friendlyOcc := pos.OccupancyMask(pos.activeColor)
 	enemyOcc := pos.OpponentOccupiedMask()
 	enemyColor := pos.OpponentColor()
-
 	info := computePositionAnalysis(pos, kingIdx, friendlyOcc, enemyOcc)
-	occWithoutKing := pos.occupied &^ (1 << kingIdx)
 
-	piecesMask := friendlyOcc
+	kingPiece := pos.board[kingIdx]
+	if kingPiece.Type() == King && kingPiece.Color() == pos.activeColor {
+		count = e.appendKingMoves(pos, kingPiece, kingIdx, enemyColor, info, dst, count)
+	}
+
+	if info.checkerCount >= 2 {
+		return count
+	}
+
+	piecesMask := friendlyOcc &^ (uint64(1) << kingIdx)
 	for piecesMask != 0 {
 		idx := int8(bits.TrailingZeros64(piecesMask))
+		piecesMask &^= 1 << idx
 
 		piece := pos.board[idx]
 		pieceType := piece.Type()
-		var pseudoCount int
-
-		if info.checkerCount >= 2 && pieceType != King {
-			piecesMask &^= 1 << idx
-			continue
-		}
+		isPinned := info.pinnedMask&(1<<idx) != 0
+		pinRay := info.pinRayBySq[idx]
 
 		switch pieceType {
 		case Pawn:
-			pseudoCount, _ = e.moveGenerator.PawnPseudoLegalMovesInto(pos, idx, targets[:])
+			count = e.appendPawnMoves(pos, piece, idx, info, pinRay, isPinned, inCheckColor, dst, count)
 		case Knight:
-			pseudoCount = e.moveGenerator.KnightPseudoLegalMovesInto(pos, idx, targets[:])
-		case Bishop:
-			pseudoCount = e.moveGenerator.SliderPseudoLegalMovesInto(pos, idx, Bishop, targets[:])
-		case Rook:
-			pseudoCount = e.moveGenerator.SliderPseudoLegalMovesInto(pos, idx, Rook, targets[:])
-		case Queen:
-			pseudoCount = e.moveGenerator.SliderPseudoLegalMovesInto(pos, idx, Queen, targets[:])
-		case King:
-			pseudoCount = e.moveGenerator.KingPseudoLegalMovesInto(pos, idx, targets[:])
+			if isPinned {
+				continue
+			}
+			targets := knightAttacksMask[idx] &^ friendlyOcc
+			if info.checkerCount == 1 {
+				targets &= info.evasionMask
+			}
+			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
+		case Bishop, Rook, Queen:
+			targets := sliderTargetsMask(pos, idx, pieceType, friendlyOcc)
+			if info.checkerCount == 1 {
+				targets &= info.evasionMask
+			}
+			if isPinned {
+				targets &= pinRay
+			}
+			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
 		}
-
-		isPinned := info.pinnedMask&(1<<idx) != 0
-		var pinRay uint64
-		if isPinned {
-			pinRay = info.pinRayBySq[idx]
-		}
-
-		for i := 0; i < pseudoCount; i++ {
-			targetIdx := targets[i]
-			targetMask := uint64(1) << targetIdx
-			targetPiece := pos.board[targetIdx]
-			isEP := pieceType == Pawn && enPassantIdx != NoEnPassant && targetIdx == enPassantIdx
-
-			if pieceType == King {
-				if absInt8(targetIdx-idx) == 2 {
-					if info.inCheck {
-						continue
-					}
-					step := int8(1)
-					if targetIdx < idx {
-						step = -1
-					}
-					if isSquareAttacked(pos, idx+step, enemyColor, occWithoutKing) {
-						continue
-					}
-				}
-				occ := occWithoutKing &^ (1 << targetIdx)
-				if isSquareAttacked(pos, targetIdx, enemyColor, occ) {
-					continue
-				}
-				flag := int8(NormalMove)
-				if absInt8(targetIdx-idx) == 2 {
-					flag = Castle
-				} else if targetPiece != NoPiece {
-					flag = Capture
-				}
-				dst[count] = Move{piece: piece, startIdx: idx, endIdx: targetIdx, flag: flag}
-				count++
-				continue
-			}
-
-			if info.inCheck && info.checkerCount == 1 {
-				if !isEP && info.evasionMask&targetMask == 0 {
-					continue
-				}
-			}
-
-			if pieceType == Pawn && isPromotionSquare(pos.activeColor, targetIdx) {
-				if info.inCheck && info.checkerCount == 1 && info.evasionMask&targetMask == 0 {
-					continue
-				}
-				for _, flag := range promotionFlags {
-					move := Move{piece: piece, startIdx: idx, endIdx: targetIdx, flag: flag}
-					if !isPinned || pinRay&(1<<targetIdx) != 0 {
-						dst[count] = move
-						count++
-					}
-				}
-				continue
-			}
-
-			flag := int8(NormalMove)
-			if isEP {
-				flag = EnPassant
-			} else if pieceType == Pawn && absInt8(targetIdx-idx) == 16 {
-				flag = PawnDoubleMove
-			} else if targetPiece != NoPiece {
-				flag = Capture
-			}
-			move := Move{piece: piece, startIdx: idx, endIdx: targetIdx, flag: flag}
-
-			if !info.inCheck && !isPinned {
-				if !isEP {
-					dst[count] = move
-					count++
-					continue
-				}
-			}
-
-			if !info.inCheck && isPinned {
-				if pinRay&targetMask != 0 {
-					if isEP {
-						history := e.positionUpdater.MakeMove(pos, move)
-						if !IsKingInCheck(pos, inCheckColor) {
-							dst[count] = move
-							count++
-						}
-						e.positionUpdater.UnMakeMove(pos, history)
-						continue
-					}
-					dst[count] = move
-					count++
-				}
-				continue
-			}
-
-			if info.inCheck && info.checkerCount == 1 {
-				if isEP {
-					history := e.positionUpdater.MakeMove(pos, move)
-					if !IsKingInCheck(pos, inCheckColor) {
-						dst[count] = move
-						count++
-					}
-					e.positionUpdater.UnMakeMove(pos, history)
-					continue
-				}
-				if isPinned && pinRay&targetMask == 0 {
-					continue
-				}
-				dst[count] = move
-				count++
-				continue
-			}
-
-			history := e.positionUpdater.MakeMove(pos, move)
-			if !IsKingInCheck(pos, inCheckColor) {
-				dst[count] = move
-				count++
-			}
-			e.positionUpdater.UnMakeMove(pos, history)
-		}
-
-		piecesMask &^= 1 << idx
 	}
 
 	return count

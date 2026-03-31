@@ -111,6 +111,7 @@ These depth-7 numbers were taken on the same benchmark FEN on March 31, 2026. Th
 | v8 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 9.83s | baseline |
 | v9 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 9.16s | -0.67s (-6.8%) |
 | v10 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 8.95s | -0.21s (-2.3%) |
+| v11 | 2026-03-31 | Perft position 3 | 7 | 178,633,661 | 8.09s | -0.86s (-9.6%) |
 
 ### Tricks On
 
@@ -510,6 +511,38 @@ Interpretation:
 
 - `v10` keeps the benchmark focus strictly on the no-tricks path and pushes the raw depth-7 benchmark below `9s`
 - The remaining dominant costs are still `MakeMove`, `UnMakeMove`, and `legalMovesInto(...)`, so the next likely wins are either more specialization of the updater hot path or a larger legal-move generation refactor
+
+### v11
+
+Optimizations applied:
+
+- Reworked `legalMovesInto(...)` into specialized paths per piece family instead of the previous generic “pseudo-target list then branch per target” loop
+- Added direct king-move generation with attack-mask validation and castling checks up front
+- Added bitboard-based knight, slider, and pawn target generation/filtering so check evasion and pin constraints are applied as masks before move materialization
+- Restricted `MakeMove` / `UnMakeMove` legality validation to the remaining ambiguous case: en passant
+- Added a dedicated `sliderTargetsMask(...)` helper to build rook/bishop/queen targets from rays and first-blocker lookups instead of walking a temporary target list
+
+Benchmark command:
+
+```bash
+BENCH_DEPTH=7 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded output:
+
+```text
+FEN: 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1
+Depth: 7
+Perft tricks: false
+Nodes: 178633661
+Elapsed: 8.085356627s
+CPU profile: .codex-tmp/bench-perft-no-tricks-v11.cpu.prof
+```
+
+Interpretation:
+
+- `v11` is the first version where the heavy legal-move refactor lands cleanly and produces a large depth-7 no-tricks gain
+- The profile now shows `legalMovesInto(...)` much lower than before; the raw move application path is once again the main limit
 
 ## Update Rules
 
