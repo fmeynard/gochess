@@ -4,20 +4,20 @@ This file records practical lessons from the perft optimization work so future s
 
 ## Current Best Known Result
 
-- Best raw benchmark so far: `benchmark-v18`
-- Best hot benchmark so far: `benchmark-v18`
+- Best raw benchmark so far: `benchmark-v19`
+- Best hot benchmark so far: `benchmark-v19`
 - Target: `Perft position 3`
 - FEN: `8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1`
 - Mode: `BENCH_NO_PERFT_TRICKS=1`
 - Depth: `7`
 - Nodes: `178,633,661`
-- Time: `5.651284934s`
+- Time: `5.650972876s`
 
 Current preferred reference:
 
 - Harness: `hot`
-- Samples: `5.777905319s`, `5.651284934s`
-- Recorded reference: `5.71s`
+- Samples: `5.650972876s`, `5.706223702s`
+- Recorded reference: `5.65s` to `5.71s`
 
 ## Strategy Context
 
@@ -216,6 +216,27 @@ Takeaway:
 
 - If this idea is retried, the path selection must come essentially for free.
 - The likely workable version is to derive the fast-path category directly from move generation or move flags, not by reclassifying inside `MakeMove` / `UnMakeMove`.
+
+### v20 exploratory attempts: deeper updater splitting and perft plain-path specialization
+
+- Several local experiments were tried on top of `v19` without committing them:
+  - deeper splitting of `MakeMove(...)` / `UnMakeMove(...)`
+  - extra splitting of quiet paths by color and pawn/non-pawn
+  - reducing some `movegen` getter calls by threading cached masks/state
+  - adding a no-tricks perft recursion path specialized to `*PlainPositionUpdater`
+- All of them preserved correctness but regressed `perft(7)` relative to `v19`.
+- Observed local timings were roughly:
+  - `6.06s`
+  - `6.36s`
+  - `6.38s`
+  - `6.59s`
+  versus the `v19` band around `5.65s` to `5.71s`.
+
+Takeaway:
+
+- More splitting in the updater is not automatically a win in this codebase.
+- Extra helper routing and code size can outweigh any theoretical branch reduction.
+- Keep `v19` as the working baseline until a new idea proves itself on the real `perft(7)` benchmark, not just on microbenchmarks or code structure.
 
 ## Correctness Pitfalls Already Hit
 
