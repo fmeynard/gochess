@@ -108,12 +108,30 @@ func renderSnapshot(snapshot match.Snapshot) {
 		},
 	))
 	b.WriteString("\n")
-	b.WriteString("Games\n")
+	b.WriteString("Active Games\n")
 	b.WriteString("┌──────┬───────┬─────────┬─────────────────────┬───────┬────────┐\n")
 	b.WriteString("│ Game │ Color │ Status  │ Reason              │ Plies │ Time   │\n")
 	b.WriteString("├──────┼───────┼─────────┼─────────────────────┼───────┼────────┤\n")
 
 	for _, game := range displayedGames(snapshot.Games) {
+		b.WriteString(fmt.Sprintf(
+			"│ %4d │ %-5s │ %-7s │ %-19s │ %5d │ %6s │\n",
+			game.GameIndex,
+			colorLabel(game.CurrentAsWhite),
+			game.Status,
+			truncate(game.Reason, 19),
+			game.Plies,
+			game.Duration.Round(time.Second),
+		))
+	}
+	b.WriteString("└──────┴───────┴─────────┴─────────────────────┴───────┴────────┘\n")
+
+	b.WriteString("\n")
+	b.WriteString("Last Finished Games\n")
+	b.WriteString("┌──────┬───────┬─────────┬─────────────────────┬───────┬────────┐\n")
+	b.WriteString("│ Game │ Color │ Status  │ Reason              │ Plies │ Time   │\n")
+	b.WriteString("├──────┼───────┼─────────┼─────────────────────┼───────┼────────┤\n")
+	for _, game := range finishedGames(snapshot.Games) {
 		b.WriteString(fmt.Sprintf(
 			"│ %4d │ %-5s │ %-7s │ %-19s │ %5d │ %6s │\n",
 			game.GameIndex,
@@ -190,6 +208,24 @@ func displayedGames(games []match.GameRecord) []match.GameRecord {
 	}
 
 	return selected
+}
+
+func finishedGames(games []match.GameRecord) []match.GameRecord {
+	finished := make([]match.GameRecord, 0, maxDisplayedGames)
+	for i := len(games) - 1; i >= 0; i-- {
+		if games[i].Status == "pending" || games[i].Status == "running" {
+			continue
+		}
+		finished = append(finished, games[i])
+		if len(finished) == maxDisplayedGames {
+			break
+		}
+	}
+
+	for i, j := 0, len(finished)-1; i < j; i, j = i+1, j-1 {
+		finished[i], finished[j] = finished[j], finished[i]
+	}
+	return finished
 }
 
 func box(title string, lines []string) string {
