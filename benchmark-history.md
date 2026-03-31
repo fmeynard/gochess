@@ -2,7 +2,10 @@
 
 This file tracks repeatable performance measurements for the engine and the optimizations introduced between versions.
 
-See also: `benchmark-learnings.md` for qualitative lessons, failed experiments, and correctness pitfalls discovered during the benchmark work.
+See also:
+
+- `benchmark-learnings.md` for qualitative lessons, failed experiments, and correctness pitfalls discovered during the benchmark work
+- `plan.md` for the current optimization target and near-term work order
 
 ## Methodology
 
@@ -64,6 +67,16 @@ Override the benchmark target if needed:
 ```bash
 BENCH_FEN='your fen here' BENCH_DEPTH=6 BENCH_PROFILE=.codex-tmp/custom.cpu.prof ./scripts/bench-perft.sh
 ```
+
+Benchmark mode defaults to `hot`, which excludes FEN parsing and engine setup from the timed section and profiles only the perft run itself. This is now the preferred mode for movegen optimization work.
+
+To include initialization and FEN parsing in the timed section:
+
+```bash
+BENCH_MODE=cold BENCH_WARMUP=0 ./scripts/bench-perft.sh
+```
+
+To run the old-style end-to-end timing explicitly, use `cold`. To compare movegen-only performance, use `hot`.
 
 `benchperft` also supports `-no-perft-tricks` directly. In this repository, "perft tricks" currently means:
 
