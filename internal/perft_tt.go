@@ -1,23 +1,36 @@
 package internal
 
-type perftTTKey struct {
-	zobrist uint64
-	depth   int8
+const perftTTSize = 1 << 20
+
+type perftTTEntry struct {
+	keyWithDepth uint64
+	count        uint64
 }
 
 type perftTT struct {
-	data map[perftTTKey]uint64
+	entries []perftTTEntry
+	mask    uint64
 }
 
 func newPerftTT() *perftTT {
-	return &perftTT{data: make(map[perftTTKey]uint64, 1<<16)}
+	return &perftTT{
+		entries: make([]perftTTEntry, perftTTSize),
+		mask:    perftTTSize - 1,
+	}
 }
 
 func (tt *perftTT) probe(zobrist uint64, depth int8) (uint64, bool) {
-	v, ok := tt.data[perftTTKey{zobrist: zobrist, depth: depth}]
-	return v, ok
+	combined := zobrist ^ (uint64(depth) << 56)
+	e := &tt.entries[zobrist&tt.mask]
+	if e.keyWithDepth == combined {
+		return e.count, true
+	}
+	return 0, false
 }
 
 func (tt *perftTT) store(zobrist uint64, depth int8, count uint64) {
-	tt.data[perftTTKey{zobrist: zobrist, depth: depth}] = count
+	tt.entries[zobrist&tt.mask] = perftTTEntry{
+		keyWithDepth: zobrist ^ (uint64(depth) << 56),
+		count:        count,
+	}
 }

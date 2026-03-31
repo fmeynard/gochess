@@ -128,6 +128,47 @@ func isSquareAttackedByKing(pos *Position, idx int8, kingColor int8) bool {
 	return (kingAttacksMask[idx] & pos.kingBoard & pos.OpponentOccupiedMaskByPieceColor(kingColor)) != 0
 }
 
+// isSquareAttacked checks if a square is attacked by pieces of attackerColor.
+// occ is the occupancy used for sliding piece ray calculations.
+func isSquareAttacked(pos *Position, sq int8, attackerColor int8, occ uint64) bool {
+	var attackerOcc uint64
+	if attackerColor == White {
+		attackerOcc = pos.whiteOccupied
+		if pawnAttacksBy[0][sq]&pos.pawnBoard&attackerOcc != 0 {
+			return true
+		}
+	} else {
+		attackerOcc = pos.blackOccupied
+		if pawnAttacksBy[1][sq]&pos.pawnBoard&attackerOcc != 0 {
+			return true
+		}
+	}
+	if knightAttacksMask[sq]&pos.knightBoard&attackerOcc != 0 {
+		return true
+	}
+	rookQueens := (pos.rookBoard | pos.queenBoard) & attackerOcc
+	if rookQueens != 0 {
+		for dirIdx := 0; dirIdx < 4; dirIdx++ {
+			ray := sliderAttackMasks[sq][dirIdx]
+			blocker := firstBlockerOnRay(occ, ray, rayDirections[dirIdx])
+			if blocker != 0 && blocker&rookQueens != 0 {
+				return true
+			}
+		}
+	}
+	bishopQueens := (pos.bishopBoard | pos.queenBoard) & attackerOcc
+	if bishopQueens != 0 {
+		for dirIdx := 4; dirIdx < 8; dirIdx++ {
+			ray := sliderAttackMasks[sq][dirIdx]
+			blocker := firstBlockerOnRay(occ, ray, rayDirections[dirIdx])
+			if blocker != 0 && blocker&bishopQueens != 0 {
+				return true
+			}
+		}
+	}
+	return kingAttacksMask[sq]&pos.kingBoard&attackerOcc != 0
+}
+
 // IsKingInCheck verifies if the king at the given index is "check".
 func IsKingInCheck(pos *Position, kingColor int8) bool {
 	var (
@@ -145,13 +186,9 @@ func IsKingInCheck(pos *Position, kingColor int8) bool {
 		}
 	}
 
-	isAttacked := false
-	if isSquareAttackedByPawn(pos, kingIdx, kingColor) ||
+	isAttacked := isSquareAttackedByPawn(pos, kingIdx, kingColor) ||
 		isSquareAttackedByKnight(pos, kingIdx, kingColor) ||
-		isSquareAttackedBySlidingPiece(pos, kingIdx, kingColor) ||
-		isSquareAttackedByKing(pos, kingIdx, kingColor) {
-		isAttacked = true
-	}
+		isSquareAttackedBySlidingPiece(pos, kingIdx, kingColor)
 
 	if kingColor == White {
 		if isAttacked {

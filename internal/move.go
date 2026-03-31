@@ -1,7 +1,5 @@
 package internal
 
-import "fmt"
-
 // Move
 // for later
 // [ 8bits chunks]
@@ -44,29 +42,29 @@ func (m Move) EndIdx() int8 {
 }
 
 func (m Move) UCI() string {
-	startRank, startFile := RankAndFile(m.StartIdx())
-	endRank, endFile := RankAndFile(m.EndIdx())
-
-	uci := fmt.Sprintf(
-		"%c%d%c%d",
-		'a'+startFile,
-		startRank+1,
-		'a'+endFile,
-		endRank+1,
-	)
-
+	startRank, startFile := RankAndFile(m.startIdx)
+	endRank, endFile := RankAndFile(m.endIdx)
+	var buf [5]byte
+	buf[0] = byte('a' + startFile)
+	buf[1] = byte('1' + startRank)
+	buf[2] = byte('a' + endFile)
+	buf[3] = byte('1' + endRank)
+	n := 4
 	switch m.flag {
 	case QueenPromotion:
-		return uci + "q"
+		buf[4] = 'q'
+		n = 5
 	case KnightPromotion:
-		return uci + "n"
+		buf[4] = 'n'
+		n = 5
 	case BishopPromotion:
-		return uci + "b"
+		buf[4] = 'b'
+		n = 5
 	case RookPromotion:
-		return uci + "r"
-	default:
-		return uci
+		buf[4] = 'r'
+		n = 5
 	}
+	return string(buf[:n])
 }
 
 func isPromotionSquare(color int8, idx int8) bool {

@@ -83,6 +83,7 @@ These results are the closest raw movegen / make-unmake comparison across versio
 | v4 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 2.28s | -3.19s (-58.3%) |
 | v5 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 1.67s | -0.61s (-26.5%) |
 | v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 921ms | -0.75s (-45.0%) |
+| v7 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 809ms | -112ms (-12.2%) |
 
 ### Tricks On
 
@@ -91,6 +92,12 @@ These results include perft-only tricks such as bulk counting and TT. `v6` is th
 | Version | Date | Position | Depth | Nodes | Time | Delta vs previous |
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 229ms | baseline |
+| v7 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 256ms | +27ms (+11.8%) |
+
+Note: `v7` timings were noisy in single-shot runs because `./scripts/bench-perft.sh` uses `go run`. The recorded `v7` numbers above are medians from four local samples taken on March 31, 2026:
+
+- Tricks on: `252ms`, `260ms`, `69ms`, `277ms` -> recorded median `256ms`
+- Tricks off: `858ms`, `780ms`, `625ms`, `838ms` -> recorded median `809ms`
 
 ## Experimental Tiers On v5 Base
 
@@ -309,6 +316,45 @@ CPU profile: .codex-tmp/bench-perft.cpu.prof
 ```
 
 Note: `v6` with tricks enabled includes bulk counting and a perft transposition table, so it is not a pure raw movegen/make-unmake comparison against earlier versions without TT. The `-no-perft-tricks` measurement is the closer raw-engine comparison for this codebase state.
+
+### v7
+
+Optimizations applied:
+
+- Reworked `legalMovesInto` around a single `computePosInfo` pass that identifies checkers, evasion masks, and pinned pieces up front
+- Replaced king move legality make/unmake checks with direct `isSquareAttacked(...)` tests, including castling path validation
+- Added fast filtering for double-check, single-check evasion, and pinned-piece move constraints before falling back to make/unmake
+- Cached `depth == 2` perft results in the transposition table instead of bypassing TT on the bulk-count fast path
+- Replaced the perft TT hash map with a fixed-size direct-addressed table keyed by `zobrist ^ (depth << 56)`
+- Removed `fmt.Sprintf` from `Move.UCI()` and built the string directly into a fixed buffer
+
+Benchmark commands:
+
+```bash
+./scripts/bench-perft.sh
+BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded local samples:
+
+```text
+Perft tricks: true
+Elapsed: 252.221302ms
+Elapsed: 260.006713ms
+Elapsed: 69.270333ms
+Elapsed: 276.845562ms
+
+Perft tricks: false
+Elapsed: 857.928135ms
+Elapsed: 780.275579ms
+Elapsed: 624.968179ms
+Elapsed: 838.292528ms
+```
+
+Interpretation:
+
+- With tricks disabled, `v7` is measurably faster than `v6`, which matches the intended reduction in make/unmake work during legal move generation
+- With tricks enabled, the median result is slightly slower than `v6`; the direct-addressed TT and new legal-move fast paths do not improve this benchmark enough to offset that on this workload
 
 ## Update Rules
 
