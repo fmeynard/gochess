@@ -23,7 +23,7 @@ It is not a full playing engine yet. Search, evaluation, self-play control, and 
 - `internal/search`
   Owns search types and future search logic.
 - `internal/eval`
-  Owns score semantics and future static evaluation.
+  Owns score semantics and static evaluation.
 - `internal/lichess`
   Reserved for future integration with Lichess.
 
@@ -156,6 +156,7 @@ That is the standard Go layout and is preferable to separate `tests/` subdirecto
 - board mutation is isolated from move generation
 - legal generation is no longer mixed into engine orchestration
 - search/eval scaffolding can now evolve without mixing search concepts into `movegen` or `board`
+- static evaluation now has a concrete minimal baseline instead of a pure placeholder
 - updater and movegen hot paths have direct regression coverage
 - benchmark workflow is simple and repeatable
 

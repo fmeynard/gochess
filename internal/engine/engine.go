@@ -25,7 +25,7 @@ const (
 func NewEngine() *Engine {
 	moveGenerator := movegen.NewPseudoLegalMoveGenerator()
 	positionUpdater := board.NewPositionUpdater()
-	evaluator := eval.NewZeroEvaluator()
+	evaluator := eval.NewStaticEvaluator()
 	searcher := search.NewAlphaBetaSearcher(moveGenerator, positionUpdater, evaluator)
 
 	return &Engine{
