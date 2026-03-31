@@ -21,9 +21,9 @@ It is not a full playing engine yet. Search, evaluation, self-play control, and 
 - `internal/engine`
   Owns orchestration: public engine API, perft recursion, and perft TT wiring.
 - `internal/search`
-  Reserved for future search.
+  Owns search types and future search logic.
 - `internal/eval`
-  Reserved for future evaluation.
+  Owns score semantics and future static evaluation.
 - `internal/lichess`
   Reserved for future integration with Lichess.
 
@@ -33,7 +33,7 @@ It is not a full playing engine yet. Search, evaluation, self-play control, and 
 - `board.Move` and `board.MoveHistory` are the move and undo records.
 - `board.MoveApplier` applies and undoes moves.
 - `movegen.PseudoLegalMoveGenerator` owns both pseudo-legal helpers and legal move generation.
-- `engine.Engine` wires `movegen` and `board` together for public use.
+- `engine.Engine` wires `movegen`, `board`, `eval`, and `search` together for public use.
 
 The dependency direction is intentional:
 
@@ -126,6 +126,7 @@ Responsibilities:
 
 - public `Engine` construction
 - `LegalMoves(...)`
+- future `BestMoveDepth(...)` / `BestMoveTime(...)` search entrypoints
 - `PerftDivide(...)`
 - recursive perft traversal
 - optional perft TT and depth-2 bulk counting when tricks are enabled
@@ -154,6 +155,7 @@ That is the standard Go layout and is preferable to separate `tests/` subdirecto
 - package boundaries are now explicit
 - board mutation is isolated from move generation
 - legal generation is no longer mixed into engine orchestration
+- search/eval scaffolding can now evolve without mixing search concepts into `movegen` or `board`
 - updater and movegen hot paths have direct regression coverage
 - benchmark workflow is simple and repeatable
 
