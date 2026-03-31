@@ -20,9 +20,11 @@ type Limits struct {
 }
 
 type Stats struct {
-	Nodes uint64
-	Depth int
-	Time  time.Duration
+	Nodes           uint64
+	QuiescenceNodes uint64
+	Cutoffs         uint64
+	Depth           int
+	Time            time.Duration
 }
 
 type Result struct {
@@ -141,6 +143,7 @@ func (s *AlphaBetaSearcher) searchDepth(pos *board.Position, depth int, deadline
 			},
 		}, nil
 	}
+	orderMoves(pos, moves[:moveCount])
 
 	bestMove := moves[0]
 	bestScore := -eval.InfinityScore
@@ -234,8 +237,10 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 	}
 
 	if depth == 0 {
-		return s.evaluator.Evaluate(pos), nil
+		return s.quiescence(pos, ply, alpha, beta, stats, deadline, stop, repetitions)
 	}
+
+	orderMoves(pos, moves[:moveCount])
 
 	bestScore := -eval.InfinityScore
 	for i := 0; i < moveCount; i++ {
@@ -257,11 +262,66 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 			alpha = score
 		}
 		if alpha >= beta {
+			stats.Cutoffs++
 			break
 		}
 	}
 
 	return bestScore, nil
+}
+
+func (s *AlphaBetaSearcher) quiescence(pos *board.Position, ply int, alpha eval.Score, beta eval.Score, stats *Stats, deadline time.Time, stop <-chan struct{}, repetitions *repetitionTracker) (eval.Score, error) {
+	if err := shouldStop(deadline, stop); err != nil {
+		return 0, err
+	}
+
+	stats.QuiescenceNodes++
+	if repetitions.isThreefold() {
+		return eval.DrawScore, nil
+	}
+
+	standPat := s.evaluator.Evaluate(pos)
+	if standPat >= beta {
+		stats.Cutoffs++
+		return beta, nil
+	}
+	if standPat > alpha {
+		alpha = standPat
+	}
+
+	var moves [256]board.Move
+	moveCount := s.moveGenerator.LegalMovesInto(pos, s.positionUpdater, moves[:])
+	if moveCount == 0 {
+		return terminalScore(pos, ply), nil
+	}
+
+	orderMoves(pos, moves[:moveCount])
+	for i := 0; i < moveCount; i++ {
+		move := moves[i]
+		if !isTacticalMove(pos, move) {
+			continue
+		}
+
+		history := s.positionUpdater.MakeMove(pos, move)
+		repetitions.push(pos.ZobristKey())
+		score, err := s.quiescence(pos, ply+1, -beta, -alpha, stats, deadline, stop, repetitions)
+		repetitions.pop()
+		s.positionUpdater.UnMakeMove(pos, history)
+		if err != nil {
+			return 0, err
+		}
+		score = -score
+
+		if score >= beta {
+			stats.Cutoffs++
+			return beta, nil
+		}
+		if score > alpha {
+			alpha = score
+		}
+	}
+
+	return alpha, nil
 }
 
 func terminalScore(pos *board.Position, ply int) eval.Score {
@@ -323,4 +383,88 @@ func (t *repetitionTracker) isThreefold() bool {
 		return false
 	}
 	return t.counts[t.stack[len(t.stack)-1]] >= 3
+}
+
+func orderMoves(pos *board.Position, moves []board.Move) {
+	for i := 1; i < len(moves); i++ {
+		move := moves[i]
+		score := scoreMove(pos, move)
+		j := i - 1
+		for ; j >= 0 && score > scoreMove(pos, moves[j]); j-- {
+			moves[j+1] = moves[j]
+		}
+		moves[j+1] = move
+	}
+}
+
+func scoreMove(pos *board.Position, move board.Move) int {
+	score := 0
+	if isCaptureMove(pos, move) {
+		captured := capturedPiece(pos, move)
+		attacker := move.Piece().Type()
+		score += 100000 + 10*pieceOrderValue(captured.Type()) - pieceOrderValue(attacker)
+	}
+
+	switch move.Flag() {
+	case board.QueenPromotion:
+		score += 50000 + pieceOrderValue(board.Queen)
+	case board.RookPromotion:
+		score += 50000 + pieceOrderValue(board.Rook)
+	case board.BishopPromotion:
+		score += 50000 + pieceOrderValue(board.Bishop)
+	case board.KnightPromotion:
+		score += 50000 + pieceOrderValue(board.Knight)
+	}
+
+	return score
+}
+
+func isTacticalMove(pos *board.Position, move board.Move) bool {
+	if isCaptureMove(pos, move) {
+		return true
+	}
+
+	switch move.Flag() {
+	case board.QueenPromotion, board.RookPromotion, board.BishopPromotion, board.KnightPromotion:
+		return true
+	default:
+		return false
+	}
+}
+
+func isCaptureMove(pos *board.Position, move board.Move) bool {
+	if move.Flag() == board.Capture || move.Flag() == board.EnPassant {
+		return true
+	}
+	return pos.PieceAt(move.EndIdx()) != board.NoPiece
+}
+
+func capturedPiece(pos *board.Position, move board.Move) board.Piece {
+	if move.Flag() == board.EnPassant {
+		end := move.EndIdx()
+		if move.Piece().IsWhite() {
+			return pos.PieceAt(end - 8)
+		}
+		return pos.PieceAt(end + 8)
+	}
+	return pos.PieceAt(move.EndIdx())
+}
+
+func pieceOrderValue(pieceType int8) int {
+	switch pieceType {
+	case board.Pawn:
+		return 100
+	case board.Knight:
+		return 320
+	case board.Bishop:
+		return 330
+	case board.Rook:
+		return 500
+	case board.Queen:
+		return 900
+	case board.King:
+		return 10000
+	default:
+		return 0
+	}
 }

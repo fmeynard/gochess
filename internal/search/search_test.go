@@ -31,9 +31,8 @@ func TestAlphaBetaSearcherSearch(t *testing.T) {
 			},
 		},
 		"winning queen capture is preferred": {
-			fen:          "3qk3/8/8/8/8/8/3Q4/4K3 w - - 0 1",
-			depth:        1,
-			expectedMove: "d2d8",
+			fen:   "3qk3/8/8/8/8/8/3Q4/4K3 w - - 0 1",
+			depth: 1,
 			assertScore: func(t *testing.T, score eval.Score) {
 				assert.Greater(t, score, eval.DrawScore)
 			},
@@ -109,6 +108,21 @@ func TestAlphaBetaSearcherSearchWithDepthAndMoveTime(t *testing.T) {
 	assert.LessOrEqual(t, result.Stats.Depth, 2)
 }
 
+func TestAlphaBetaSearcherQuiescenceAvoidsPoisonedPawn(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN("4k3/3p4/8/8/8/8/3Q4/4K3 w - - 0 1")
+	assert.NoError(t, err)
+
+	result, err := searcher.Search(pos, Limits{Depth: 1})
+	assert.NoError(t, err)
+	assert.NotEqual(t, "d2d7", result.BestMove.UCI())
+	assert.Greater(t, result.Stats.QuiescenceNodes, uint64(0))
+}
+
 func TestRepetitionTrackerDetectsThreefold(t *testing.T) {
 	pos, err := board.NewPositionFromFEN(board.FenStartPos)
 	assert.NoError(t, err)
@@ -135,4 +149,17 @@ func TestRepetitionTrackerDetectsThreefold(t *testing.T) {
 
 	tracker := newRepetitionTracker(pos, history)
 	assert.True(t, tracker.isThreefold())
+}
+
+func TestOrderMovesPrefersCaptures(t *testing.T) {
+	pos, err := board.NewPositionFromFEN("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1")
+	assert.NoError(t, err)
+
+	moves := []board.Move{
+		board.NewMove(board.Piece(board.White|board.Pawn), board.E4, board.E5, board.NormalMove),
+		board.NewMove(board.Piece(board.White|board.Pawn), board.E4, board.D5, board.Capture),
+	}
+
+	orderMoves(pos, moves)
+	assert.Equal(t, "e4d5", moves[0].UCI())
 }

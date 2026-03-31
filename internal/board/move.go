@@ -47,6 +47,14 @@ func (m Move) EndIdx() int8 {
 	return m.endIdx
 }
 
+func (m Move) Piece() Piece {
+	return m.piece
+}
+
+func (m Move) Flag() int8 {
+	return m.flag
+}
+
 func (m Move) UCI() string {
 	startRank, startFile := RankAndFile(m.startIdx)
 	endRank, endFile := RankAndFile(m.endIdx)
