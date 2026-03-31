@@ -29,7 +29,7 @@ The project is not a full playing engine yet. Search, evaluation, self-play orch
 Run tests:
 
 ```bash
-GOCACHE=/home/fab/Projects/gochess/.codex-tmp/go-build-cache go test ./...
+go test ./...
 ```
 
 Run the reference perft benchmark:

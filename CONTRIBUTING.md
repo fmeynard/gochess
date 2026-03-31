@@ -39,7 +39,7 @@ PRs should include:
 Minimum baseline for most PRs:
 
 ```bash
-GOCACHE=/home/fab/Projects/gochess/.codex-tmp/go-build-cache go test ./...
+go test ./...
 ```
 
 If the PR touches `internal/board` or `internal/movegen`, include:

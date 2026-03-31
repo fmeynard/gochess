@@ -292,7 +292,7 @@ Benchmark commands:
 
 ```bash
 BENCH_DEPTH=7 BENCH_MODE=hot BENCH_WARMUP=1 BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
-GOCACHE=/home/fab/Projects/gochess/.codex-tmp/go-build-cache go test ./internal/board -run '^$' -bench 'BenchmarkPositionUpdaterMakeUnmake' -benchtime=200ms
+go test ./internal/board -run '^$' -bench 'BenchmarkPositionUpdaterMakeUnmake' -benchtime=200ms
 ```
 
 Recorded output:

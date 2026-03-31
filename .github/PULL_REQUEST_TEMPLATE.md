@@ -11,7 +11,7 @@
 ## Validation
 
 ```bash
-GOCACHE=/home/fab/Projects/gochess/.codex-tmp/go-build-cache go test ./...
+go test ./...
 ```
 
 Results:
