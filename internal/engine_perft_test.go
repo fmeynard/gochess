@@ -47,7 +47,7 @@ func TestEngine_MoveGenerationTest_Regressions(t *testing.T) {
 		"Promotion position depth 3": {
 			fen:      "2r1k3/3P4/8/8/8/8/8/4K3 w - - 0 1",
 			depth:    3,
-			expected: 117,
+			expected: 73,
 		},
 	}
 
@@ -63,4 +63,14 @@ func TestEngine_MoveGenerationTest_Regressions(t *testing.T) {
 			assert.Equal(t, d.expected, engine.MoveGenerationTest(pos, d.depth))
 		})
 	}
+}
+
+func TestEngine_MoveGenerationTest_KingCaptureIsNotCounted(t *testing.T) {
+	engine := NewEngine()
+	pos, err := NewPositionFromFEN("2r1k3/3P4/8/8/8/8/8/4K3 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, uint64(73), engine.MoveGenerationTest(pos, 3))
 }

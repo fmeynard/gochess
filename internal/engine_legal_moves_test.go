@@ -75,7 +75,6 @@ func TestEngine_LegalMoves_Regressions(t *testing.T) {
 			expectedMoves: []string{
 				"d7c8b", "d7c8n", "d7c8q", "d7c8r",
 				"d7d8b", "d7d8n", "d7d8q", "d7d8r",
-				"d7e8b", "d7e8n", "d7e8q", "d7e8r",
 				"e1d1", "e1d2", "e1e2", "e1f1", "e1f2",
 			},
 		},
@@ -176,6 +175,49 @@ func TestEngine_LegalMoves_KnownPositionCounts(t *testing.T) {
 			}
 
 			assert.Len(t, engine.LegalMoves(pos), d.expectedCount)
+		})
+	}
+}
+
+func TestEngine_LegalMoves_NeverCaptureEnemyKing(t *testing.T) {
+	data := map[string]struct {
+		fen             string
+		enemyKingSquare string
+	}{
+		"promotion cannot capture king": {
+			fen:             "2r1k3/3P4/8/8/8/8/8/4K3 w - - 0 1",
+			enemyKingSquare: "e8",
+		},
+		"rook cannot capture king": {
+			fen:             "4k3/8/8/8/4R3/8/8/4K3 w - - 0 1",
+			enemyKingSquare: "e8",
+		},
+		"bishop cannot capture king": {
+			fen:             "4k3/8/8/7B/8/8/8/4K3 w - - 0 1",
+			enemyKingSquare: "e8",
+		},
+		"knight cannot capture king": {
+			fen:             "4k3/8/5N2/8/8/8/8/4K3 w - - 0 1",
+			enemyKingSquare: "e8",
+		},
+		"king cannot capture king": {
+			fen:             "8/8/8/8/3kK3/8/8/8 w - - 0 1",
+			enemyKingSquare: "d4",
+		},
+	}
+
+	engine := NewEngine()
+
+	for name, d := range data {
+		t.Run(name, func(t *testing.T) {
+			pos, err := NewPositionFromFEN(d.fen)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for _, move := range engine.LegalMoves(pos) {
+				assert.NotEqual(t, d.enemyKingSquare, IdxToSquare(move.EndIdx()))
+			}
 		})
 	}
 }

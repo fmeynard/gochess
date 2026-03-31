@@ -105,9 +105,9 @@ func sliderTargetsMask(pos *Position, idx int8, pieceType int8, friendlyOcc uint
 	return attacks
 }
 
-func (e *Engine) appendKingMoves(pos *Position, piece Piece, kingIdx int8, enemyColor int8, info positionAnalysis, dst []Move, count int) int {
+func (e *Engine) appendKingMoves(pos *Position, piece Piece, kingIdx int8, enemyColor int8, enemyKingMask uint64, info positionAnalysis, dst []Move, count int) int {
 	friendlyOcc := pos.OccupancyMask(pos.activeColor)
-	targets := kingAttacksMask[kingIdx] &^ friendlyOcc
+	targets := kingAttacksMask[kingIdx] &^ friendlyOcc &^ enemyKingMask
 	occWithoutKing := pos.occupied &^ (uint64(1) << kingIdx)
 
 	for targets != 0 {
@@ -170,13 +170,12 @@ func (e *Engine) appendKingMoves(pos *Position, piece Piece, kingIdx int8, enemy
 	return count
 }
 
-func (e *Engine) appendPawnMoves(pos *Position, piece Piece, idx int8, info positionAnalysis, pinRay uint64, isPinned bool, inCheckColor int8, dst []Move, count int) int {
+func (e *Engine) appendPawnMoves(pos *Position, piece Piece, idx int8, enemyOcc uint64, info positionAnalysis, pinRay uint64, isPinned bool, inCheckColor int8, dst []Move, count int) int {
 	var quietTargets uint64
 	var captureTargets uint64
 	var promotionTargets uint64
 	var epTarget uint64
 
-	enemyOcc := pos.OpponentOccupiedMask()
 	if pos.activeColor == White {
 		oneStep := idx + 8
 		if oneStep < 64 && pos.board[oneStep] == NoPiece {
@@ -240,24 +239,30 @@ func (e *Engine) appendPawnMoves(pos *Position, piece Piece, idx int8, info posi
 
 func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	count := 0
-	inCheckColor := pos.activeColor
-
-	var kingIdx int8
-	if pos.activeColor == White {
+	color := pos.activeColor
+	inCheckColor := color
+	kingIdx := pos.blackKingIdx
+	friendlyOcc := pos.blackOccupied
+	enemyOcc := pos.whiteOccupied
+	enemyColor := White
+	enemyKingIdx := pos.whiteKingIdx
+	if color == White {
 		kingIdx = pos.whiteKingIdx
-	} else {
-		kingIdx = pos.blackKingIdx
+		friendlyOcc = pos.whiteOccupied
+		enemyOcc = pos.blackOccupied
+		enemyColor = Black
+		enemyKingIdx = pos.blackKingIdx
 	}
-
-	friendlyOcc := pos.OccupancyMask(pos.activeColor)
-	enemyOcc := pos.OpponentOccupiedMask()
-	enemyColor := pos.OpponentColor()
-	info := computePositionAnalysis(pos, kingIdx, friendlyOcc, enemyOcc)
+	enemyKingMask := uint64(1) << enemyKingIdx
+	enemyOccNoKing := enemyOcc &^ enemyKingMask
 
 	kingPiece := pos.board[kingIdx]
-	if kingPiece.Type() == King && kingPiece.Color() == pos.activeColor {
-		count = e.appendKingMoves(pos, kingPiece, kingIdx, enemyColor, info, dst, count)
+	if kingPiece != Piece(color|King) {
+		return 0
 	}
+
+	info := computePositionAnalysis(pos, kingIdx, friendlyOcc, enemyOcc)
+	count = e.appendKingMoves(pos, kingPiece, kingIdx, enemyColor, enemyKingMask, info, dst, count)
 
 	if info.checkerCount >= 2 {
 		return count
@@ -275,18 +280,18 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 
 		switch pieceType {
 		case Pawn:
-			count = e.appendPawnMoves(pos, piece, idx, info, pinRay, isPinned, inCheckColor, dst, count)
+			count = e.appendPawnMoves(pos, piece, idx, enemyOccNoKing, info, pinRay, isPinned, inCheckColor, dst, count)
 		case Knight:
 			if isPinned {
 				continue
 			}
-			targets := knightAttacksMask[idx] &^ friendlyOcc
+			targets := knightAttacksMask[idx] &^ friendlyOcc &^ enemyKingMask
 			if info.checkerCount == 1 {
 				targets &= info.evasionMask
 			}
 			count = appendMovesFromMask(pos, piece, idx, targets, dst, count)
 		case Bishop, Rook, Queen:
-			targets := sliderTargetsMask(pos, idx, pieceType, friendlyOcc)
+			targets := sliderTargetsMask(pos, idx, pieceType, friendlyOcc) &^ enemyKingMask
 			if info.checkerCount == 1 {
 				targets &= info.evasionMask
 			}
