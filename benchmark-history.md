@@ -84,6 +84,7 @@ These results are the closest raw movegen / make-unmake comparison across versio
 | v5 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 1.67s | -0.61s (-26.5%) |
 | v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 921ms | -0.75s (-45.0%) |
 | v7 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 809ms | -112ms (-12.2%) |
+| v8 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 776ms | -33ms (-4.1%) |
 
 ### Tricks On
 
@@ -93,11 +94,17 @@ These results include perft-only tricks such as bulk counting and TT. `v6` is th
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | v6 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 229ms | baseline |
 | v7 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 256ms | +27ms (+11.8%) |
+| v8 | 2026-03-31 | Perft position 3 | 6 | 11,030,083 | 68ms | -188ms (-73.4%) |
 
 Note: `v7` timings were noisy in single-shot runs because `./scripts/bench-perft.sh` uses `go run`. The recorded `v7` numbers above are medians from four local samples taken on March 31, 2026:
 
 - Tricks on: `252ms`, `260ms`, `69ms`, `277ms` -> recorded median `256ms`
 - Tricks off: `858ms`, `780ms`, `625ms`, `838ms` -> recorded median `809ms`
+
+Note: `v8` was measured with the same `go run`-based script and the same median-of-4 convention:
+
+- Tricks on: `256ms`, `67ms`, `66ms`, `70ms` -> recorded median `68ms`
+- Tricks off: `802ms`, `762ms`, `790ms`, `629ms` -> recorded median `776ms`
 
 ## Experimental Tiers On v5 Base
 
@@ -355,6 +362,44 @@ Interpretation:
 
 - With tricks disabled, `v7` is measurably faster than `v6`, which matches the intended reduction in make/unmake work during legal move generation
 - With tricks enabled, the median result is slightly slower than `v6`; the direct-addressed TT and new legal-move fast paths do not improve this benchmark enough to offset that on this workload
+
+### v8
+
+Optimizations applied:
+
+- Classified generated moves with richer `Move` flags so `MakeMove` no longer has to rediscover castling, en passant, captures, and pawn double pushes from board state in the hot path
+- Compacted `MoveHistory` by packing prior king squares, castle rights, en passant, and king safety caches into a small `meta` field instead of carrying many separate fields
+- Stored and restored cached king-affect masks directly in the undo record so `UnMakeMove` no longer recomputes them per node
+- Disabled incremental Zobrist maintenance when perft tricks are turned off, since the hash is only needed for the perft TT in this benchmark mode
+- Switched `MakeMove` / `UnMakeMove` to trust the internally generated move's `piece` payload instead of rereading it from the board in the recursive hot path
+
+Benchmark commands:
+
+```bash
+./scripts/bench-perft.sh
+BENCH_NO_PERFT_TRICKS=1 ./scripts/bench-perft.sh
+```
+
+Recorded local samples:
+
+```text
+Perft tricks: true
+Elapsed: 256.336512ms
+Elapsed: 67.063821ms
+Elapsed: 66.125952ms
+Elapsed: 69.747462ms
+
+Perft tricks: false
+Elapsed: 802.044841ms
+Elapsed: 761.603425ms
+Elapsed: 789.776057ms
+Elapsed: 629.293308ms
+```
+
+Interpretation:
+
+- With tricks disabled, `v8` is a modest but real improvement over `v7`; most of the gain comes from lighter undo work and skipping unused Zobrist updates
+- With tricks enabled, `v8` is much faster on warmed runs; the move-flag and undo-path cleanup materially reduces the remaining overhead around the TT-assisted perft path
 
 ## Update Rules
 

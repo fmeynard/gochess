@@ -31,6 +31,7 @@ func NewEngine() *Engine {
 
 func (e *Engine) SetPerftTricks(enabled bool) {
 	e.usePerftTricks = enabled
+	e.positionUpdater.SetTrackZobrist(enabled)
 }
 
 func (e *Engine) StartGame() {}
@@ -117,6 +118,24 @@ func (pi *posInfo) pinRayFor(sq int8) uint64 {
 	return 0
 }
 
+func classifyMove(pos *Position, piece Piece, startIdx, targetIdx int8) int8 {
+	if piece.Type() == King && absInt8(targetIdx-startIdx) == 2 {
+		return Castle
+	}
+	if piece.Type() == Pawn {
+		if pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx {
+			return EnPassant
+		}
+		if absInt8(targetIdx-startIdx) == 16 {
+			return PawnDoubleMove
+		}
+	}
+	if pos.board[targetIdx] != NoPiece {
+		return Capture
+	}
+	return NormalMove
+}
+
 func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 	count := 0
 	var targets [MaxTargets]int8
@@ -190,7 +209,7 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 				if isSquareAttacked(pos, targetIdx, enemyColor, occ) {
 					continue
 				}
-				dst[count] = NewMove(piece, idx, targetIdx, NormalMove)
+				dst[count] = NewMove(piece, idx, targetIdx, classifyMove(pos, piece, idx, targetIdx))
 				count++
 				continue
 			}
@@ -216,7 +235,7 @@ func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
 				continue
 			}
 
-			move := NewMove(piece, idx, targetIdx, NormalMove)
+			move := NewMove(piece, idx, targetIdx, classifyMove(pos, piece, idx, targetIdx))
 
 			if !info.inCheck && !isPinned {
 				isEP := pieceType == Pawn && pos.enPassantIdx != NoEnPassant && targetIdx == pos.enPassantIdx

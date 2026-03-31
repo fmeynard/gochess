@@ -1,181 +1,147 @@
 # Future Optimisations
 
-## MoveHistory and undo strategy
+This document tracks the remaining move-generation performance ideas after the `v8` work on move flags, undo-record compaction, cached king-affect restoration, and optional Zobrist maintenance.
 
-The current `MoveHistory` approach is correct in spirit because a chess engine should keep an undo record and use `make` / `unmake` in the hot path.
+## 1. Occupancy-Driven Slider Attacks
 
-What is probably not optimal is storing a near-full snapshot of the mutable position for every move:
+The current slider move generation still walks precomputed square lists one square at a time.
 
-- `occupied`
-- `whiteOccupied`
-- `blackOccupied`
-- all piece bitboards
-- king state caches
-- castling rights
-- en passant square
+Relevant code:
 
-This makes `UnMakeMove` simple, but it copies more data than necessary at each node.
+- `internal/bitsboard-move-generator.go`
+- `SliderPseudoLegalMovesInto(...)`
 
-## Better direction
+Likely next step:
 
-Prefer a compact incremental undo record instead of:
+- Replace directional square scans with occupancy-driven attack generation
+- Candidate techniques: magic bitboards, PEXT-based lookups, or hyperbola quintessence
 
-- recomputing the previous position from the last move
-- storing a full position snapshot
+Expected benefit:
 
-The engine should:
+- Fewer branches in rook/bishop/queen move generation
+- Better scaling on dense middlegame positions
+- Cleaner reuse of attack masks for both move generation and attack detection
 
-1. Apply the move incrementally.
-2. Save only the state that cannot be reconstructed cheaply.
-3. Reverse the exact delta during `UnMakeMove`.
+## 2. Bitboard-First Legal Filtering
 
-## Why not recompute from the previous move
+`legalMovesInto(...)` is already much better than the earlier make/unmake-heavy path, but it still works as:
 
-Recomputing the old position from the last move is usually slower and more fragile because undo still needs enough information to restore:
+1. Generate target squares into a temporary array
+2. Apply pin / evasion / king-safety logic per target
+3. Materialize `Move` values
 
-- the captured piece
-- previous castling rights
-- previous en passant square
-- king locations
-- promotion state
-- en passant capture square
-- rook movement during castling
+Relevant code:
 
-If that information must already be stored, then a compact undo record is usually the better design.
+- `internal/engine.go`
+- `legalMovesInto(...)`
 
-## Suggested compact undo record
+Likely next step:
 
-A lean undo structure for this engine could store:
+- Generate destination bitboards first
+- Mask them with:
+  - `^friendlyOcc`
+  - pin rays
+  - evasion masks
+  - king-safe destination masks
+- Iterate only the surviving bits
 
-- moved piece
-- captured piece
-- start square
-- end square
-- move flag / move kind
-- previous white castling rights
-- previous black castling rights
-- previous en passant square
-- previous white king safety cache
-- previous black king safety cache
-- previous white king square if needed
-- previous black king square if needed
+Expected benefit:
 
-Depending on the final `Move` representation, some of these fields may already exist on the move itself and do not need to be duplicated in the undo record.
+- Less branching in the inner loop
+- Better composition of legality constraints
+- A cleaner path toward specialized legal generators per piece type
 
-## Incremental unmake logic
+## 3. Pawn Generation Specialization
 
-With the captured piece and move kind available, the engine can restore bitboards directly instead of restoring full snapshots.
+Pawn generation is still one of the hotter pseudo-legal generators because it mixes:
 
-Typical `UnMakeMove` flow:
+- side-to-move branching
+- promotions
+- double pushes
+- en passant
 
-1. Remove the moved piece from the destination square.
-2. Restore the moved piece on the origin square.
-3. If the move was a capture, restore the captured piece on the correct square.
-4. If the move was en passant, restore the pawn on the passed square instead of the destination square.
-5. If the move was castling, move the rook back.
-6. If the move was a promotion, remove the promoted piece and restore a pawn on the origin square.
-7. Restore castling rights, en passant square, active color, and cached king safety values.
+Relevant code:
 
-## Bitboards that can be restored incrementally
+- `internal/bitsboard-move-generator.go`
+- `PawnPseudoLegalMovesInto(...)`
 
-The following do not need to be copied wholesale if undo data is sufficient:
+Likely next step:
 
-- `occupied`
-- `whiteOccupied`
-- `blackOccupied`
-- `pawnBoard`
-- `knightBoard`
-- `bishopBoard`
-- `rookBoard`
-- `queenBoard`
-- `kingBoard`
+- Split white and black pawn generation into separate specialized functions
+- Remove repeated color-dependent branching from the hot path
+- Consider emitting captures and pushes from bitboard expressions instead of mixed conditional logic
 
-They can be updated by applying and reversing the move delta.
+Expected benefit:
 
-## Practical guidance
+- Lower branch pressure
+- Simpler hot code per side
 
-- Keep passing `*Position` in the hot path.
-- Keep `make` / `unmake`.
-- Replace full `MoveHistory` snapshots with a compact undo record.
-- Store the captured piece explicitly.
-- Ensure move flags are rich enough to distinguish normal moves, captures, castling, en passant, and promotions.
+## 4. More Specialized Board Updates
 
-## Expected benefit
+`movePiece(...)` and `capturePiece(...)` are already much better than generic board rewriting, but they still switch on piece type on every move.
 
-This should reduce per-node memory traffic and improve cache behavior while keeping undo constant-time and deterministic.
+Relevant code:
 
-The expected performance win is more likely to come from reducing repeated state copying than from changing `Position` from pointer to value.
+- `internal/position.go`
+- `movePiece(...)`
+- `capturePiece(...)`
 
-## Memory and GC
+Likely next step:
 
-If GC time grows quickly at deeper perft depths, the likely cause is not recursion itself but heap allocation inside the recursive path.
+- Add specialized fast paths for the most common cases:
+  - pawn quiet move
+  - pawn capture
+  - king move
+  - rook move
+- Keep the generic helpers as fallback
 
-In a move tree, even small per-node allocations become expensive because they are multiplied by every node in the tree.
+Expected benefit:
 
-### Likely allocation sources in the current code
+- Lower dispatch overhead in `MakeMove` / `UnMakeMove`
+- Better inlining opportunities
 
-- `Engine.LegalMoves` creates a fresh `[]Move` on each call.
-- Pseudo-legal generators create fresh `[]int8` slices on each call.
-- `MakeMove` creates a new `MoveHistory` for each move.
-- The current `MoveHistory` copies a large amount of mutable state.
+## 5. Even Tighter Move Representation
 
-### Important principle
+`Move` already carries more information than before, but the representation is still structurally “field-based”.
 
-Recursion is not automatically the GC problem.
+Relevant code:
 
-The usual problem is:
+- `internal/move.go`
 
-- recursive traversal
-- plus per-node heap allocations
-- multiplied by millions of nodes
+Likely next step:
 
-The goal for perft and search should be to make the hot path close to allocation-free.
+- Pack move data into a narrower integer representation
+- Keep cheap accessors for:
+  - start square
+  - end square
+  - moving piece
+  - move kind
 
-### Recommended direction
+Expected benefit:
 
-- Keep recursion if it stays simple and fast.
-- Remove heap allocations from the recursive move-generation path.
-- Use compact undo data instead of large snapshots.
-- Prefer preallocated per-ply buffers for moves.
-- Prefer writing moves directly into a caller-owned buffer.
+- Reduced copy cost for move buffers and undo records
+- Better cache density in deep perft/search trees
 
-### Concrete opportunities
+## 6. Profile Search Separately From Perft
 
-#### 1. Generate moves directly into a buffer
+The current benchmark work is strongly perft-driven. That is useful, but some optimizations may help perft more than search, or the reverse.
 
-Avoid generating pseudo-legal `[]int8` slices only to immediately convert each target square into a `Move`.
+Likely next step:
 
-Instead:
+- Add a repeatable search benchmark suite
+- Track move-generation, make/unmake, and attack-detection costs under search workloads
 
-- pass a destination buffer into move generation
-- append `Move` values directly
-- return only the count written
+Expected benefit:
 
-This removes an intermediate allocation layer and reduces temporary objects in the hottest path.
+- Avoid overfitting the engine purely to perft
+- Make tradeoffs more explicit before larger architectural work
 
-#### 2. Preallocate move storage per ply
+## Suggested Order
 
-For perft/search paths, use a fixed per-depth move buffer such as:
+If the goal remains “highest performance gain for the lowest implementation risk”, the next sequence to test is:
 
-- `[MaxPly][MaxMoves]Move`
-
-Then each depth level writes into its own slice window.
-
-This avoids allocating new move slices at each recursive call.
-
-#### 3. Replace pointer undo records with compact value undo records
-
-If possible:
-
-- return undo data by value
-- keep the undo struct small
-- avoid copying all bitboards every move
-
-#### 4. Benchmark allocation counts directly
-
-When Go is available, use:
-
-- `go test -bench . -benchmem`
-- `go build -gcflags=-m ./...`
-
-The target should be to drive allocations in the perft path toward zero or near-zero.
+1. Specialized pawn generation
+2. More specialized board-update helpers
+3. Bitboard-first legal filtering
+4. Occupancy-driven slider attack generation
+5. Tighter move packing
