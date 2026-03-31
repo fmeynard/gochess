@@ -4,20 +4,20 @@ This file records practical lessons from the perft optimization work so future s
 
 ## Current Best Known Result
 
-- Best raw benchmark so far: `benchmark-v19`
-- Best hot benchmark so far: `benchmark-v19`
+- Best raw benchmark so far: `benchmark-v20`
+- Best hot benchmark so far: `benchmark-v20`
 - Target: `Perft position 3`
 - FEN: `8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1`
 - Mode: `BENCH_NO_PERFT_TRICKS=1`
 - Depth: `7`
 - Nodes: `178,633,661`
-- Time: `5.650972876s`
+- Time: `5.544416355s`
 
 Current preferred reference:
 
 - Harness: `hot`
-- Samples: `5.650972876s`, `5.706223702s`
-- Recorded reference: `5.65s` to `5.71s`
+- Samples: `5.544416355s`
+- Recorded reference: `5.54s`
 
 ## Strategy Context
 
@@ -150,6 +150,16 @@ Takeaway:
 
 - In this codebase, moving hot-path metadata from "large struct returned and passed by value" to "caller-owned buffer passed by pointer" is worthwhile.
 - Move-materialization splits can pay if they remove real repeated classification work in the inner loop; the failed earlier attempts were too helper-heavy without removing enough hot-path decisions.
+
+### v20
+
+- Prefiltering king targets against enemy pawn, knight, and king attacks before the remaining slider checks paid.
+- On this codebase, direct occupied-bitboard tests for pawn quiet pushes were acceptable in combination with that king-target prefilter.
+
+Takeaway:
+
+- `appendKingMoves(...)` and `isSquareAttacked(...)` were a real enough hotspot that removing obvious non-slider-attacked king targets up front paid on the benchmark FEN.
+- The useful part of the change was not a broad movegen refactor; it was a narrow reduction in per-target king-legality work.
 
 ## What Did Not Pay
 
