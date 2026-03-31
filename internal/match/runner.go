@@ -214,7 +214,15 @@ func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-
 		state.startGame(gameIndex, currentAsWhite)
 
 		start := time.Now()
-		outcome, plies, reason, nodes, searchTime, err := playSingleGame(currentClient, opponentClient, currentAsWhite, moveTime)
+		outcome, plies, reason, nodes, searchTime, err := playSingleGame(
+			currentClient,
+			opponentClient,
+			currentAsWhite,
+			moveTime,
+			func(ply int) {
+				state.updatePlies(gameIndex, ply)
+			},
+		)
 		if err != nil {
 			return err
 		}
@@ -373,7 +381,7 @@ func (s *matchState) emitLocked() {
 	})
 }
 
-func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite bool, moveTime time.Duration) (int, int, string, uint64, time.Duration, error) {
+func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite bool, moveTime time.Duration, onPly func(int)) (int, int, string, uint64, time.Duration, error) {
 	referee := engine.NewEngine()
 	pos, err := board.NewPositionFromFEN(board.FenStartPos)
 	if err != nil {
@@ -424,9 +432,18 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 
 		moves = append(moves, bestMove)
 		repetitionCount[pos.ZobristKey()]++
+		if onPly != nil {
+			onPly(ply + 1)
+		}
 	}
 
 	return 0, defaultMaxPlies, "max plies", totalNodes, totalSearchTime, nil
+}
+
+func (s *matchState) updatePlies(gameIndex int, plies int) {
+	s.mu.Lock()
+	s.games[gameIndex].Plies = plies
+	s.mu.Unlock()
 }
 
 func selectClient(currentClient, opponentClient *UCIClient, activeColor int8, currentIsWhite bool) *UCIClient {
