@@ -1,7 +1,8 @@
 package main
 
 import (
-	chess "chessV2/internal/chess"
+	board "chessV2/internal/board"
+	"chessV2/internal/engine"
 	"flag"
 	"fmt"
 	"log"
@@ -16,8 +17,8 @@ const (
 	defaultDepth = 6
 )
 
-func runPerft(pos *chess.Position, engine *chess.Engine, depth int) uint64 {
-	_, nodes := engine.PerftDivide(pos, depth)
+func runPerft(pos *board.Position, e *engine.Engine, depth int) uint64 {
+	_, nodes := e.PerftDivide(pos, depth)
 	return nodes
 }
 
@@ -57,20 +58,20 @@ func main() {
 
 	switch *mode {
 	case "hot":
-		pos, err := chess.NewPositionFromFEN(*fen)
+		pos, err := board.NewPositionFromFEN(*fen)
 		if err != nil {
 			log.Fatalf("parse fen: %v", err)
 		}
 
-		engine := chess.NewEngine()
-		engine.SetPerftTricks(!*noPerftTricks)
+		e := engine.NewEngine()
+		e.SetPerftTricks(!*noPerftTricks)
 
 		for i := 0; i < *warmup; i++ {
-			warmPos, err := chess.NewPositionFromFEN(*fen)
+			warmPos, err := board.NewPositionFromFEN(*fen)
 			if err != nil {
 				log.Fatalf("parse fen for warmup: %v", err)
 			}
-			runPerft(warmPos, engine, *depth)
+			runPerft(warmPos, e, *depth)
 		}
 
 		if profileFile != nil {
@@ -79,7 +80,7 @@ func main() {
 			}
 		}
 		start = time.Now()
-		nodes = runPerft(pos, engine, *depth)
+		nodes = runPerft(pos, e, *depth)
 		if profileFile != nil {
 			pprof.StopCPUProfile()
 		}
@@ -90,14 +91,14 @@ func main() {
 			}
 		}
 		start = time.Now()
-		pos, err := chess.NewPositionFromFEN(*fen)
+		pos, err := board.NewPositionFromFEN(*fen)
 		if err != nil {
 			log.Fatalf("parse fen: %v", err)
 		}
 
-		engine := chess.NewEngine()
-		engine.SetPerftTricks(!*noPerftTricks)
-		nodes = runPerft(pos, engine, *depth)
+		e := engine.NewEngine()
+		e.SetPerftTricks(!*noPerftTricks)
+		nodes = runPerft(pos, e, *depth)
 		if profileFile != nil {
 			pprof.StopCPUProfile()
 		}
