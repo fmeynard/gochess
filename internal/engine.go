@@ -18,7 +18,17 @@ type IMoveGenerator interface {
 	SliderPseudoLegalMoves(pos *Position, idx int8, pieceType int8) []int8
 	KingPseudoLegalMoves(pos *Position, idx int8) []int8
 	KnightPseudoLegalMoves(pos *Position, idx int8) []int8
+	PawnPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) (int, int8)
+	SliderPseudoLegalMovesInto(pos *Position, idx int8, pieceType int8, dst []int8) int
+	KingPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int
+	KnightPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int
 }
+
+const (
+	MaxPerftPly   = 64
+	MaxLegalMoves = 256
+	MaxTargets    = 28
+)
 
 func NewEngine() *Engine {
 	moveGenerator := NewBitsBoardMoveGenerator()
@@ -57,90 +67,113 @@ func (e *Engine) isCastlePathSafe(pos *Position, move Move) bool {
 	return isIntermediateSquareSafe
 }
 
-func (e *Engine) LegalMoves(pos *Position) []Move {
-	var moves []Move
+func (e *Engine) legalMovesInto(pos *Position, dst []Move) int {
+	count := 0
+	var targets [MaxTargets]int8
+	positionCheck := pos.IsCheck()
 
 	piecesMask := pos.OccupancyMask(pos.activeColor)
-	for piecesMask != 0 { //for idx := int8(0); idx < 64; idx++ {
+	for piecesMask != 0 {
 		idx := int8(bits.TrailingZeros64(piecesMask))
-		//piece := pos.PieceAt(idx)
 
 		pieceMask := uint64(1 << idx)
 		var (
-			pseudoLegalMoves []int8
-			pieceType        int8
+			pseudoCount  int
+			pieceType    int8
+			piece        Piece
+			initialColor = pos.activeColor
 		)
 
 		switch {
 		case pieceMask&pos.pawnBoard != 0:
-			pseudoLegalMoves, _ = e.moveGenerator.PawnPseudoLegalMoves(pos, idx)
+			pseudoCount, _ = e.moveGenerator.PawnPseudoLegalMovesInto(pos, idx, targets[:])
 			pieceType = Pawn
 		case pieceMask&pos.knightBoard != 0:
-			pseudoLegalMoves = e.moveGenerator.KnightPseudoLegalMoves(pos, idx)
+			pseudoCount = e.moveGenerator.KnightPseudoLegalMovesInto(pos, idx, targets[:])
 			pieceType = Knight
 		case pieceMask&pos.bishopBoard != 0:
-			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Bishop)
+			pseudoCount = e.moveGenerator.SliderPseudoLegalMovesInto(pos, idx, Bishop, targets[:])
 			pieceType = Bishop
 		case pieceMask&pos.rookBoard != 0:
-			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Rook)
+			pseudoCount = e.moveGenerator.SliderPseudoLegalMovesInto(pos, idx, Rook, targets[:])
 			pieceType = Rook
 		case pieceMask&pos.queenBoard != 0:
-			pseudoLegalMoves = e.moveGenerator.SliderPseudoLegalMoves(pos, idx, Queen)
+			pseudoCount = e.moveGenerator.SliderPseudoLegalMovesInto(pos, idx, Queen, targets[:])
 			pieceType = Queen
 		case pieceMask&pos.kingBoard != 0:
-			pseudoLegalMoves = e.moveGenerator.KingPseudoLegalMoves(pos, idx)
+			pseudoCount = e.moveGenerator.KingPseudoLegalMovesInto(pos, idx, targets[:])
 			pieceType = King
 		}
 
-		for _, pseudoLegalMoveIdx := range pseudoLegalMoves {
-			initialColor := pos.activeColor
-			candidateMoves := []Move{
-				NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, NormalMove),
+		piece = Piece(pos.activeColor | pieceType)
+		for i := 0; i < pseudoCount; i++ {
+			targetIdx := targets[i]
+			if pieceType == Pawn && isPromotionSquare(pos.activeColor, targetIdx) {
+				flags := [4]int8{QueenPromotion, KnightPromotion, BishopPromotion, RookPromotion}
+				for _, flag := range flags {
+					move := NewMove(piece, idx, targetIdx, flag)
+					if e.isCastleMove(pieceType, move) && !e.isCastlePathSafe(pos, move) {
+						continue
+					}
+					if !positionCheck && !e.positionUpdater.IsMoveAffectsKing(pos, move, pos.activeColor) {
+						dst[count] = move
+						count++
+						continue
+					}
+					history := e.positionUpdater.MakeMove(pos, move)
+					if !IsKingInCheck(pos, initialColor) {
+						dst[count] = move
+						count++
+					}
+					e.positionUpdater.UnMakeMove(pos, history)
+				}
+				continue
 			}
 
-			if pieceType == Pawn && isPromotionSquare(pos.activeColor, pseudoLegalMoveIdx) {
-				candidateMoves = []Move{
-					NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, QueenPromotion),
-					NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, KnightPromotion),
-					NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, BishopPromotion),
-					NewMove(Piece(pos.activeColor|pieceType), idx, pseudoLegalMoveIdx, RookPromotion),
-				}
+			move := NewMove(piece, idx, targetIdx, NormalMove)
+			if e.isCastleMove(pieceType, move) && !e.isCastlePathSafe(pos, move) {
+				continue
 			}
 
-			for _, pseudoLegalMove := range candidateMoves {
-				if e.isCastleMove(pieceType, pseudoLegalMove) && !e.isCastlePathSafe(pos, pseudoLegalMove) {
-					continue
-				}
-
-				// skip further checks if not needed
-				if !pos.IsCheck() && !e.positionUpdater.IsMoveAffectsKing(pos, pseudoLegalMove, pos.activeColor) {
-					moves = append(moves, pseudoLegalMove)
-					continue
-				}
-
-				history := e.positionUpdater.MakeMove(pos, pseudoLegalMove)
-
-				if !IsKingInCheck(pos, initialColor) { // check is the new position that the initial color is not in check
-					moves = append(moves, pseudoLegalMove)
-				}
-
-				e.positionUpdater.UnMakeMove(pos, history)
+			if !positionCheck && !e.positionUpdater.IsMoveAffectsKing(pos, move, pos.activeColor) {
+				dst[count] = move
+				count++
+				continue
 			}
+
+			history := e.positionUpdater.MakeMove(pos, move)
+			if !IsKingInCheck(pos, initialColor) {
+				dst[count] = move
+				count++
+			}
+			e.positionUpdater.UnMakeMove(pos, history)
 		}
 
 		piecesMask &^= 1 << idx
 	}
 
+	return count
+}
+
+func (e *Engine) LegalMoves(pos *Position) []Move {
+	var buf [MaxLegalMoves]Move
+	count := e.legalMovesInto(pos, buf[:])
+	moves := make([]Move, count)
+	copy(moves, buf[:count])
 	return moves
 }
 
 func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint64) {
+	var moveBuffers [MaxPerftPly][MaxLegalMoves]Move
 	res := make(map[string]uint64)
 	total := uint64(0)
 
-	for _, move := range e.LegalMoves(pos) {
+	rootMoves := moveBuffers[0][:]
+	rootCount := e.legalMovesInto(pos, rootMoves)
+	for i := 0; i < rootCount; i++ {
+		move := rootMoves[i]
 		history := e.positionUpdater.MakeMove(pos, move)
-		res[move.UCI()] = e.MoveGenerationTest(pos, depth)
+		res[move.UCI()] = e.moveGenerationTestWithBuffers(pos, depth, 1, &moveBuffers)
 		total += res[move.UCI()]
 		e.positionUpdater.UnMakeMove(pos, history)
 	}
@@ -149,16 +182,24 @@ func (e *Engine) PerftDivide(pos *Position, depth int) (map[string]uint64, uint6
 }
 
 func (e *Engine) MoveGenerationTest(pos *Position, depth int) uint64 {
+	var moveBuffers [MaxPerftPly][MaxLegalMoves]Move
+	return e.moveGenerationTestWithBuffers(pos, depth, 0, &moveBuffers)
+}
+
+func (e *Engine) moveGenerationTestWithBuffers(pos *Position, depth int, ply int, moveBuffers *[MaxPerftPly][MaxLegalMoves]Move) uint64 {
 	if depth == 1 {
 		return uint64(1)
 	}
 
+	moves := moveBuffers[ply][:]
+	moveCount := e.legalMovesInto(pos, moves)
 	posCount := uint64(0)
-	for _, move := range e.LegalMoves(pos) {
+	for i := 0; i < moveCount; i++ {
+		move := moves[i]
 		history := e.positionUpdater.MakeMove(pos, move)
 
 		nextDepth := depth - 1
-		nextDepthResult := e.MoveGenerationTest(pos, nextDepth)
+		nextDepthResult := e.moveGenerationTestWithBuffers(pos, nextDepth, ply+1, moveBuffers)
 		e.positionUpdater.UnMakeMove(pos, history)
 
 		posCount += nextDepthResult

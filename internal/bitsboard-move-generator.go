@@ -245,9 +245,16 @@ func (g *BitsBoardMoveGenerator) initKingMaskForSquare(squareIdx int8) {
 
 // PawnPseudoLegalMoves Generate pawn moves using bitboards
 func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) ([]int8, int8) {
-	moves := make([]int8, 0, 4)
-	promotionIdx := int8(-1)
+	var buf [4]int8
+	count, promotionIdx := g.PawnPseudoLegalMovesInto(pos, idx, buf[:])
+	moves := make([]int8, count)
+	copy(moves, buf[:count])
+	return moves, promotionIdx
+}
 
+func (g *BitsBoardMoveGenerator) PawnPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) (int, int8) {
+	count := 0
+	promotionIdx := int8(-1)
 	isWhite := pos.activeColor == White
 
 	var moveMask, captureMask uint64
@@ -259,15 +266,12 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 		captureMask = g.blackPawnCapturesMasks[idx]
 	}
 
-	// Generate moves
-
 	for moveMask != 0 {
 		targetIdx := leastSignificantOne(moveMask)
 		moveMask &= moveMask - 1
 
 		if pos.occupied&(1<<targetIdx) == 0 {
 			if (isWhite && targetIdx >= A8) || (!isWhite && targetIdx <= H1) {
-				// Handle promotion
 				promotionIdx = targetIdx
 			}
 
@@ -279,21 +283,16 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 				continue
 			}
 
-			moves = append(moves, targetIdx)
+			dst[count] = targetIdx
+			count++
 		}
 	}
 
-	// Handle en passant
-	// check first as next part is modifying the captureMask
-	// no color check need as pos.enPassantIdx is automatically set to NoEnPassant after player move,
-	// so it is impossible to be in the scenario of a Pawn being able
-	if pos.enPassantIdx != NoEnPassant {
-		if captureMask&(1<<pos.enPassantIdx) != 0 {
-			moves = append(moves, pos.enPassantIdx)
-		}
+	if pos.enPassantIdx != NoEnPassant && captureMask&(1<<pos.enPassantIdx) != 0 {
+		dst[count] = pos.enPassantIdx
+		count++
 	}
 
-	// Generate captures
 	oMask := pos.OpponentOccupiedMask()
 	for captureMask != 0 {
 		targetIdx := leastSignificantOne(captureMask)
@@ -301,20 +300,27 @@ func (g *BitsBoardMoveGenerator) PawnPseudoLegalMoves(pos *Position, idx int8) (
 
 		if (oMask & (1 << targetIdx)) != 0 {
 			if (isWhite && targetIdx >= A8) || (!isWhite && targetIdx <= H1) {
-				// Handle promotion with capture
 				promotionIdx = targetIdx
 			}
 
-			moves = append(moves, targetIdx)
+			dst[count] = targetIdx
+			count++
 		}
 	}
 
-	return moves, promotionIdx
+	return count, promotionIdx
 }
 
 func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) []int8 {
-	var moves = make([]int8, 0, 8)
+	var buf [8]int8
+	count := g.KingPseudoLegalMovesInto(pos, idx, buf[:])
+	moves := make([]int8, count)
+	copy(moves, buf[:count])
+	return moves
+}
 
+func (g *BitsBoardMoveGenerator) KingPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int {
+	count := 0
 	opponentOccupiedMask := pos.OpponentOccupiedMask()
 	castleRights := pos.CastleRights()
 	isWhite := pos.activeColor == White
@@ -324,7 +330,8 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) [
 		moveMask &= moveMask - 1
 
 		if pos.occupied&(1<<targetIdx) == 0 || opponentOccupiedMask&(1<<targetIdx) != 0 {
-			moves = append(moves, targetIdx)
+			dst[count] = targetIdx
+			count++
 		}
 	}
 
@@ -339,7 +346,7 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) [
 
 	// early exit no castle
 	if idx != kingStartIdx || castleRights == NoCastle {
-		return moves
+		return count
 	}
 
 	// queen side
@@ -357,7 +364,8 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) [
 		}
 
 		if queenPathIsClear {
-			moves = append(moves, queenCastleIdx)
+			dst[count] = queenCastleIdx
+			count++
 		}
 	}
 
@@ -376,15 +384,24 @@ func (g *BitsBoardMoveGenerator) KingPseudoLegalMoves(pos *Position, idx int8) [
 		}
 
 		if kingPathIsClear {
-			moves = append(moves, kingCastleIdx)
+			dst[count] = kingCastleIdx
+			count++
 		}
 	}
 
-	return moves
+	return count
 }
 
 func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos *Position, idx int8) []int8 {
-	var moves = make([]int8, 0, 8)
+	var buf [8]int8
+	count := g.KnightPseudoLegalMovesInto(pos, idx, buf[:])
+	moves := make([]int8, count)
+	copy(moves, buf[:count])
+	return moves
+}
+
+func (g *BitsBoardMoveGenerator) KnightPseudoLegalMovesInto(pos *Position, idx int8, dst []int8) int {
+	count := 0
 	knightMask := g.knightMasks[idx]
 	opponentOccupiedMask := pos.OpponentOccupiedMask()
 
@@ -393,14 +410,23 @@ func (g *BitsBoardMoveGenerator) KnightPseudoLegalMoves(pos *Position, idx int8)
 		knightMask &= knightMask - 1
 
 		if pos.occupied&(1<<targetIdx) == 0 || opponentOccupiedMask&(1<<targetIdx) != 0 {
-			moves = append(moves, targetIdx)
+			dst[count] = targetIdx
+			count++
 		}
 	}
 
-	return moves
+	return count
 }
 
 func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8, pieceType int8) []int8 {
+	var buf [28]int8
+	count := g.SliderPseudoLegalMovesInto(pos, idx, pieceType, buf[:])
+	moves := make([]int8, count)
+	copy(moves, buf[:count])
+	return moves
+}
+
+func (g *BitsBoardMoveGenerator) SliderPseudoLegalMovesInto(pos *Position, idx int8, pieceType int8, dst []int8) int {
 	var (
 		processBishopDirections = false
 		processRookDirections   = false
@@ -419,7 +445,7 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8,
 		processRookDirections = true
 	}
 
-	moves := make([]int8, 0, maxMovesCnt)
+	count := 0
 
 	opponentOccupiedMask := pos.OpponentOccupiedMask()
 	for dir := 0; dir < 4; dir++ {
@@ -427,12 +453,14 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8,
 			for _, targetIdx := range g.rookMasks[idx][dir] {
 				targetMask := uint64(1 << targetIdx)
 				if pos.occupied&targetMask == 0 {
-					moves = append(moves, targetIdx)
+					dst[count] = targetIdx
+					count++
 					continue
 				}
 
 				if opponentOccupiedMask&targetMask != 0 {
-					moves = append(moves, targetIdx)
+					dst[count] = targetIdx
+					count++
 				}
 
 				break
@@ -443,12 +471,14 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8,
 			for _, targetIdx := range g.bishopMasks[idx][dir] {
 				targetMask := uint64(1 << targetIdx)
 				if pos.occupied&targetMask == 0 {
-					moves = append(moves, targetIdx)
+					dst[count] = targetIdx
+					count++
 					continue
 				}
 
 				if opponentOccupiedMask&targetMask != 0 {
-					moves = append(moves, targetIdx)
+					dst[count] = targetIdx
+					count++
 				}
 
 				break
@@ -456,5 +486,6 @@ func (g *BitsBoardMoveGenerator) SliderPseudoLegalMoves(pos *Position, idx int8,
 		}
 	}
 
-	return moves
+	_ = maxMovesCnt
+	return count
 }
