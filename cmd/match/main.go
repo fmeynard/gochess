@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const maxDisplayedGames = 18
+const maxDisplayedGames = 10
 
 func main() {
 	var opponentTag string
@@ -76,27 +76,42 @@ func main() {
 	fmt.Printf("Games: %d\n", summary.Games)
 	fmt.Printf("Score: %s\n", summary.ScoreSummary())
 	fmt.Printf("W/D/L: %s\n", summary.WDLSummary())
+	fmt.Printf("As White W/D/L: %s\n", summary.AsWhite.Summary())
+	fmt.Printf("As Black W/D/L: %s\n", summary.AsBlack.Summary())
+	fmt.Printf("Reasons: %s\n", summary.ReasonSummary())
 	fmt.Printf("Markdown: %s", summary.MarkdownRow())
 }
 
 func renderSnapshot(snapshot match.Snapshot) {
 	var b strings.Builder
 	b.WriteString("\033[H\033[2J")
-	b.WriteString(fmt.Sprintf("Current: %s\n", snapshot.Current))
-	b.WriteString(fmt.Sprintf("Opponent: %s\n", snapshot.Opponent))
-	b.WriteString(fmt.Sprintf("Movetime: %s\n\n", snapshot.MoveTime))
-
-	b.WriteString(fmt.Sprintf("Progress  %s %d/%d\n", progressBar(snapshot.CompletedGames, snapshot.TotalGames, 32), snapshot.CompletedGames, snapshot.TotalGames))
-	b.WriteString(fmt.Sprintf("Global    %.1f/%d   W/D/L %s\n", snapshot.Score, snapshot.TotalGames, snapshot.Global.Summary()))
-	b.WriteString(fmt.Sprintf("As White  W/D/L %s\n", snapshot.AsWhite.Summary()))
-	b.WriteString(fmt.Sprintf("As Black  W/D/L %s\n", snapshot.AsBlack.Summary()))
-	b.WriteString(fmt.Sprintf("Running   %d\n", snapshot.RunningGames))
-	b.WriteString(fmt.Sprintf("Avg NPS   %.0f\n", snapshot.AverageNPS))
-	b.WriteString(fmt.Sprintf("Elapsed   %s\n", snapshot.Elapsed.Round(time.Second)))
-	b.WriteString(fmt.Sprintf("ETA       %s\n\n", snapshot.EstimatedRemain.Round(time.Second)))
-
-	b.WriteString("Game  Color  Status   Reason               Plies  Time\n")
-	b.WriteString("----  -----  -------  -------------------  -----  -------\n")
+	b.WriteString(box(
+		"Match",
+		[]string{
+			fmt.Sprintf("Current   %s", snapshot.Current),
+			fmt.Sprintf("Opponent  %s", snapshot.Opponent),
+			fmt.Sprintf("Movetime  %s", snapshot.MoveTime),
+		},
+	))
+	b.WriteString("\n")
+	b.WriteString(box(
+		"Stats",
+		[]string{
+			fmt.Sprintf("Progress  %s %d/%d", progressBar(snapshot.CompletedGames, snapshot.TotalGames, 28), snapshot.CompletedGames, snapshot.TotalGames),
+			fmt.Sprintf("Global    %.1f/%d   W/D/L %s", snapshot.Score, snapshot.TotalGames, snapshot.Global.Summary()),
+			fmt.Sprintf("As White  W/D/L %s", snapshot.AsWhite.Summary()),
+			fmt.Sprintf("As Black  W/D/L %s", snapshot.AsBlack.Summary()),
+			fmt.Sprintf("Running   %d", snapshot.RunningGames),
+			fmt.Sprintf("Avg NPS   %.0f", snapshot.AverageNPS),
+			fmt.Sprintf("Elapsed   %s", snapshot.Elapsed.Round(time.Second)),
+			fmt.Sprintf("ETA       %s", snapshot.EstimatedRemain.Round(time.Second)),
+		},
+	))
+	b.WriteString("\n")
+	b.WriteString("Games\n")
+	b.WriteString("┌──────┬───────┬─────────┬─────────────────────┬───────┬────────┐\n")
+	b.WriteString("│ Game │ Color │ Status  │ Reason              │ Plies │ Time   │\n")
+	b.WriteString("├──────┼───────┼─────────┼─────────────────────┼───────┼────────┤\n")
 
 	start := 0
 	if len(snapshot.Games) > maxDisplayedGames {
@@ -104,7 +119,7 @@ func renderSnapshot(snapshot match.Snapshot) {
 	}
 	for _, game := range snapshot.Games[start:] {
 		b.WriteString(fmt.Sprintf(
-			"%4d  %-5s  %-7s  %-19s  %5d  %7s\n",
+			"│ %4d │ %-5s │ %-7s │ %-19s │ %5d │ %6s │\n",
 			game.GameIndex,
 			colorLabel(game.CurrentAsWhite),
 			game.Status,
@@ -113,6 +128,7 @@ func renderSnapshot(snapshot match.Snapshot) {
 			game.Duration.Round(time.Second),
 		))
 	}
+	b.WriteString("└──────┴───────┴─────────┴─────────────────────┴───────┴────────┘\n")
 
 	fmt.Print(b.String())
 }
@@ -143,4 +159,32 @@ func truncate(s string, max int) string {
 		return s[:max]
 	}
 	return s[:max-3] + "..."
+}
+
+func box(title string, lines []string) string {
+	width := len(title)
+	for _, line := range lines {
+		if len(line) > width {
+			width = len(line)
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("┌─ ")
+	b.WriteString(title)
+	b.WriteString(" ")
+	b.WriteString(strings.Repeat("─", width-len(title)))
+	b.WriteString("─┐\n")
+	for _, line := range lines {
+		b.WriteString("│ ")
+		b.WriteString(line)
+		if pad := width - len(line); pad > 0 {
+			b.WriteString(strings.Repeat(" ", pad))
+		}
+		b.WriteString(" │\n")
+	}
+	b.WriteString("└")
+	b.WriteString(strings.Repeat("─", width+2))
+	b.WriteString("┘\n")
+	return b.String()
 }

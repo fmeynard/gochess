@@ -78,6 +78,7 @@ type matchState struct {
 	asWhite Record
 	asBlack Record
 	games   []GameRecord
+	started []time.Time
 	running int
 	nodes   uint64
 	time    time.Duration
@@ -117,6 +118,29 @@ func RunMatch(cfg Config) (Summary, error) {
 
 	state := newMatchState(cfg, opponent.Label)
 	state.emit()
+
+	stopTicker := make(chan struct{})
+	var tickerWG sync.WaitGroup
+	if cfg.Progress != nil {
+		tickerWG.Add(1)
+		go func() {
+			defer tickerWG.Done()
+			ticker := time.NewTicker(250 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					state.emit()
+				case <-stopTicker:
+					return
+				}
+			}
+		}()
+	}
+	defer func() {
+		close(stopTicker)
+		tickerWG.Wait()
+	}()
 
 	jobs := make(chan int)
 	results := make(chan gameResult, cfg.Games)
@@ -230,9 +254,11 @@ func newMatchState(cfg Config, opponentLabel string) *matchState {
 			Opponent: opponentLabel,
 			MoveTime: cfg.MoveTime,
 			Games:    cfg.Games,
+			Reasons:  make(map[string]int),
 			Notes:    cfg.Notes,
 		},
-		games: games,
+		games:   games,
+		started: make([]time.Time, cfg.Games),
 	}
 }
 
@@ -243,6 +269,7 @@ func (s *matchState) startGame(gameIndex int, currentAsWhite bool) {
 	s.games[gameIndex].Plies = 0
 	s.games[gameIndex].Duration = 0
 	s.games[gameIndex].CurrentAsWhite = currentAsWhite
+	s.started[gameIndex] = time.Now()
 	s.running++
 	s.mu.Unlock()
 	s.emit()
@@ -257,31 +284,39 @@ func (s *matchState) finish(result gameResult) {
 	record.Reason = result.reason
 	record.Plies = result.plies
 	record.Duration = result.duration
+	s.started[result.gameIndex] = time.Time{}
 
 	s.running--
 	s.nodes += result.nodes
 	s.time += result.searchTime
+	s.summary.Reasons[result.reason]++
 	switch result.outcome {
 	case 1:
 		s.summary.CurrentWins++
 		if result.currentAsWhite {
 			s.asWhite.Wins++
+			s.summary.AsWhite = s.asWhite
 		} else {
 			s.asBlack.Wins++
+			s.summary.AsBlack = s.asBlack
 		}
 	case -1:
 		s.summary.CurrentLosses++
 		if result.currentAsWhite {
 			s.asWhite.Losses++
+			s.summary.AsWhite = s.asWhite
 		} else {
 			s.asBlack.Losses++
+			s.summary.AsBlack = s.asBlack
 		}
 	default:
 		s.summary.Draws++
 		if result.currentAsWhite {
 			s.asWhite.Draws++
+			s.summary.AsWhite = s.asWhite
 		} else {
 			s.asBlack.Draws++
+			s.summary.AsBlack = s.asBlack
 		}
 	}
 
@@ -309,6 +344,12 @@ func (s *matchState) emitLocked() {
 
 	gamesCopy := make([]GameRecord, len(s.games))
 	copy(gamesCopy, s.games)
+	now := time.Now()
+	for i := range gamesCopy {
+		if gamesCopy[i].Status == "running" && !s.started[i].IsZero() {
+			gamesCopy[i].Duration = now.Sub(s.started[i])
+		}
+	}
 
 	s.cfg.Progress(Snapshot{
 		Current:         s.summary.Current,

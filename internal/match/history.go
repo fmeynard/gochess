@@ -15,6 +15,9 @@ type Summary struct {
 	CurrentWins   int
 	Draws         int
 	CurrentLosses int
+	AsWhite       Record
+	AsBlack       Record
+	Reasons       map[string]int
 	Notes         string
 }
 
@@ -52,6 +55,44 @@ func (s Summary) MarkdownRow() string {
 		s.WDLSummary(),
 		escapeMarkdownCell(s.Notes),
 	)
+}
+
+func (s Summary) ReasonSummary() string {
+	if len(s.Reasons) == 0 {
+		return "-"
+	}
+
+	order := []string{
+		"checkmate",
+		"draw by repetition",
+		"stalemate",
+		"max plies",
+		"illegal move",
+		"search error",
+	}
+
+	parts := make([]string, 0, len(s.Reasons))
+	seen := make(map[string]bool, len(order))
+	for _, reason := range order {
+		count := s.Reasons[reason]
+		if count == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=%d", reason, count))
+		seen[reason] = true
+	}
+
+	for reason, count := range s.Reasons {
+		if seen[reason] || count == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=%d", reason, count))
+	}
+
+	if len(parts) == 0 {
+		return "-"
+	}
+	return strings.Join(parts, ", ")
 }
 
 func escapeMarkdownCell(s string) string {
