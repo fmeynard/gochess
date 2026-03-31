@@ -5,12 +5,13 @@ Owns search code and search-facing types.
 Current scope:
 
 - search limits/results/stats types
-- alpha-beta searcher scaffolding
+- fixed-depth negamax alpha-beta
+- terminal handling for:
+  - checkmate
+  - stalemate
 
 Planned scope:
 
-- negamax
-- alpha-beta pruning
 - iterative deepening
 - move ordering
 - quiescence
