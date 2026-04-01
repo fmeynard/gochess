@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	board "chessV2/internal/board"
 	"chessV2/internal/match"
 	"encoding/json"
 	"errors"
@@ -199,11 +198,7 @@ func newStockfishClient(path string) (*stockfishClient, error) {
 }
 
 func (c *stockfishClient) evaluate(fen string, moveTime time.Duration) (int, string, error) {
-	sanitizedFEN, err := sanitizeFENForStockfish(fen)
-	if err != nil {
-		return 0, "", err
-	}
-	if err := c.send("position fen " + sanitizedFEN); err != nil {
+	if err := c.send("position fen " + fen); err != nil {
 		return 0, "", err
 	}
 	if err := c.send(fmt.Sprintf("go movetime %d", moveTime.Milliseconds())); err != nil {
@@ -294,43 +289,6 @@ func parseCentipawnScore(line string) (int, bool) {
 		}
 	}
 	return 0, false
-}
-
-func sanitizeFENForStockfish(fen string) (string, error) {
-	pos, err := board.NewPositionFromFEN(fen)
-	if err != nil {
-		return "", err
-	}
-
-	parts := strings.Fields(fen)
-	if len(parts) < 4 {
-		return "", fmt.Errorf("invalid FEN: %s", fen)
-	}
-
-	rights := make([]byte, 0, 4)
-	if pos.PieceAt(board.E1) == board.Piece(board.White|board.King) {
-		if pos.PieceAt(board.H1) == board.Piece(board.White|board.Rook) {
-			rights = append(rights, 'K')
-		}
-		if pos.PieceAt(board.A1) == board.Piece(board.White|board.Rook) {
-			rights = append(rights, 'Q')
-		}
-	}
-	if pos.PieceAt(board.E8) == board.Piece(board.Black|board.King) {
-		if pos.PieceAt(board.H8) == board.Piece(board.Black|board.Rook) {
-			rights = append(rights, 'k')
-		}
-		if pos.PieceAt(board.A8) == board.Piece(board.Black|board.Rook) {
-			rights = append(rights, 'q')
-		}
-	}
-	if len(rights) == 0 {
-		parts[2] = "-"
-	} else {
-		parts[2] = string(rights)
-	}
-
-	return strings.Join(parts, " "), nil
 }
 
 func (c *stockfishClient) readFailure(context string) error {
