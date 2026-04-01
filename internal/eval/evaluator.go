@@ -72,6 +72,8 @@ const (
 	doubledPawnPenaltyEG   Score = 8
 	queenOverextensionBase Score = 18
 	rookOverextensionBase  Score = 12
+	queenRaidPenaltyBase   Score = 28
+	rookRaidPenaltyBase    Score = 20
 )
 
 const kingSafetyTradeValue Score = 2000
@@ -402,14 +404,14 @@ func pieceSafetyScore(pos *board.Position, color int8) Score {
 			}
 		}
 
-		penalty += heavyPieceOverextensionPenalty(piece, idx, color, attackers, defenders, leastAttacker, leastDefender)
+		penalty += heavyPieceOverextensionPenalty(pos, piece, idx, color, attackers, defenders, leastAttacker, leastDefender)
 		score -= penalty
 	}
 
 	return score
 }
 
-func heavyPieceOverextensionPenalty(piece board.Piece, idx, color int8, attackers, defenders int, leastAttacker, leastDefender Score) Score {
+func heavyPieceOverextensionPenalty(pos *board.Position, piece board.Piece, idx, color int8, attackers, defenders int, leastAttacker, leastDefender Score) Score {
 	if piece.Type() != board.Queen && piece.Type() != board.Rook {
 		return DrawScore
 	}
@@ -439,6 +441,34 @@ func heavyPieceOverextensionPenalty(piece board.Piece, idx, color int8, attacker
 		if leastDefender == 0 || leastDefender > leastAttacker {
 			penalty += basePenalty / 2
 		}
+	}
+
+	penalty += unsafeHeavyRaidPenalty(pos, piece, idx, color, attackers, defenders)
+	return penalty
+}
+
+func unsafeHeavyRaidPenalty(pos *board.Position, piece board.Piece, idx, color int8, attackers, defenders int) Score {
+	depth := enemyTerritoryDepth(color, idx)
+	if depth < 2 {
+		return DrawScore
+	}
+
+	basePenalty := rookRaidPenaltyBase
+	if piece.Type() == board.Queen {
+		basePenalty = queenRaidPenaltyBase
+	}
+
+	safeRetreats := safeHeavyRetreatCount(pos, piece, idx, color)
+	if safeRetreats >= 3 {
+		return DrawScore
+	}
+
+	penalty := basePenalty * Score(3-safeRetreats)
+	if attackers > defenders {
+		penalty += basePenalty / 2
+	}
+	if safeRetreats == 0 {
+		penalty += basePenalty / 2
 	}
 
 	return penalty
@@ -630,6 +660,46 @@ func enemyTerritoryDepth(color, idx int8) int8 {
 		return rank - 3
 	}
 	return 4 - rank
+}
+
+func safeHeavyRetreatCount(pos *board.Position, piece board.Piece, idx, color int8) int {
+	enemyColor := board.White
+	if color == board.White {
+		enemyColor = board.Black
+	}
+
+	currentDepth := enemyTerritoryDepth(color, idx)
+	targets := movegen.PseudoLegalTargetsMask(pos, piece, idx)
+	count := 0
+
+	for targets != 0 {
+		target := int8(bits.TrailingZeros64(targets))
+		targets &^= 1 << target
+
+		if retreatDepth(color, target) > currentDepth {
+			continue
+		}
+
+		enemyAttackers := attackCountOnSquare(pos, enemyColor, target)
+		friendlyDefenders := attackCountOnSquare(pos, color, target)
+		if movegen.PieceAttackMask(pos, piece, idx)&(uint64(1)<<target) != 0 && friendlyDefenders > 0 {
+			friendlyDefenders--
+		}
+		leastEnemy := leastAttackerValueOnSquare(pos, enemyColor, target)
+
+		if enemyAttackers == 0 || friendlyDefenders > enemyAttackers || leastEnemy >= tradeSafetyValue(piece.Type()) {
+			count++
+		}
+	}
+
+	return count
+}
+
+func retreatDepth(color, idx int8) int8 {
+	if !isEnemyTerritorySquare(color, idx) {
+		return 0
+	}
+	return enemyTerritoryDepth(color, idx)
 }
 
 func pawnShieldPenalty(pos *board.Position, color, kingIdx int8, phase int) Score {

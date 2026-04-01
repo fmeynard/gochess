@@ -155,6 +155,24 @@ func TestStaticEvaluatorEvaluate(t *testing.T) {
 				assert.Less(t, exposed, safe)
 			},
 		},
+		"deep rook raid with fewer escape squares scores worse than a shallower rook": {
+			fen: "1r4k1/pR6/8/8/8/8/6b1/4K3 w - - 0 1",
+			assertion: func(t *testing.T, trapped Score) {
+				saferPos, err := board.NewPositionFromFEN("1r4k1/p7/3R4/8/8/8/6b1/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				safer := evaluator.Evaluate(saferPos)
+				assert.Less(t, trapped, safer)
+			},
+		},
+		"deep queen raid with fewer escape squares scores worse than a shallower queen": {
+			fen: "6k1/6pp/8/8/8/7b/6Q1/4K3 w - - 0 1",
+			assertion: func(t *testing.T, trapped Score) {
+				saferPos, err := board.NewPositionFromFEN("6k1/6pp/8/8/6Q1/7b/8/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				safer := evaluator.Evaluate(saferPos)
+				assert.Less(t, trapped, safer)
+			},
+		},
 	}
 
 	for name, tt := range tests {
