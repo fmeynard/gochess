@@ -22,6 +22,18 @@ type Summary struct {
 	Notes         string
 }
 
+type MoveRecord struct {
+	GameIndex      int       `json:"game_index"`
+	Ply            int       `json:"ply"`
+	CurrentAsWhite bool      `json:"current_as_white"`
+	SideToMove     string    `json:"side_to_move"`
+	Player         string    `json:"player"`
+	Move           string    `json:"move"`
+	FENBefore      string    `json:"fen_before"`
+	FENAfter       string    `json:"fen_after"`
+	Timestamp      time.Time `json:"timestamp"`
+}
+
 type IllegalMoveDiagnostic struct {
 	GameIndex      int
 	CurrentAsWhite bool

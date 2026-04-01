@@ -6,6 +6,7 @@ GAMES ?= 10
 MOVETIME ?= 1000
 MOVE_OVERHEAD ?= 50
 NOTES ?=
+RECORD_PATH ?=
 BENCH_DEPTH ?= 7
 BENCH_MODE ?= hot
 BENCH_WARMUP ?= 1
@@ -22,6 +23,9 @@ endif
 ifneq ($(strip $(NOTES)),)
 RUNNER_FLAGS += -notes "$(NOTES)"
 endif
+ifneq ($(strip $(RECORD_PATH)),)
+RUNNER_FLAGS += -record-path $(RECORD_PATH)
+endif
 ifeq ($(MODE),plain)
 RUNNER_FLAGS += -plain
 endif
@@ -34,7 +38,7 @@ ifneq ($(strip $(BENCH_PROFILE)),)
 BENCH_PERFT_ENV += BENCH_PROFILE='$(BENCH_PROFILE)'
 endif
 
-.PHONY: help test build-uci smoke-uci runner bench-perft bench-perft-hot bench-perft-hot-no-tricks bench-perft-cold-no-tricks bench-updater-bench
+.PHONY: help test build-uci smoke-uci runner analyze-match bench-perft bench-perft-hot bench-perft-hot-no-tricks bench-perft-cold-no-tricks bench-updater-bench
 
 help:
 	@echo "Common targets:"
@@ -42,6 +46,7 @@ help:
 	@echo "  make build-uci"
 	@echo "  make smoke-uci"
 	@echo "  make runner MODE=tui CONCURRENT=5 OPPONENT_TAG=score-v1 GAMES=10 MOVETIME=1000 MOVE_OVERHEAD=50"
+	@echo "  make analyze-match RECORD_PATH=.codex-tmp/match/records.jsonl STOCKFISH=stockfish"
 	@echo "  make bench-perft BENCH_DEPTH=7 BENCH_MODE=hot BENCH_NO_PERFT_TRICKS=1"
 	@echo "  make bench-perft-hot"
 	@echo "  make bench-perft-hot-no-tricks"
@@ -56,6 +61,7 @@ help:
 	@echo "  MOVETIME=<ms>         default: $(MOVETIME)"
 	@echo "  MOVE_OVERHEAD=<ms>    default: $(MOVE_OVERHEAD)"
 	@echo "  NOTES=<text>          default: empty"
+	@echo "  RECORD_PATH=<path>    optional JSONL move log for match analysis"
 	@echo ""
 	@echo "Benchmark variables:"
 	@echo "  BENCH_DEPTH=<n>       default: $(BENCH_DEPTH)"
@@ -79,6 +85,14 @@ smoke-uci: build-uci
 
 runner:
 	GOCACHE="$(GOCACHE)" go run ./cmd/match $(RUNNER_FLAGS)
+
+STOCKFISH ?= stockfish
+ANALYZE_LIMIT ?= 20
+ANALYZE_MOVETIME ?= 250
+ANALYZE_MIN_SWING ?= 150
+
+analyze-match:
+	GOCACHE="$(GOCACHE)" go run ./cmd/analyze-match -input $(RECORD_PATH) -stockfish $(STOCKFISH) -movetime $(ANALYZE_MOVETIME) -limit $(ANALYZE_LIMIT) -min-swing $(ANALYZE_MIN_SWING)
 
 bench-perft:
 	$(BENCH_PERFT_ENV) ./scripts/bench-perft.sh

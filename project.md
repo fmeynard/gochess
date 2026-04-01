@@ -106,6 +106,7 @@ Useful flags:
 - `-movetime <ms>`: per-move time budget in milliseconds
 - `-move-overhead <ms>`: safety margin subtracted before sending `go movetime`
 - `-notes "<text>"`: note included in the printed markdown row
+- `-record-path <path>`: optional JSONL move log with FEN before/after every move
 - `-plain`: line-based progress output instead of the live terminal dashboard
 
 Useful `make` variables:
@@ -117,6 +118,30 @@ Useful `make` variables:
 - `MOVETIME=<ms>`
 - `MOVE_OVERHEAD=<ms>`
 - `NOTES="<text>"`
+- `RECORD_PATH=<path>`
+
+## Analyze Match Blunders With Stockfish
+
+Record a match to JSONL:
+
+```bash
+make runner MODE=plain GAMES=2 MOVETIME=1000 OPPONENT_TAG=score-v1 RECORD_PATH=.codex-tmp/match/records.jsonl
+```
+
+Then analyze the largest evaluation swings with Stockfish:
+
+```bash
+make analyze-match RECORD_PATH=.codex-tmp/match/records.jsonl STOCKFISH=stockfish ANALYZE_MOVETIME=250 ANALYZE_LIMIT=20 ANALYZE_MIN_SWING=150
+```
+
+The analyzer prints the biggest centipawn drops for recorded moves, including:
+
+- game index
+- ply
+- move played
+- Stockfish best move on the pre-move position
+- centipawn score before and after the move
+- FEN before and after the move
 
 Output shape:
 
