@@ -89,7 +89,12 @@ func (s *AlphaBetaSearcher) searchIterative(pos *board.Position, limits Limits) 
 	var haveComplete bool
 
 	for depth := 1; depth <= maxDepth; depth++ {
-		result, err := s.searchDepth(pos, depth, deadline, limits.Stop, newRepetitionTracker(pos, limits.History))
+		iterPos := pos
+		if refreshed, refreshErr := board.NewPositionFromFEN(pos.FEN()); refreshErr == nil {
+			iterPos = refreshed
+		}
+
+		result, err := s.searchDepth(iterPos, depth, deadline, limits.Stop, newRepetitionTracker(iterPos, limits.History))
 		if err != nil {
 			if errors.Is(err, errSearchTimeout) || errors.Is(err, errSearchStopped) {
 				if haveComplete {
@@ -98,10 +103,10 @@ func (s *AlphaBetaSearcher) searchIterative(pos *board.Position, limits Limits) 
 				}
 
 				var fallbackMoves [256]board.Move
-				moveCount := s.moveGenerator.LegalMovesInto(pos, s.positionUpdater, fallbackMoves[:])
+				moveCount := s.moveGenerator.LegalMovesInto(iterPos, s.positionUpdater, fallbackMoves[:])
 				if moveCount == 0 {
 					return Result{
-						Score: terminalScore(pos, 0),
+						Score: terminalScore(iterPos, 0),
 						Stats: Stats{
 							Nodes: 1,
 							Time:  time.Since(start),
