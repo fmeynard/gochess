@@ -72,6 +72,8 @@ const (
 	doubledPawnPenaltyEG   Score = 8
 )
 
+const kingSafetyTradeValue Score = 2000
+
 var passedPawnBonusMG = [8]Score{0, 0, 8, 14, 24, 40, 70, 0}
 var passedPawnBonusEG = [8]Score{0, 0, 16, 28, 48, 80, 130, 0}
 
@@ -363,6 +365,9 @@ func pieceSafetyScore(pos *board.Position, color int8) Score {
 
 		attackers := attackCountOnSquare(pos, enemyColor, idx)
 		defenders := attackCountOnSquare(pos, color, idx)
+		leastAttacker := leastAttackerValueOnSquare(pos, enemyColor, idx)
+		leastDefender := leastAttackerValueOnSquare(pos, color, idx)
+		pieceValue := tradeSafetyValue(piece.Type())
 
 		if defenders > 0 {
 			bonus := protectedPieceWeights[piece.Type()]
@@ -382,6 +387,19 @@ func pieceSafetyScore(pos *board.Position, color int8) Score {
 		} else if attackers > defenders {
 			penalty += exposedPieceWeights[piece.Type()] * Score(attackers-defenders)
 		}
+
+		if leastAttacker > 0 && leastAttacker < pieceValue {
+			tradeLoss := pieceValue - leastAttacker
+			switch {
+			case defenders == 0:
+				penalty += tradeLoss
+			case leastDefender == 0:
+				penalty += tradeLoss * 3 / 4
+			case leastDefender > leastAttacker:
+				penalty += tradeLoss * 3 / 5
+			}
+		}
+
 		score -= penalty
 	}
 
@@ -529,6 +547,35 @@ func attackCountOnSquare(pos *board.Position, color, square int8) int {
 		}
 	}
 	return count
+}
+
+func leastAttackerValueOnSquare(pos *board.Position, color, square int8) Score {
+	lowest := Score(0)
+	squareMask := uint64(1) << square
+
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece == board.NoPiece || piece.Color() != color {
+			continue
+		}
+		if movegen.PieceAttackMask(pos, piece, idx)&squareMask == 0 {
+			continue
+		}
+
+		value := tradeSafetyValue(piece.Type())
+		if lowest == 0 || value < lowest {
+			lowest = value
+		}
+	}
+
+	return lowest
+}
+
+func tradeSafetyValue(pieceType int8) Score {
+	if pieceType == board.King {
+		return kingSafetyTradeValue
+	}
+	return pieceValues[pieceType]
 }
 
 func pawnShieldPenalty(pos *board.Position, color, kingIdx int8, phase int) Score {
