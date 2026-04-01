@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -66,9 +67,35 @@ func TestServerStopCancelsRunningSearch(t *testing.T) {
 }
 
 func TestParseGoLimitsDefaultsDepthOne(t *testing.T) {
-	limits, err := parseGoLimits(nil)
+	limits, err := parseGoLimits(nil, board.White)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, limits.Depth)
+}
+
+func TestParseGoLimitsMoveTimeOverridesClockData(t *testing.T) {
+	limits, err := parseGoLimits([]string{"movetime", "250", "wtime", "60000", "btime", "60000"}, board.White)
+	assert.NoError(t, err)
+	assert.Equal(t, 250*time.Millisecond, limits.MoveTime)
+	assert.Zero(t, limits.Depth)
+}
+
+func TestParseGoLimitsAllocatesFromWhiteClock(t *testing.T) {
+	limits, err := parseGoLimits([]string{"wtime", "60000", "btime", "120000", "winc", "1000", "binc", "2000"}, board.White)
+	assert.NoError(t, err)
+	assert.Equal(t, 2750*time.Millisecond, limits.MoveTime)
+	assert.Zero(t, limits.Depth)
+}
+
+func TestParseGoLimitsAllocatesFromBlackClockAndMovesToGo(t *testing.T) {
+	limits, err := parseGoLimits([]string{"wtime", "60000", "btime", "90000", "winc", "1000", "binc", "2000", "movestogo", "20"}, board.Black)
+	assert.NoError(t, err)
+	assert.Equal(t, 6000*time.Millisecond, limits.MoveTime)
+	assert.Zero(t, limits.Depth)
+}
+
+func TestParseGoLimitsRejectsInvalidClockValue(t *testing.T) {
+	_, err := parseGoLimits([]string{"wtime", "-1"}, board.White)
+	assert.Error(t, err)
 }
 
 func TestEngineApplyUCIMoves(t *testing.T) {
@@ -117,6 +144,21 @@ func TestServerGoMoveTimeReturnsLegalBestMoveOnRegressionPositions(t *testing.T)
 			assert.Contains(t, legalMoves, bestMove)
 		})
 	}
+}
+
+func TestServerPositionAndGoClockTime(t *testing.T) {
+	e := engine.NewEngine()
+	server, err := NewServer(e)
+	assert.NoError(t, err)
+
+	var out bytes.Buffer
+	input := "position startpos moves e2e4\ngo wtime 60000 btime 60000 winc 1000 binc 1000\nquit\n"
+	err = server.Run(strings.NewReader(input), &out)
+	assert.NoError(t, err)
+
+	output := out.String()
+	assert.Contains(t, output, "info depth ")
+	assert.Contains(t, output, "bestmove ")
 }
 
 func parseBestMove(output string) string {
