@@ -177,8 +177,21 @@ func TestOrderMovesPrefersCaptures(t *testing.T) {
 		board.NewMove(board.Piece(board.White|board.Pawn), board.E4, board.D5, board.Capture),
 	}
 
-	orderMoves(pos, moves)
+	orderMoves(pos, moves, board.Move{})
 	assert.Equal(t, "e4d5", moves[0].UCI())
+}
+
+func TestOrderMovesPrefersTTMove(t *testing.T) {
+	pos, err := board.NewPositionFromFEN(board.FenStartPos)
+	assert.NoError(t, err)
+
+	moves := []board.Move{
+		board.NewMove(board.Piece(board.White|board.Knight), board.B1, board.C3, board.NormalMove),
+		board.NewMove(board.Piece(board.White|board.Knight), board.G1, board.F3, board.NormalMove),
+	}
+
+	orderMoves(pos, moves, moves[1])
+	assert.Equal(t, "g1f3", moves[0].UCI())
 }
 
 func TestAlphaBetaSearcherSearchWithMoveTimeRegressionGame45NeverReturnsZeroMove(t *testing.T) {
