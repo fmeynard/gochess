@@ -89,7 +89,7 @@ That expands to a live TUI run with:
 
 - `MODE=tui`
 - `CONCURRENT=5`
-- `OPPONENT_TAG=score-v0`
+- `OPPONENT_TAG=score-v1`
 - `GAMES=10`
 - `MOVETIME=1000`
 - `MOVE_OVERHEAD=50`

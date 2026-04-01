@@ -1,7 +1,7 @@
 GOCACHE ?= $(CURDIR)/.codex-tmp/go-build-cache
 MODE ?= tui
 CONCURRENT ?= 5
-OPPONENT_TAG ?= score-v0
+OPPONENT_TAG ?= score-v1
 GAMES ?= 10
 MOVETIME ?= 1000
 MOVE_OVERHEAD ?= 50
@@ -41,7 +41,7 @@ help:
 	@echo "  make test"
 	@echo "  make build-uci"
 	@echo "  make smoke-uci"
-	@echo "  make runner MODE=tui CONCURRENT=5 OPPONENT_TAG=score-v0 GAMES=10 MOVETIME=1000 MOVE_OVERHEAD=50"
+	@echo "  make runner MODE=tui CONCURRENT=5 OPPONENT_TAG=score-v1 GAMES=10 MOVETIME=1000 MOVE_OVERHEAD=50"
 	@echo "  make bench-perft BENCH_DEPTH=7 BENCH_MODE=hot BENCH_NO_PERFT_TRICKS=1"
 	@echo "  make bench-perft-hot"
 	@echo "  make bench-perft-hot-no-tricks"
