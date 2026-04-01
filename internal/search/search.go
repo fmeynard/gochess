@@ -62,10 +62,19 @@ func (s *AlphaBetaSearcher) Search(pos *board.Position, limits Limits) (Result, 
 		return Result{}, ErrInvalidLimits
 	}
 
+	var (
+		result Result
+		err    error
+	)
 	if limits.MoveTime > 0 {
-		return s.searchIterative(pos, limits)
+		result, err = s.searchIterative(pos, limits)
+	} else {
+		result, err = s.searchDepth(pos, limits.Depth, time.Time{}, limits.Stop, newRepetitionTracker(pos, limits.History))
 	}
-	return s.searchDepth(pos, limits.Depth, time.Time{}, limits.Stop, newRepetitionTracker(pos, limits.History))
+	if err != nil {
+		return Result{}, err
+	}
+	return s.ensureBestMove(pos, result), nil
 }
 
 func (s *AlphaBetaSearcher) searchIterative(pos *board.Position, limits Limits) (Result, error) {
@@ -467,4 +476,17 @@ func pieceOrderValue(pieceType int8) int {
 	default:
 		return 0
 	}
+}
+
+func (s *AlphaBetaSearcher) ensureBestMove(pos *board.Position, result Result) Result {
+	if result.BestMove != (board.Move{}) {
+		return result
+	}
+
+	var moves [256]board.Move
+	moveCount := s.moveGenerator.LegalMovesInto(pos, s.positionUpdater, moves[:])
+	if moveCount > 0 {
+		result.BestMove = moves[0]
+	}
+	return result
 }

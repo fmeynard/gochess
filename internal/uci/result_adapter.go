@@ -1,6 +1,7 @@
 package uci
 
 import (
+	board "chessV2/internal/board"
 	"chessV2/internal/search"
 	"time"
 )
@@ -38,5 +39,8 @@ func (r resultAdapter) searchScore() int32 {
 }
 
 func (r resultAdapter) bestMoveUCI() string {
+	if r.result.BestMove == (board.Move{}) {
+		return ""
+	}
 	return r.result.BestMove.UCI()
 }

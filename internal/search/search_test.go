@@ -92,6 +92,23 @@ func TestAlphaBetaSearcherSearchWithMoveTime(t *testing.T) {
 	assert.GreaterOrEqual(t, result.Stats.Time, time.Duration(0))
 }
 
+func TestAlphaBetaSearcherSearchReturnsFallbackMoveWhenStoppedImmediately(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN(board.FenStartPos)
+	assert.NoError(t, err)
+
+	stop := make(chan struct{})
+	close(stop)
+
+	result, err := searcher.Search(pos, Limits{Depth: 3, Stop: stop})
+	assert.NoError(t, err)
+	assert.NotEqual(t, board.Move{}, result.BestMove)
+}
+
 func TestAlphaBetaSearcherSearchWithDepthAndMoveTime(t *testing.T) {
 	searcher := NewAlphaBetaSearcher(
 		movegen.NewPseudoLegalMoveGenerator(),

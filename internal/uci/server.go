@@ -213,6 +213,7 @@ func (s *Server) runSearch(active *activeSearch, pos *board.Position, history []
 		return
 	}
 
+	result = s.ensureBestMove(pos, result)
 	s.writeResult(out, result)
 }
 
@@ -239,7 +240,10 @@ func (s *Server) writeResult(out io.Writer, result search.Result) {
 	defer s.writeMu.Unlock()
 
 	writeInfo(out, adaptResult(result))
-	bestMove := result.BestMove.UCI()
+	bestMove := "0000"
+	if result.BestMove != (board.Move{}) {
+		bestMove = result.BestMove.UCI()
+	}
 	if bestMove == "" {
 		bestMove = "0000"
 	}
@@ -312,4 +316,16 @@ func absScore(v int32) int32 {
 		return -v
 	}
 	return v
+}
+
+func (s *Server) ensureBestMove(pos *board.Position, result search.Result) search.Result {
+	if result.BestMove != (board.Move{}) {
+		return result
+	}
+
+	moves := s.engine.LegalMoves(pos)
+	if len(moves) > 0 {
+		result.BestMove = moves[0]
+	}
+	return result
 }
