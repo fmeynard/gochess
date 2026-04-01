@@ -1,5 +1,3 @@
-SHELL := /bin/zsh
-
 GOCACHE ?= $(CURDIR)/.codex-tmp/go-build-cache
 MODE ?= tui
 CONCURRENT ?= 5
