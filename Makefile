@@ -90,9 +90,11 @@ STOCKFISH ?= stockfish
 ANALYZE_LIMIT ?= 20
 ANALYZE_MOVETIME ?= 250
 ANALYZE_MIN_SWING ?= 150
+ANALYZE_EXCLUDE_MATE ?= true
+ANALYZE_MIN_MATERIAL ?= 2000
 
 analyze-match:
-	GOCACHE="$(GOCACHE)" go run ./cmd/analyze-match -input $(RECORD_PATH) -stockfish $(STOCKFISH) -movetime $(ANALYZE_MOVETIME) -limit $(ANALYZE_LIMIT) -min-swing $(ANALYZE_MIN_SWING)
+	GOCACHE="$(GOCACHE)" go run ./cmd/analyze-match -input $(RECORD_PATH) -stockfish $(STOCKFISH) -movetime $(ANALYZE_MOVETIME) -limit $(ANALYZE_LIMIT) -min-swing $(ANALYZE_MIN_SWING) -exclude-mate=$(ANALYZE_EXCLUDE_MATE) -min-material $(ANALYZE_MIN_MATERIAL)
 
 bench-perft:
 	$(BENCH_PERFT_ENV) ./scripts/bench-perft.sh

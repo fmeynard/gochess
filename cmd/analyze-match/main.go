@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	board "chessV2/internal/board"
 	"chessV2/internal/match"
 	"encoding/json"
 	"errors"
@@ -24,6 +25,11 @@ type swing struct {
 	BestMove string
 }
 
+type evalScore struct {
+	CP     int
+	IsMate bool
+}
+
 type stockfishClient struct {
 	cmd      *exec.Cmd
 	stdin    io.WriteCloser
@@ -39,6 +45,8 @@ func main() {
 		limit         int
 		minSwingCP    int
 		onlyCurrent   bool
+		excludeMate   bool
+		minMaterial   int
 	)
 
 	flag.StringVar(&inputPath, "input", "", "Path to match JSONL record file")
@@ -47,6 +55,8 @@ func main() {
 	flag.IntVar(&limit, "limit", 20, "Maximum number of swings to print")
 	flag.IntVar(&minSwingCP, "min-swing", 150, "Minimum centipawn swing to include")
 	flag.BoolVar(&onlyCurrent, "only-current", true, "Only report swings from current engine moves")
+	flag.BoolVar(&excludeMate, "exclude-mate", true, "Exclude swings where the before or after score is a mate score")
+	flag.IntVar(&minMaterial, "min-material", 2000, "Minimum non-king material required in both positions to include a swing")
 	flag.Parse()
 
 	if inputPath == "" {
@@ -73,26 +83,45 @@ func main() {
 			continue
 		}
 
-		beforeCP, bestMove, err := client.evaluate(record.FENBefore, time.Duration(movetimeMS)*time.Millisecond)
+		beforeScore, bestMove, err := client.evaluate(record.FENBefore, time.Duration(movetimeMS)*time.Millisecond)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		afterCP, _, err := client.evaluate(record.FENAfter, time.Duration(movetimeMS)*time.Millisecond)
+		afterScore, _, err := client.evaluate(record.FENAfter, time.Duration(movetimeMS)*time.Millisecond)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 
-		delta := beforeCP + afterCP
+		if excludeMate && (beforeScore.IsMate || afterScore.IsMate) {
+			continue
+		}
+		if minMaterial > 0 {
+			beforeMaterial, err := nonKingMaterial(record.FENBefore)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			afterMaterial, err := nonKingMaterial(record.FENAfter)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			if beforeMaterial < minMaterial || afterMaterial < minMaterial {
+				continue
+			}
+		}
+
+		delta := beforeScore.CP + afterScore.CP
 		if delta < minSwingCP {
 			continue
 		}
 
 		swings = append(swings, swing{
 			MoveRecord: record,
-			BeforeCP:   beforeCP,
-			AfterCP:    afterCP,
+			BeforeCP:   beforeScore.CP,
+			AfterCP:    afterScore.CP,
 			DeltaCP:    delta,
 			BestMove:   bestMove,
 		})
@@ -197,15 +226,15 @@ func newStockfishClient(path string) (*stockfishClient, error) {
 	return client, nil
 }
 
-func (c *stockfishClient) evaluate(fen string, moveTime time.Duration) (int, string, error) {
+func (c *stockfishClient) evaluate(fen string, moveTime time.Duration) (evalScore, string, error) {
 	if err := c.send("position fen " + fen); err != nil {
-		return 0, "", err
+		return evalScore{}, "", err
 	}
 	if err := c.send(fmt.Sprintf("go movetime %d", moveTime.Milliseconds())); err != nil {
-		return 0, "", err
+		return evalScore{}, "", err
 	}
 
-	bestScore := 0
+	bestScore := evalScore{}
 	bestMove := ""
 	timer := time.NewTimer(moveTime + 5*time.Second)
 	defer timer.Stop()
@@ -214,7 +243,7 @@ func (c *stockfishClient) evaluate(fen string, moveTime time.Duration) (int, str
 		select {
 		case line, ok := <-c.lines:
 			if !ok {
-				return 0, "", c.readFailure("analysis")
+				return evalScore{}, "", c.readFailure("analysis")
 			}
 			if strings.HasPrefix(line, "info ") {
 				if score, ok := parseCentipawnScore(line); ok {
@@ -230,7 +259,7 @@ func (c *stockfishClient) evaluate(fen string, moveTime time.Duration) (int, str
 				return bestScore, bestMove, nil
 			}
 		case <-timer.C:
-			return 0, "", fmt.Errorf("timeout waiting for stockfish bestmove")
+			return evalScore{}, "", fmt.Errorf("timeout waiting for stockfish bestmove")
 		}
 	}
 }
@@ -264,7 +293,7 @@ func (c *stockfishClient) waitFor(prefix string, timeout time.Duration) (string,
 	}
 }
 
-func parseCentipawnScore(line string) (int, bool) {
+func parseCentipawnScore(line string) (evalScore, bool) {
 	fields := strings.Fields(line)
 	for i := 0; i < len(fields)-1; i++ {
 		if fields[i] != "score" || i+2 >= len(fields) {
@@ -274,21 +303,55 @@ func parseCentipawnScore(line string) (int, bool) {
 		case "cp":
 			value, err := strconv.Atoi(fields[i+2])
 			if err != nil {
-				return 0, false
+				return evalScore{}, false
 			}
-			return value, true
+			return evalScore{CP: value}, true
 		case "mate":
 			value, err := strconv.Atoi(fields[i+2])
 			if err != nil {
-				return 0, false
+				return evalScore{}, false
 			}
 			if value > 0 {
-				return 30000, true
+				return evalScore{CP: 30000, IsMate: true}, true
 			}
-			return -30000, true
+			return evalScore{CP: -30000, IsMate: true}, true
 		}
 	}
-	return 0, false
+	return evalScore{}, false
+}
+
+func nonKingMaterial(fen string) (int, error) {
+	pos, err := board.NewPositionFromFEN(fen)
+	if err != nil {
+		return 0, err
+	}
+
+	total := 0
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece == board.NoPiece || piece.Type() == board.King {
+			continue
+		}
+		total += pieceMaterialValue(piece.Type())
+	}
+	return total, nil
+}
+
+func pieceMaterialValue(pieceType int8) int {
+	switch pieceType {
+	case board.Pawn:
+		return 100
+	case board.Knight:
+		return 320
+	case board.Bishop:
+		return 330
+	case board.Rook:
+		return 500
+	case board.Queen:
+		return 900
+	default:
+		return 0
+	}
 }
 
 func (c *stockfishClient) readFailure(context string) error {
