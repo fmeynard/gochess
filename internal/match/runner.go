@@ -40,6 +40,7 @@ type GameRecord struct {
 	Reason         string
 	Plies          int
 	Duration       time.Duration
+	Diagnostic     *IllegalMoveDiagnostic
 }
 
 type Snapshot struct {
@@ -68,6 +69,7 @@ type gameResult struct {
 	duration       time.Duration
 	nodes          uint64
 	searchTime     time.Duration
+	diagnostic     *IllegalMoveDiagnostic
 }
 
 type matchState struct {
@@ -214,7 +216,7 @@ func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-
 		state.startGame(gameIndex, currentAsWhite)
 
 		start := time.Now()
-		outcome, plies, reason, nodes, searchTime, err := playSingleGame(
+		outcome, plies, reason, nodes, searchTime, diagnostic, err := playSingleGame(
 			currentClient,
 			opponentClient,
 			currentAsWhite,
@@ -226,6 +228,9 @@ func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-
 		if err != nil {
 			return err
 		}
+		if diagnostic != nil {
+			diagnostic.GameIndex = gameIndex + 1
+		}
 
 		results <- gameResult{
 			gameIndex:      gameIndex,
@@ -236,6 +241,7 @@ func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-
 			duration:       time.Since(start),
 			nodes:          nodes,
 			searchTime:     searchTime,
+			diagnostic:     diagnostic,
 		}
 	}
 
@@ -292,12 +298,16 @@ func (s *matchState) finish(result gameResult) {
 	record.Reason = result.reason
 	record.Plies = result.plies
 	record.Duration = result.duration
+	record.Diagnostic = result.diagnostic
 	s.started[result.gameIndex] = time.Time{}
 
 	s.running--
 	s.nodes += result.nodes
 	s.time += result.searchTime
 	s.summary.Reasons[result.reason]++
+	if result.diagnostic != nil {
+		s.summary.IllegalMoves = append(s.summary.IllegalMoves, *result.diagnostic)
+	}
 	switch result.outcome {
 	case 1:
 		s.summary.CurrentWins++
@@ -381,11 +391,11 @@ func (s *matchState) emitLocked() {
 	})
 }
 
-func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite bool, moveTime time.Duration, onPly func(int)) (int, int, string, uint64, time.Duration, error) {
+func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite bool, moveTime time.Duration, onPly func(int)) (int, int, string, uint64, time.Duration, *IllegalMoveDiagnostic, error) {
 	referee := engine.NewEngine()
 	pos, err := board.NewPositionFromFEN(board.FenStartPos)
 	if err != nil {
-		return 0, 0, "", 0, 0, err
+		return 0, 0, "", 0, 0, nil, err
 	}
 
 	moves := make([]string, 0, defaultMaxPlies)
@@ -395,7 +405,7 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 
 	for ply := 0; ply < defaultMaxPlies; ply++ {
 		if repetitionCount[pos.ZobristKey()] >= 3 {
-			return 0, ply, "draw by repetition", totalNodes, totalSearchTime, nil
+			return 0, ply, "draw by repetition", totalNodes, totalSearchTime, nil, nil
 		}
 
 		legalMoves := referee.LegalMoves(pos)
@@ -403,11 +413,11 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 			if movegen.IsKingInCheck(pos, pos.ActiveColor()) {
 				currentToMove := (pos.ActiveColor() == board.White) == currentIsWhite
 				if currentToMove {
-					return -1, ply, "checkmate", totalNodes, totalSearchTime, nil
+					return -1, ply, "checkmate", totalNodes, totalSearchTime, nil, nil
 				}
-				return 1, ply, "checkmate", totalNodes, totalSearchTime, nil
+				return 1, ply, "checkmate", totalNodes, totalSearchTime, nil, nil
 			}
-			return 0, ply, "stalemate", totalNodes, totalSearchTime, nil
+			return 0, ply, "stalemate", totalNodes, totalSearchTime, nil, nil
 		}
 
 		client := selectClient(currentClient, opponentClient, pos.ActiveColor(), currentIsWhite)
@@ -415,19 +425,27 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 		if err != nil {
 			currentToMove := (pos.ActiveColor() == board.White) == currentIsWhite
 			if currentToMove {
-				return -1, ply, "search error", totalNodes, totalSearchTime, nil
+				return -1, ply, "search error", totalNodes, totalSearchTime, nil, nil
 			}
-			return 1, ply, "search error", totalNodes, totalSearchTime, nil
+			return 1, ply, "search error", totalNodes, totalSearchTime, nil, nil
 		}
 		totalNodes += stats.Nodes
 		totalSearchTime += stats.Time
 
 		if err := referee.ApplyUCIMove(pos, bestMove); err != nil {
 			currentToMove := (pos.ActiveColor() == board.White) == currentIsWhite
-			if currentToMove {
-				return -1, ply, "illegal move", totalNodes, totalSearchTime, nil
+			diagnostic := &IllegalMoveDiagnostic{
+				GameIndex:      0,
+				CurrentAsWhite: currentIsWhite,
+				Offender:       illegalMoveOffender(currentToMove),
+				BestMove:       bestMove,
+				FEN:            pos.FEN(),
+				LegalMoves:     boardMovesToUCIs(legalMoves),
 			}
-			return 1, ply, "illegal move", totalNodes, totalSearchTime, nil
+			if currentToMove {
+				return -1, ply, "illegal move", totalNodes, totalSearchTime, diagnostic, nil
+			}
+			return 1, ply, "illegal move", totalNodes, totalSearchTime, diagnostic, nil
 		}
 
 		moves = append(moves, bestMove)
@@ -437,7 +455,7 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 		}
 	}
 
-	return 0, defaultMaxPlies, "max plies", totalNodes, totalSearchTime, nil
+	return 0, defaultMaxPlies, "max plies", totalNodes, totalSearchTime, nil, nil
 }
 
 func (s *matchState) updatePlies(gameIndex int, plies int) {
@@ -556,6 +574,21 @@ func outcomeLabel(outcome int) string {
 	default:
 		return "draw"
 	}
+}
+
+func illegalMoveOffender(currentToMove bool) string {
+	if currentToMove {
+		return "current"
+	}
+	return "opponent"
+}
+
+func boardMovesToUCIs(moves []board.Move) []string {
+	ucis := make([]string, 0, len(moves))
+	for _, move := range moves {
+		ucis = append(ucis, move.UCI())
+	}
+	return ucis
 }
 
 func averageNPS(nodes uint64, searchTime time.Duration) float64 {

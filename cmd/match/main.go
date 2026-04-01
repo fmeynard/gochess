@@ -79,6 +79,7 @@ func main() {
 	fmt.Printf("As White W/D/L: %s\n", summary.AsWhite.Summary())
 	fmt.Printf("As Black W/D/L: %s\n", summary.AsBlack.Summary())
 	fmt.Printf("Reasons: %s\n", summary.ReasonSummary())
+	printIllegalMoveDiagnostics(summary)
 	fmt.Printf("Markdown: %s", summary.MarkdownRow())
 }
 
@@ -254,4 +255,23 @@ func box(title string, lines []string) string {
 	b.WriteString(strings.Repeat("─", width+2))
 	b.WriteString("┘\n")
 	return b.String()
+}
+
+func printIllegalMoveDiagnostics(summary match.Summary) {
+	if len(summary.IllegalMoves) == 0 {
+		return
+	}
+
+	fmt.Println("Illegal Move Diagnostics:")
+	for _, diagnostic := range summary.IllegalMoves {
+		fmt.Printf(
+			"- Game %d | current=%s | offender=%s | bestmove=%s\n",
+			diagnostic.GameIndex,
+			colorLabel(diagnostic.CurrentAsWhite),
+			diagnostic.Offender,
+			diagnostic.BestMove,
+		)
+		fmt.Printf("  FEN: %s\n", diagnostic.FEN)
+		fmt.Printf("  Legal: %s\n", strings.Join(diagnostic.LegalMoves, ", "))
+	}
 }
