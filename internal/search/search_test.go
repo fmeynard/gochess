@@ -168,6 +168,22 @@ func TestRepetitionTrackerDetectsThreefold(t *testing.T) {
 	assert.True(t, tracker.isThreefold())
 }
 
+func TestRepetitionScoreDiscouragesDrawWhenAhead(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+
+	betterPos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1")
+	assert.NoError(t, err)
+	assert.Less(t, searcher.repetitionScore(betterPos), eval.DrawScore)
+
+	worsePos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/4q3/4K3 w - - 0 1")
+	assert.NoError(t, err)
+	assert.Greater(t, searcher.repetitionScore(worsePos), eval.DrawScore)
+}
+
 func TestOrderMovesPrefersCaptures(t *testing.T) {
 	searcher := NewAlphaBetaSearcher(
 		movegen.NewPseudoLegalMoveGenerator(),
