@@ -70,6 +70,8 @@ const (
 	isolatedPawnPenaltyEG  Score = 7
 	doubledPawnPenaltyMG   Score = 10
 	doubledPawnPenaltyEG   Score = 8
+	queenOverextensionBase Score = 18
+	rookOverextensionBase  Score = 12
 )
 
 const kingSafetyTradeValue Score = 2000
@@ -400,10 +402,46 @@ func pieceSafetyScore(pos *board.Position, color int8) Score {
 			}
 		}
 
+		penalty += heavyPieceOverextensionPenalty(piece, idx, color, attackers, defenders, leastAttacker, leastDefender)
 		score -= penalty
 	}
 
 	return score
+}
+
+func heavyPieceOverextensionPenalty(piece board.Piece, idx, color int8, attackers, defenders int, leastAttacker, leastDefender Score) Score {
+	if piece.Type() != board.Queen && piece.Type() != board.Rook {
+		return DrawScore
+	}
+	if !isEnemyTerritorySquare(color, idx) || attackers == 0 {
+		return DrawScore
+	}
+
+	basePenalty := rookOverextensionBase
+	if piece.Type() == board.Queen {
+		basePenalty = queenOverextensionBase
+	}
+
+	depth := enemyTerritoryDepth(color, idx)
+	penalty := basePenalty + Score(attackers)*basePenalty/2 + Score(depth)*basePenalty/3
+
+	switch {
+	case defenders == 0:
+		penalty += basePenalty
+	case attackers >= defenders:
+		penalty += basePenalty / 2
+	}
+
+	if leastAttacker > 0 {
+		if leastAttacker < tradeSafetyValue(piece.Type()) {
+			penalty += basePenalty
+		}
+		if leastDefender == 0 || leastDefender > leastAttacker {
+			penalty += basePenalty / 2
+		}
+	}
+
+	return penalty
 }
 
 func kingSafetyPenalty(pos *board.Position, color int8, phase int) Score {
@@ -576,6 +614,22 @@ func tradeSafetyValue(pieceType int8) Score {
 		return kingSafetyTradeValue
 	}
 	return pieceValues[pieceType]
+}
+
+func isEnemyTerritorySquare(color, idx int8) bool {
+	rank := board.RankFromIdx(idx)
+	if color == board.White {
+		return rank >= 4
+	}
+	return rank <= 3
+}
+
+func enemyTerritoryDepth(color, idx int8) int8 {
+	rank := board.RankFromIdx(idx)
+	if color == board.White {
+		return rank - 3
+	}
+	return 4 - rank
 }
 
 func pawnShieldPenalty(pos *board.Position, color, kingIdx int8, phase int) Score {

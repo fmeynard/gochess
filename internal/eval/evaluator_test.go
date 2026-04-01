@@ -137,6 +137,24 @@ func TestStaticEvaluatorEvaluate(t *testing.T) {
 				assert.Greater(t, healthy, weak)
 			},
 		},
+		"overextended queen in enemy territory is penalized against a safe queen": {
+			fen: "4k3/3Q4/8/8/6b1/8/8/4K3 w - - 0 1",
+			assertion: func(t *testing.T, exposed Score) {
+				safePos, err := board.NewPositionFromFEN("4k3/8/8/8/6b1/3Q4/8/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				safe := evaluator.Evaluate(safePos)
+				assert.Less(t, exposed, safe)
+			},
+		},
+		"overextended rook in enemy territory is penalized against a safe rook": {
+			fen: "4k3/1R6/8/8/8/8/6b1/4K3 w - - 0 1",
+			assertion: func(t *testing.T, exposed Score) {
+				safePos, err := board.NewPositionFromFEN("4k3/8/8/8/8/1R6/6b1/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				safe := evaluator.Evaluate(safePos)
+				assert.Less(t, exposed, safe)
+			},
+		},
 	}
 
 	for name, tt := range tests {
