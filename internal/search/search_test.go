@@ -169,6 +169,11 @@ func TestRepetitionTrackerDetectsThreefold(t *testing.T) {
 }
 
 func TestOrderMovesPrefersCaptures(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
 	pos, err := board.NewPositionFromFEN("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1")
 	assert.NoError(t, err)
 
@@ -177,11 +182,16 @@ func TestOrderMovesPrefersCaptures(t *testing.T) {
 		board.NewMove(board.Piece(board.White|board.Pawn), board.E4, board.D5, board.Capture),
 	}
 
-	orderMoves(pos, moves, board.Move{})
+	searcher.orderMoves(pos, moves, 0, board.Move{})
 	assert.Equal(t, "e4d5", moves[0].UCI())
 }
 
 func TestOrderMovesPrefersTTMove(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
 	pos, err := board.NewPositionFromFEN(board.FenStartPos)
 	assert.NoError(t, err)
 
@@ -190,7 +200,49 @@ func TestOrderMovesPrefersTTMove(t *testing.T) {
 		board.NewMove(board.Piece(board.White|board.Knight), board.G1, board.F3, board.NormalMove),
 	}
 
-	orderMoves(pos, moves, moves[1])
+	searcher.orderMoves(pos, moves, 0, moves[1])
+	assert.Equal(t, "g1f3", moves[0].UCI())
+}
+
+func TestOrderMovesPrefersKillerMove(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN(board.FenStartPos)
+	assert.NoError(t, err)
+
+	killer := board.NewMove(board.Piece(board.White|board.Knight), board.G1, board.F3, board.NormalMove)
+	searcher.recordKiller(3, killer)
+
+	moves := []board.Move{
+		board.NewMove(board.Piece(board.White|board.Knight), board.B1, board.C3, board.NormalMove),
+		killer,
+	}
+
+	searcher.orderMoves(pos, moves, 3, board.Move{})
+	assert.Equal(t, "g1f3", moves[0].UCI())
+}
+
+func TestOrderMovesPrefersHistoryMove(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN(board.FenStartPos)
+	assert.NoError(t, err)
+
+	historyMove := board.NewMove(board.Piece(board.White|board.Knight), board.G1, board.F3, board.NormalMove)
+	searcher.recordHistory(historyMove, 6)
+
+	moves := []board.Move{
+		board.NewMove(board.Piece(board.White|board.Knight), board.B1, board.C3, board.NormalMove),
+		historyMove,
+	}
+
+	searcher.orderMoves(pos, moves, 2, board.Move{})
 	assert.Equal(t, "g1f3", moves[0].UCI())
 }
 

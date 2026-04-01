@@ -12,6 +12,8 @@ var ErrInvalidLimits = errors.New("invalid search limits")
 var errSearchTimeout = errors.New("search timeout")
 var errSearchStopped = errors.New("search stopped")
 
+const searchMaxPly = 128
+
 type Limits struct {
 	Depth    int
 	MoveTime time.Duration
@@ -43,6 +45,8 @@ type AlphaBetaSearcher struct {
 	positionUpdater board.MoveApplier
 	evaluator       eval.Evaluator
 	tt              *searchTT
+	killerMoves     [searchMaxPly][2]board.Move
+	historyScores   [2][64][64]int
 }
 
 type repetitionTracker struct {
@@ -163,7 +167,7 @@ func (s *AlphaBetaSearcher) searchDepth(pos *board.Position, depth int, deadline
 	if entry, ok := s.tt.probe(pos.ZobristKey(), depth, 0); ok {
 		ttMove = entry.bestMove
 	}
-	orderMoves(pos, moves[:moveCount], ttMove)
+	s.orderMoves(pos, moves[:moveCount], 0, ttMove)
 
 	bestMove := moves[0]
 	bestScore := -eval.InfinityScore
@@ -247,6 +251,8 @@ func (s *AlphaBetaSearcher) searchDepth(pos *board.Position, depth int, deadline
 
 func (s *AlphaBetaSearcher) NewGame() {
 	s.tt.clear()
+	clear(s.killerMoves[:])
+	clear(s.historyScores[:])
 }
 
 func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alpha eval.Score, beta eval.Score, stats *Stats, deadline time.Time, stop <-chan struct{}, repetitions *repetitionTracker) (eval.Score, error) {
@@ -293,7 +299,7 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 		return s.quiescence(pos, ply, alpha, beta, stats, deadline, stop, repetitions)
 	}
 
-	orderMoves(pos, moves[:moveCount], ttMove)
+	s.orderMoves(pos, moves[:moveCount], ply, ttMove)
 
 	bestScore := -eval.InfinityScore
 	bestMove := board.Move{}
@@ -317,6 +323,10 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 			alpha = score
 		}
 		if alpha >= beta {
+			if !isTacticalMove(pos, move) {
+				s.recordKiller(ply, move)
+				s.recordHistory(move, depth)
+			}
 			stats.Cutoffs++
 			break
 		}
@@ -358,7 +368,7 @@ func (s *AlphaBetaSearcher) quiescence(pos *board.Position, ply int, alpha eval.
 		return terminalScore(pos, ply), nil
 	}
 
-	orderMoves(pos, moves[:moveCount], board.Move{})
+	s.orderMoves(pos, moves[:moveCount], ply, board.Move{})
 	for i := 0; i < moveCount; i++ {
 		move := moves[i]
 		if !isTacticalMove(pos, move) {
@@ -448,19 +458,19 @@ func (t *repetitionTracker) isThreefold() bool {
 	return t.counts[t.stack[len(t.stack)-1]] >= 3
 }
 
-func orderMoves(pos *board.Position, moves []board.Move, ttMove board.Move) {
+func (s *AlphaBetaSearcher) orderMoves(pos *board.Position, moves []board.Move, ply int, ttMove board.Move) {
 	for i := 1; i < len(moves); i++ {
 		move := moves[i]
-		score := scoreMove(pos, move, ttMove)
+		score := s.scoreMove(pos, move, ply, ttMove)
 		j := i - 1
-		for ; j >= 0 && score > scoreMove(pos, moves[j], ttMove); j-- {
+		for ; j >= 0 && score > s.scoreMove(pos, moves[j], ply, ttMove); j-- {
 			moves[j+1] = moves[j]
 		}
 		moves[j+1] = move
 	}
 }
 
-func scoreMove(pos *board.Position, move board.Move, ttMove board.Move) int {
+func (s *AlphaBetaSearcher) scoreMove(pos *board.Position, move board.Move, ply int, ttMove board.Move) int {
 	if ttMove != (board.Move{}) && move == ttMove {
 		return 1_000_000
 	}
@@ -483,7 +493,54 @@ func scoreMove(pos *board.Position, move board.Move, ttMove board.Move) int {
 		score += 50000 + pieceOrderValue(board.Knight)
 	}
 
+	if move == s.killerMove(ply, 0) {
+		score += 40_000
+	} else if move == s.killerMove(ply, 1) {
+		score += 35_000
+	}
+
+	score += s.historyScore(move)
+
 	return score
+}
+
+func (s *AlphaBetaSearcher) recordKiller(ply int, move board.Move) {
+	idx := boundedPly(ply)
+	if s.killerMoves[idx][0] == move {
+		return
+	}
+	s.killerMoves[idx][1] = s.killerMoves[idx][0]
+	s.killerMoves[idx][0] = move
+}
+
+func (s *AlphaBetaSearcher) killerMove(ply int, slot int) board.Move {
+	return s.killerMoves[boundedPly(ply)][slot]
+}
+
+func (s *AlphaBetaSearcher) recordHistory(move board.Move, depth int) {
+	colorIdx := 0
+	if !move.Piece().IsWhite() {
+		colorIdx = 1
+	}
+	s.historyScores[colorIdx][move.StartIdx()][move.EndIdx()] += depth * depth
+}
+
+func (s *AlphaBetaSearcher) historyScore(move board.Move) int {
+	colorIdx := 0
+	if !move.Piece().IsWhite() {
+		colorIdx = 1
+	}
+	return s.historyScores[colorIdx][move.StartIdx()][move.EndIdx()]
+}
+
+func boundedPly(ply int) int {
+	if ply < 0 {
+		return 0
+	}
+	if ply >= searchMaxPly {
+		return searchMaxPly - 1
+	}
+	return ply
 }
 
 func isTacticalMove(pos *board.Position, move board.Move) bool {
