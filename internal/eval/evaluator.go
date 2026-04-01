@@ -32,6 +32,22 @@ var mobilityWeights = [7]Score{
 	2, // rook
 }
 
+var exposedPieceWeights = [7]Score{
+	0,  // no piece
+	0,  // king
+	32, // queen
+	4,  // pawn
+	12, // knight
+	12, // bishop
+	20, // rook
+}
+
+const (
+	kingRingAttackWeight Score = 8
+	kingInCheckPenalty   Score = 40
+	missingShieldPenalty Score = 10
+)
+
 func NewStaticEvaluator() *StaticEvaluator {
 	return &StaticEvaluator{}
 }
@@ -161,6 +177,10 @@ func (e *StaticEvaluator) Evaluate(pos *board.Position) Score {
 
 	whiteScore += mobilityScore(pos, board.White)
 	blackScore += mobilityScore(pos, board.Black)
+	whiteScore -= exposedPiecesPenalty(pos, board.White)
+	blackScore -= exposedPiecesPenalty(pos, board.Black)
+	whiteScore -= kingSafetyPenalty(pos, board.White)
+	blackScore -= kingSafetyPenalty(pos, board.Black)
 
 	if pos.ActiveColor() == board.White {
 		return whiteScore - blackScore
@@ -185,4 +205,112 @@ func mobilityScore(pos *board.Position, color int8) Score {
 		score += Score(bits.OnesCount64(targets)) * weight
 	}
 	return score
+}
+
+func exposedPiecesPenalty(pos *board.Position, color int8) Score {
+	enemyColor := board.White
+	if color == board.White {
+		enemyColor = board.Black
+	}
+
+	penalty := DrawScore
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece == board.NoPiece || piece.Color() != color || piece.Type() == board.King {
+			continue
+		}
+
+		attackers := attackCountOnSquare(pos, enemyColor, idx)
+		if attackers == 0 {
+			continue
+		}
+
+		defenders := attackCountOnSquare(pos, color, idx)
+		base := exposedPieceWeights[piece.Type()] * Score(attackers)
+		if defenders == 0 {
+			base *= 2
+		} else if attackers > defenders {
+			base += exposedPieceWeights[piece.Type()] * Score(attackers-defenders)
+		}
+		penalty += base
+	}
+
+	return penalty
+}
+
+func kingSafetyPenalty(pos *board.Position, color int8) Score {
+	kingIdx := pos.BlackKingIdx()
+	enemyColor := board.White
+	if color == board.White {
+		kingIdx = pos.WhiteKingIdx()
+		enemyColor = board.Black
+	}
+
+	penalty := DrawScore
+	if movegen.IsKingInCheck(pos, color) {
+		penalty += kingInCheckPenalty
+	}
+
+	ring := movegen.KingRingMask(kingIdx)
+	enemyAttacks := attackMap(pos, enemyColor)
+	penalty += Score(bits.OnesCount64(ring&enemyAttacks)) * kingRingAttackWeight
+	penalty += pawnShieldPenalty(pos, color, kingIdx)
+	return penalty
+}
+
+func attackMap(pos *board.Position, color int8) uint64 {
+	mask := uint64(0)
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece == board.NoPiece || piece.Color() != color {
+			continue
+		}
+		mask |= movegen.PieceAttackMask(pos, piece, idx)
+	}
+	return mask
+}
+
+func attackCountOnSquare(pos *board.Position, color, square int8) int {
+	count := 0
+	squareMask := uint64(1) << square
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece == board.NoPiece || piece.Color() != color {
+			continue
+		}
+		if movegen.PieceAttackMask(pos, piece, idx)&squareMask != 0 {
+			count++
+		}
+	}
+	return count
+}
+
+func pawnShieldPenalty(pos *board.Position, color, kingIdx int8) Score {
+	file := board.FileFromIdx(kingIdx)
+	rank := board.RankFromIdx(kingIdx)
+	penalty := DrawScore
+
+	for df := int8(-1); df <= 1; df++ {
+		targetFile := file + df
+		if targetFile < 0 || targetFile > 7 {
+			continue
+		}
+
+		shieldRank := rank + 1
+		if color == board.Black {
+			shieldRank = rank - 1
+		}
+		if shieldRank < 0 || shieldRank > 7 {
+			penalty += missingShieldPenalty
+			continue
+		}
+
+		shieldIdx := shieldRank*8 + targetFile
+		expectedPawn := board.Piece(color | board.Pawn)
+		if pos.PieceAt(shieldIdx) != expectedPawn {
+			penalty += missingShieldPenalty
+		}
+	}
+
+	return penalty
 }

@@ -65,6 +65,33 @@ func TestStaticEvaluatorEvaluate(t *testing.T) {
 				assert.Greater(t, center, corner)
 			},
 		},
+		"undefended queen under multiple attacks is penalized": {
+			fen: "4k3/8/8/8/3n4/2b5/4Q3/4K3 w - - 0 1",
+			assertion: func(t *testing.T, exposed Score) {
+				safePos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				safe := evaluator.Evaluate(safePos)
+				assert.Less(t, exposed, safe)
+			},
+		},
+		"king with intact pawn shield scores better than exposed king": {
+			fen: "4k3/8/8/8/8/8/3PPP2/4K3 w - - 0 1",
+			assertion: func(t *testing.T, shielded Score) {
+				exposedPos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/8/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				exposed := evaluator.Evaluate(exposedPos)
+				assert.Greater(t, shielded, exposed)
+			},
+		},
+		"king under attack is penalized": {
+			fen: "4k3/8/8/8/4r3/8/8/4K3 w - - 0 1",
+			assertion: func(t *testing.T, attacked Score) {
+				safePos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/8/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				safe := evaluator.Evaluate(safePos)
+				assert.Less(t, attacked, safe)
+			},
+		},
 	}
 
 	for name, tt := range tests {
