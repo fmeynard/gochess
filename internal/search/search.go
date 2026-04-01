@@ -42,6 +42,7 @@ type AlphaBetaSearcher struct {
 	moveGenerator   *movegen.PseudoLegalMoveGenerator
 	positionUpdater board.MoveApplier
 	evaluator       eval.Evaluator
+	tt              *searchTT
 }
 
 type repetitionTracker struct {
@@ -54,6 +55,7 @@ func NewAlphaBetaSearcher(moveGenerator *movegen.PseudoLegalMoveGenerator, posit
 		moveGenerator:   moveGenerator,
 		positionUpdater: positionUpdater,
 		evaluator:       evaluator,
+		tt:              newSearchTT(),
 	}
 }
 
@@ -157,12 +159,17 @@ func (s *AlphaBetaSearcher) searchDepth(pos *board.Position, depth int, deadline
 			},
 		}, nil
 	}
-	orderMoves(pos, moves[:moveCount])
+	var ttMove board.Move
+	if entry, ok := s.tt.probe(pos.ZobristKey(), depth, 0); ok {
+		ttMove = entry.bestMove
+	}
+	orderMoves(pos, moves[:moveCount], ttMove)
 
 	bestMove := moves[0]
 	bestScore := -eval.InfinityScore
 	alpha := -eval.InfinityScore
 	beta := eval.InfinityScore
+	alphaStart := alpha
 	haveComplete := false
 
 	for i := 0; i < moveCount; i++ {
@@ -224,6 +231,12 @@ func (s *AlphaBetaSearcher) searchDepth(pos *board.Position, depth int, deadline
 		}
 	}
 
+	bound := ttBoundExact
+	if bestScore <= alphaStart {
+		bound = ttBoundUpper
+	}
+	s.tt.store(pos.ZobristKey(), depth, 0, bestScore, bound, bestMove)
+
 	stats.Time = time.Since(start)
 	return Result{
 		BestMove: bestMove,
@@ -232,7 +245,9 @@ func (s *AlphaBetaSearcher) searchDepth(pos *board.Position, depth int, deadline
 	}, nil
 }
 
-func (s *AlphaBetaSearcher) NewGame() {}
+func (s *AlphaBetaSearcher) NewGame() {
+	s.tt.clear()
+}
 
 func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alpha eval.Score, beta eval.Score, stats *Stats, deadline time.Time, stop <-chan struct{}, repetitions *repetitionTracker) (eval.Score, error) {
 	if err := shouldStop(deadline, stop); err != nil {
@@ -242,6 +257,30 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 	stats.Nodes++
 	if repetitions.isThreefold() {
 		return eval.DrawScore, nil
+	}
+
+	key := pos.ZobristKey()
+	alphaStart := alpha
+	betaStart := beta
+	var ttMove board.Move
+	if entry, ok := s.tt.probe(key, depth, ply); ok {
+		ttMove = entry.bestMove
+		switch entry.bound {
+		case ttBoundExact:
+			return entry.score, nil
+		case ttBoundLower:
+			if entry.score > alpha {
+				alpha = entry.score
+			}
+		case ttBoundUpper:
+			if entry.score < beta {
+				beta = entry.score
+			}
+		}
+		if alpha >= beta {
+			stats.Cutoffs++
+			return entry.score, nil
+		}
 	}
 
 	var moves [256]board.Move
@@ -254,9 +293,10 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 		return s.quiescence(pos, ply, alpha, beta, stats, deadline, stop, repetitions)
 	}
 
-	orderMoves(pos, moves[:moveCount])
+	orderMoves(pos, moves[:moveCount], ttMove)
 
 	bestScore := -eval.InfinityScore
+	bestMove := board.Move{}
 	for i := 0; i < moveCount; i++ {
 		move := moves[i]
 		history := s.positionUpdater.MakeMove(pos, move)
@@ -271,6 +311,7 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 
 		if score > bestScore {
 			bestScore = score
+			bestMove = move
 		}
 		if score > alpha {
 			alpha = score
@@ -280,6 +321,14 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 			break
 		}
 	}
+
+	bound := ttBoundExact
+	if bestScore <= alphaStart {
+		bound = ttBoundUpper
+	} else if bestScore >= betaStart {
+		bound = ttBoundLower
+	}
+	s.tt.store(key, depth, ply, bestScore, bound, bestMove)
 
 	return bestScore, nil
 }
@@ -309,7 +358,7 @@ func (s *AlphaBetaSearcher) quiescence(pos *board.Position, ply int, alpha eval.
 		return terminalScore(pos, ply), nil
 	}
 
-	orderMoves(pos, moves[:moveCount])
+	orderMoves(pos, moves[:moveCount], board.Move{})
 	for i := 0; i < moveCount; i++ {
 		move := moves[i]
 		if !isTacticalMove(pos, move) {
@@ -399,19 +448,23 @@ func (t *repetitionTracker) isThreefold() bool {
 	return t.counts[t.stack[len(t.stack)-1]] >= 3
 }
 
-func orderMoves(pos *board.Position, moves []board.Move) {
+func orderMoves(pos *board.Position, moves []board.Move, ttMove board.Move) {
 	for i := 1; i < len(moves); i++ {
 		move := moves[i]
-		score := scoreMove(pos, move)
+		score := scoreMove(pos, move, ttMove)
 		j := i - 1
-		for ; j >= 0 && score > scoreMove(pos, moves[j]); j-- {
+		for ; j >= 0 && score > scoreMove(pos, moves[j], ttMove); j-- {
 			moves[j+1] = moves[j]
 		}
 		moves[j+1] = move
 	}
 }
 
-func scoreMove(pos *board.Position, move board.Move) int {
+func scoreMove(pos *board.Position, move board.Move, ttMove board.Move) int {
+	if ttMove != (board.Move{}) && move == ttMove {
+		return 1_000_000
+	}
+
 	score := 0
 	if isCaptureMove(pos, move) {
 		captured := capturedPiece(pos, move)
