@@ -10,11 +10,11 @@ Current scope:
 - simple move ordering
 - quiescence
 - search TT
+- killer ordering
+- history heuristic
 - terminal handling for:
   - checkmate
   - stalemate
 
 Planned scope:
-
-- killer ordering
-- history heuristic
+- search time management refinements
