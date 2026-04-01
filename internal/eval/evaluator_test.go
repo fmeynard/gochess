@@ -92,6 +92,42 @@ func TestStaticEvaluatorEvaluate(t *testing.T) {
 				assert.Less(t, attacked, safe)
 			},
 		},
+		"central king is rewarded in endgame": {
+			fen: "4k3/8/8/3K4/8/8/8/8 w - - 0 1",
+			assertion: func(t *testing.T, center Score) {
+				edgePos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/8/K7 w - - 0 1")
+				assert.NoError(t, err)
+				edge := evaluator.Evaluate(edgePos)
+				assert.Greater(t, center, edge)
+			},
+		},
+		"advanced passed pawn scores better than blocked pawn": {
+			fen: "4k3/8/4P3/8/8/8/8/4K3 w - - 0 1",
+			assertion: func(t *testing.T, passed Score) {
+				blockedPos, err := board.NewPositionFromFEN("4k3/4p3/4P3/8/8/8/8/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				blocked := evaluator.Evaluate(blockedPos)
+				assert.Greater(t, passed, blocked)
+			},
+		},
+		"protected queen scores better than unprotected queen": {
+			fen: "4k3/8/8/8/8/8/4P3/4QK2 w - - 0 1",
+			assertion: func(t *testing.T, protected Score) {
+				unprotectedPos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/8/4QK2 w - - 0 1")
+				assert.NoError(t, err)
+				unprotected := evaluator.Evaluate(unprotectedPos)
+				assert.Greater(t, protected, unprotected)
+			},
+		},
+		"healthy pawn chain scores better than isolated doubled pawns": {
+			fen: "4k3/8/8/8/8/2P5/3PP3/4K3 w - - 0 1",
+			assertion: func(t *testing.T, healthy Score) {
+				weakPos, err := board.NewPositionFromFEN("4k3/8/8/8/8/3P4/3P4/4K3 w - - 0 1")
+				assert.NoError(t, err)
+				weak := evaluator.Evaluate(weakPos)
+				assert.Greater(t, healthy, weak)
+			},
+		},
 	}
 
 	for name, tt := range tests {

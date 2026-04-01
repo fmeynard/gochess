@@ -13,6 +13,7 @@ var errSearchTimeout = errors.New("search timeout")
 var errSearchStopped = errors.New("search stopped")
 
 const searchMaxPly = 128
+const repetitionContemptMax = 30
 
 type Limits struct {
 	Depth    int
@@ -262,7 +263,7 @@ func (s *AlphaBetaSearcher) negamax(pos *board.Position, depth int, ply int, alp
 
 	stats.Nodes++
 	if repetitions.isThreefold() {
-		return eval.DrawScore, nil
+		return s.repetitionScore(pos), nil
 	}
 
 	key := pos.ZobristKey()
@@ -350,7 +351,7 @@ func (s *AlphaBetaSearcher) quiescence(pos *board.Position, ply int, alpha eval.
 
 	stats.QuiescenceNodes++
 	if repetitions.isThreefold() {
-		return eval.DrawScore, nil
+		return s.repetitionScore(pos), nil
 	}
 
 	standPat := s.evaluator.Evaluate(pos)
@@ -416,6 +417,18 @@ func shouldStop(deadline time.Time, stop <-chan struct{}) error {
 	}
 
 	return nil
+}
+
+func (s *AlphaBetaSearcher) repetitionScore(pos *board.Position) eval.Score {
+	static := s.evaluator.Evaluate(pos)
+	bias := static / 20
+	if bias > repetitionContemptMax {
+		bias = repetitionContemptMax
+	}
+	if bias < -repetitionContemptMax {
+		bias = -repetitionContemptMax
+	}
+	return -bias
 }
 
 func newRepetitionTracker(pos *board.Position, history []uint64) *repetitionTracker {
