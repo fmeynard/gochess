@@ -155,6 +155,32 @@ func TestAlphaBetaSearcherQuiescenceAvoidsPoisonedQueenCapture(t *testing.T) {
 	assert.Greater(t, result.Stats.QuiescenceNodes, uint64(0))
 }
 
+func TestSEELiteRejectsPoisonedQueenCapture(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN("3rk3/3p4/8/8/8/8/3Q4/4K3 w - - 0 1")
+	assert.NoError(t, err)
+
+	move := board.NewMove(board.Piece(board.White|board.Queen), board.D2, board.D7, board.Capture)
+	assert.Less(t, searcher.seeLite(pos, move), 0)
+}
+
+func TestSEELiteKeepsWinningQueenCapturePositive(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/3r4/3QK3 w - - 0 1")
+	assert.NoError(t, err)
+
+	move := board.NewMove(board.Piece(board.White|board.Queen), board.D1, board.D2, board.Capture)
+	assert.Greater(t, searcher.seeLite(pos, move), 0)
+}
+
 func TestRepetitionTrackerDetectsThreefold(t *testing.T) {
 	pos, err := board.NewPositionFromFEN(board.FenStartPos)
 	assert.NoError(t, err)

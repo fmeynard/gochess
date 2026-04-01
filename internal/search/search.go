@@ -375,6 +375,9 @@ func (s *AlphaBetaSearcher) quiescence(pos *board.Position, ply int, alpha eval.
 		if !isTacticalMove(pos, move) {
 			continue
 		}
+		if isCaptureMove(pos, move) && s.seeLite(pos, move) < 0 {
+			continue
+		}
 
 		history := s.positionUpdater.MakeMove(pos, move)
 		repetitions.push(pos.ZobristKey())
@@ -493,6 +496,10 @@ func (s *AlphaBetaSearcher) scoreMove(pos *board.Position, move board.Move, ply 
 		captured := capturedPiece(pos, move)
 		attacker := move.Piece().Type()
 		score += 100000 + 10*pieceOrderValue(captured.Type()) - pieceOrderValue(attacker)
+		see := s.seeLite(pos, move)
+		if see < 0 {
+			score += see
+		}
 	}
 
 	switch move.Flag() {
@@ -515,6 +522,38 @@ func (s *AlphaBetaSearcher) scoreMove(pos *board.Position, move board.Move, ply 
 	score += s.historyScore(move)
 
 	return score
+}
+
+func (s *AlphaBetaSearcher) seeLite(pos *board.Position, move board.Move) int {
+	if !isCaptureMove(pos, move) {
+		return 0
+	}
+
+	captured := capturedPiece(pos, move)
+	if captured == board.NoPiece {
+		return 0
+	}
+
+	history := s.positionUpdater.MakeMove(pos, move)
+	defer s.positionUpdater.UnMakeMove(pos, history)
+
+	enemyColor := board.White
+	if move.Piece().IsWhite() {
+		enemyColor = board.Black
+	}
+
+	recaptureValue := leastAttackerValueOnSquare(pos, enemyColor, move.EndIdx())
+	if recaptureValue == 0 {
+		return pieceOrderValue(captured.Type())
+	}
+
+	followupDefender := leastAttackerValueOnSquare(pos, move.Piece().Color(), move.EndIdx())
+	net := pieceOrderValue(captured.Type()) - pieceOrderValue(move.Piece().Type())
+	if followupDefender > 0 && followupDefender <= recaptureValue {
+		net += pieceOrderValue(move.Piece().Type()) / 4
+	}
+
+	return net
 }
 
 func (s *AlphaBetaSearcher) recordKiller(ply int, move board.Move) {
@@ -604,6 +643,31 @@ func pieceOrderValue(pieceType int8) int {
 	default:
 		return 0
 	}
+}
+
+func leastAttackerValueOnSquare(pos *board.Position, color, square int8) int {
+	squareMask := uint64(1) << square
+	best := 0
+
+	for idx := int8(0); idx < 64; idx++ {
+		piece := pos.PieceAt(idx)
+		if piece == board.NoPiece || piece.Color() != color {
+			continue
+		}
+		if idx == square {
+			continue
+		}
+		if movegen.PieceAttackMask(pos, piece, idx)&squareMask == 0 {
+			continue
+		}
+
+		value := pieceOrderValue(piece.Type())
+		if best == 0 || value < best {
+			best = value
+		}
+	}
+
+	return best
 }
 
 func (s *AlphaBetaSearcher) ensureBestMove(pos *board.Position, result Result) Result {
