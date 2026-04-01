@@ -323,7 +323,12 @@ func (s *Server) ensureBestMove(pos *board.Position, result search.Result) searc
 		return result
 	}
 
-	moves := s.engine.LegalMoves(pos)
+	root := pos
+	if refreshed, err := board.NewPositionFromFEN(pos.FEN()); err == nil {
+		root = refreshed
+	}
+
+	moves := s.engine.LegalMoves(root)
 	if len(moves) > 0 {
 		result.BestMove = moves[0]
 	}

@@ -483,8 +483,13 @@ func (s *AlphaBetaSearcher) ensureBestMove(pos *board.Position, result Result) R
 		return result
 	}
 
+	root := pos
+	if refreshed, err := board.NewPositionFromFEN(pos.FEN()); err == nil {
+		root = refreshed
+	}
+
 	var moves [256]board.Move
-	moveCount := s.moveGenerator.LegalMovesInto(pos, s.positionUpdater, moves[:])
+	moveCount := s.moveGenerator.LegalMovesInto(root, s.positionUpdater, moves[:])
 	if moveCount > 0 {
 		result.BestMove = moves[0]
 	}
