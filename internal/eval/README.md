@@ -9,8 +9,13 @@ Current scope:
 - zero evaluator scaffolding
 - basic static evaluator with:
   - material scoring
-  - piece-square tables
+  - phase-aware piece-square tables
+  - mobility
+  - piece safety
+  - king safety
+  - passed pawns
+  - simple pawn structure
 
 Planned scope:
 
-- later positional heuristics
+- richer positional heuristics
