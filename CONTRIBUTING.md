@@ -50,6 +50,30 @@ BENCH_DEPTH=7 BENCH_MODE=hot BENCH_WARMUP=1 BENCH_NO_PERFT_TRICKS=1 ./scripts/be
 
 If a change only touches docs or repo metadata, benchmarking is not required.
 
+## Scoring Version Workflow
+
+For a new scoring version, use the normal issue -> branch -> PR flow, then do the versioning and comparison only after the PR is merged.
+
+Recommended sequence:
+
+1. Create one or more issues for the scoring ideas.
+2. Implement them on a dedicated branch.
+3. Open one PR for the scoring slice.
+4. Merge the PR to `main`.
+5. Tag the merged `main` commit as the next `score-vN`.
+6. Run a match against the previous score tag, for example:
+
+```bash
+make runner MODE=plain GAMES=50 MOVETIME=300 OPPONENT_TAG=score-v2
+```
+
+7. Update [`docs/match-history.md`](/home/fab/Projects/gochess/docs/match-history.md):
+   - add the new version to the version summary table
+   - add the new match result at the top of the results table
+   - keep both tables in reverse chronological order
+
+Do not tag a scoring version from an in-flight branch unless the tag is explicitly meant to be experimental.
+
 ## Benchmark Expectations
 
 For board or move-generation changes, the PR should state:
