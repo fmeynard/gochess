@@ -43,11 +43,3 @@ func TestReadLinesHandlesLongInput(t *testing.T) {
 	default:
 	}
 }
-
-func TestSanitizeFENForStockfishDropsImpossibleCastleRights(t *testing.T) {
-	fen := "3qk2r/1p3ppp/3Rp3/8/r7/8/1PP1P1PP/4KB1n w Kk - 0 1"
-
-	sanitized, err := sanitizeFENForStockfish(fen)
-	assert.NoError(t, err)
-	assert.Equal(t, "3qk2r/1p3ppp/3Rp3/8/r7/8/1PP1P1PP/4KB1n w k - 0 1", sanitized)
-}

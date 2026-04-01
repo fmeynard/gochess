@@ -133,6 +133,19 @@ func promotionPieceType(flag int8) int8 {
 	}
 }
 
+func clearCastleRightsForRookSquare(pos *Position, rookSquare int8) {
+	switch rookSquare {
+	case A1:
+		pos.whiteCastleRights &^= QueenSideCastle
+	case H1:
+		pos.whiteCastleRights &^= KingSideCastle
+	case A8:
+		pos.blackCastleRights &^= QueenSideCastle
+	case H8:
+		pos.blackCastleRights &^= KingSideCastle
+	}
+}
+
 func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHistory {
 	startPieceIdx := move.startIdx
 	endPieceIdx := move.endIdx
@@ -337,19 +350,11 @@ func (updater *PlainPositionUpdater) MakeMove(pos *Position, move Move) MoveHist
 
 	// knight
 	if startPieceType == Rook {
-		if startColor == White {
-			if startPieceIdx == A1 {
-				pos.whiteCastleRights = pos.whiteCastleRights &^ QueenSideCastle
-			} else if startPieceIdx == H1 {
-				pos.whiteCastleRights = pos.whiteCastleRights &^ KingSideCastle
-			}
-		} else {
-			if startPieceIdx == A8 {
-				pos.blackCastleRights = pos.blackCastleRights &^ QueenSideCastle
-			} else if startPieceIdx == H8 {
-				pos.blackCastleRights = pos.blackCastleRights &^ KingSideCastle
-			}
-		}
+		clearCastleRightsForRookSquare(pos, startPieceIdx)
+	}
+
+	if isCapture && capturedPiece.Type() == Rook {
+		clearCastleRightsForRookSquare(pos, captureIdx)
 	}
 
 	updater.invalidateKingSafetyCaches(pos)

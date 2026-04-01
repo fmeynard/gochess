@@ -266,6 +266,16 @@ func Test_PositionAfterMoveCastleRights(t *testing.T) {
 			move:           NewMove(Piece(King|Black), E7, A8, NormalMove),
 			expectedRights: NoCastle,
 		},
+		"White king-side rook captured -> no white king-side right": {
+			fenPos:         "4k2r/8/8/8/8/8/8/4K2R b Kk - 0 1",
+			move:           NewMove(Piece(Rook|Black), H8, H1, Capture),
+			expectedRights: NoCastle,
+		},
+		"Black king-side rook captured -> no black king-side right": {
+			fenPos:         "4k2r/8/8/8/8/8/8/4K2R w Kk - 0 1",
+			move:           NewMove(Piece(Rook|White), H1, H8, Capture),
+			expectedRights: NoCastle,
+		},
 	}
 
 	updater := NewPositionUpdater()
@@ -290,6 +300,17 @@ func Test_PositionAfterMoveCastleRights(t *testing.T) {
 			assert.Equal(t, d.expectedRights, initialColorCastleRights)
 		})
 	}
+}
+
+func TestPositionFENClearsCastleRightsAfterStartRookCapture(t *testing.T) {
+	updater := NewPositionUpdater()
+	pos, err := NewPositionFromFEN("3qk2r/1p3ppp/3Rp3/8/r7/8/1PP1PnPP/4KB1R b Kk - 0 1")
+	assert.NoError(t, err)
+
+	move := NewMove(Piece(Knight|Black), F2, H1, Capture)
+	updater.MakeMove(pos, move)
+
+	assert.Equal(t, "3qk2r/1p3ppp/3Rp3/8/r7/8/1PP1P1PP/4KB1n w k - 0 1", pos.FEN())
 }
 
 func Test_PositionAfterEnPassantUpdate(t *testing.T) {
