@@ -61,7 +61,6 @@ go build -o ./bin/gochess-uci ./cmd/uci
 - [Codebase Overview](./docs/codebase-overview.md)
 - [Benchmark History](./docs/benchmark-history.md)
 - [Benchmark Learnings](./docs/benchmark-learnings.md)
-- [Future Optimisations](./docs/future-optimisations.md)
 
 ## Useful External Links
 
