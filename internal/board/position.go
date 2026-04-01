@@ -3,6 +3,7 @@ package board
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -498,4 +499,99 @@ func (p *Position) CastleRights() int8 {
 func (p *Position) Clone() *Position {
 	cloned := *p
 	return &cloned
+}
+
+func (p *Position) FEN() string {
+	var b strings.Builder
+	for rank := int8(7); rank >= 0; rank-- {
+		empty := 0
+		for file := int8(0); file < 8; file++ {
+			idx := rank*8 + file
+			piece := p.board[idx]
+			if piece == NoPiece {
+				empty++
+				continue
+			}
+			if empty > 0 {
+				b.WriteString(strconv.Itoa(empty))
+				empty = 0
+			}
+			b.WriteByte(pieceToFENChar(piece))
+		}
+		if empty > 0 {
+			b.WriteString(strconv.Itoa(empty))
+		}
+		if rank > 0 {
+			b.WriteByte('/')
+		}
+	}
+
+	b.WriteByte(' ')
+	if p.activeColor == White {
+		b.WriteByte('w')
+	} else {
+		b.WriteByte('b')
+	}
+
+	b.WriteByte(' ')
+	castle := castleRightsToFEN(p.whiteCastleRights, p.blackCastleRights)
+	if castle == "" {
+		b.WriteByte('-')
+	} else {
+		b.WriteString(castle)
+	}
+
+	b.WriteByte(' ')
+	if p.enPassantIdx == NoEnPassant {
+		b.WriteByte('-')
+	} else {
+		b.WriteString(IdxToSquare(p.enPassantIdx))
+	}
+
+	// Halfmove/fullmove are not tracked today. `0 1` is sufficient to
+	// reproduce legal move generation and illegal-move diagnostics.
+	b.WriteString(" 0 1")
+	return b.String()
+}
+
+func pieceToFENChar(piece Piece) byte {
+	var ch byte
+	switch piece.Type() {
+	case King:
+		ch = 'k'
+	case Queen:
+		ch = 'q'
+	case Rook:
+		ch = 'r'
+	case Bishop:
+		ch = 'b'
+	case Knight:
+		ch = 'n'
+	case Pawn:
+		ch = 'p'
+	default:
+		return '?'
+	}
+
+	if piece.Color() == White {
+		ch -= 'a' - 'A'
+	}
+	return ch
+}
+
+func castleRightsToFEN(whiteRights, blackRights int8) string {
+	var b strings.Builder
+	if whiteRights&KingSideCastle != 0 {
+		b.WriteByte('K')
+	}
+	if whiteRights&QueenSideCastle != 0 {
+		b.WriteByte('Q')
+	}
+	if blackRights&KingSideCastle != 0 {
+		b.WriteByte('k')
+	}
+	if blackRights&QueenSideCastle != 0 {
+		b.WriteByte('q')
+	}
+	return b.String()
 }

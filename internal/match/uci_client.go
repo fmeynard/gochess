@@ -77,6 +77,10 @@ func (c *UCIClient) NewGame() error {
 }
 
 func (c *UCIClient) BestMove(moves []string, moveTime time.Duration) (string, SearchStats, error) {
+	if err := c.ready(); err != nil {
+		return "", SearchStats{}, err
+	}
+
 	position := "position startpos"
 	if len(moves) > 0 {
 		position += " moves " + strings.Join(moves, " ")
@@ -102,6 +106,14 @@ func (c *UCIClient) BestMove(moves []string, moveTime time.Duration) (string, Se
 func (c *UCIClient) Close() error {
 	_ = c.send("quit")
 	return c.cmd.Wait()
+}
+
+func (c *UCIClient) ready() error {
+	if err := c.send("isready"); err != nil {
+		return err
+	}
+	_, err := c.waitFor("readyok", 5*time.Second)
+	return err
 }
 
 func (c *UCIClient) send(line string) error {

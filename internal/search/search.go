@@ -62,10 +62,19 @@ func (s *AlphaBetaSearcher) Search(pos *board.Position, limits Limits) (Result, 
 		return Result{}, ErrInvalidLimits
 	}
 
+	var (
+		result Result
+		err    error
+	)
 	if limits.MoveTime > 0 {
-		return s.searchIterative(pos, limits)
+		result, err = s.searchIterative(pos, limits)
+	} else {
+		result, err = s.searchDepth(pos, limits.Depth, time.Time{}, limits.Stop, newRepetitionTracker(pos, limits.History))
 	}
-	return s.searchDepth(pos, limits.Depth, time.Time{}, limits.Stop, newRepetitionTracker(pos, limits.History))
+	if err != nil {
+		return Result{}, err
+	}
+	return s.ensureBestMove(pos, result), nil
 }
 
 func (s *AlphaBetaSearcher) searchIterative(pos *board.Position, limits Limits) (Result, error) {
@@ -80,7 +89,12 @@ func (s *AlphaBetaSearcher) searchIterative(pos *board.Position, limits Limits) 
 	var haveComplete bool
 
 	for depth := 1; depth <= maxDepth; depth++ {
-		result, err := s.searchDepth(pos, depth, deadline, limits.Stop, newRepetitionTracker(pos, limits.History))
+		iterPos := pos
+		if refreshed, refreshErr := board.NewPositionFromFEN(pos.FEN()); refreshErr == nil {
+			iterPos = refreshed
+		}
+
+		result, err := s.searchDepth(iterPos, depth, deadline, limits.Stop, newRepetitionTracker(iterPos, limits.History))
 		if err != nil {
 			if errors.Is(err, errSearchTimeout) || errors.Is(err, errSearchStopped) {
 				if haveComplete {
@@ -89,10 +103,10 @@ func (s *AlphaBetaSearcher) searchIterative(pos *board.Position, limits Limits) 
 				}
 
 				var fallbackMoves [256]board.Move
-				moveCount := s.moveGenerator.LegalMovesInto(pos, s.positionUpdater, fallbackMoves[:])
+				moveCount := s.moveGenerator.LegalMovesInto(iterPos, s.positionUpdater, fallbackMoves[:])
 				if moveCount == 0 {
 					return Result{
-						Score: terminalScore(pos, 0),
+						Score: terminalScore(iterPos, 0),
 						Stats: Stats{
 							Nodes: 1,
 							Time:  time.Since(start),
@@ -467,4 +481,22 @@ func pieceOrderValue(pieceType int8) int {
 	default:
 		return 0
 	}
+}
+
+func (s *AlphaBetaSearcher) ensureBestMove(pos *board.Position, result Result) Result {
+	if result.BestMove != (board.Move{}) {
+		return result
+	}
+
+	root := pos
+	if refreshed, err := board.NewPositionFromFEN(pos.FEN()); err == nil {
+		root = refreshed
+	}
+
+	var moves [256]board.Move
+	moveCount := s.moveGenerator.LegalMovesInto(root, s.positionUpdater, moves[:])
+	if moveCount > 0 {
+		result.BestMove = moves[0]
+	}
+	return result
 }

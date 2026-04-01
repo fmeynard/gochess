@@ -4,6 +4,7 @@ CONCURRENT ?= 5
 OPPONENT_TAG ?= score-v0
 GAMES ?= 10
 MOVETIME ?= 1000
+MOVE_OVERHEAD ?= 50
 NOTES ?=
 BENCH_DEPTH ?= 7
 BENCH_MODE ?= hot
@@ -14,7 +15,7 @@ BENCH_PROFILE ?=
 BOARD_BENCH ?= BenchmarkPositionUpdaterMakeUnmake
 BOARD_BENCH_TIME ?= 200ms
 
-RUNNER_FLAGS = -games $(GAMES) -parallel $(CONCURRENT) -movetime $(MOVETIME)
+RUNNER_FLAGS = -games $(GAMES) -parallel $(CONCURRENT) -movetime $(MOVETIME) -move-overhead $(MOVE_OVERHEAD)
 ifneq ($(strip $(OPPONENT_TAG)),)
 RUNNER_FLAGS += -opponent-tag $(OPPONENT_TAG)
 endif
@@ -40,7 +41,7 @@ help:
 	@echo "  make test"
 	@echo "  make build-uci"
 	@echo "  make smoke-uci"
-	@echo "  make runner MODE=tui CONCURRENT=5 OPPONENT_TAG=score-v0 GAMES=10 MOVETIME=1000"
+	@echo "  make runner MODE=tui CONCURRENT=5 OPPONENT_TAG=score-v0 GAMES=10 MOVETIME=1000 MOVE_OVERHEAD=50"
 	@echo "  make bench-perft BENCH_DEPTH=7 BENCH_MODE=hot BENCH_NO_PERFT_TRICKS=1"
 	@echo "  make bench-perft-hot"
 	@echo "  make bench-perft-hot-no-tricks"
@@ -53,6 +54,7 @@ help:
 	@echo "  OPPONENT_TAG=<tag>    default: $(OPPONENT_TAG)"
 	@echo "  GAMES=<n>             default: $(GAMES)"
 	@echo "  MOVETIME=<ms>         default: $(MOVETIME)"
+	@echo "  MOVE_OVERHEAD=<ms>    default: $(MOVE_OVERHEAD)"
 	@echo "  NOTES=<text>          default: empty"
 	@echo ""
 	@echo "Benchmark variables:"

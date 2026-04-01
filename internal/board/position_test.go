@@ -1,8 +1,9 @@
 package board
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_NewPositionFromFEN(t *testing.T) {
@@ -81,5 +82,19 @@ func TestSetPieceAt(t *testing.T) {
 				assert.Equal(t, false, pos.IsColorOccupied(pos.OpponentColor(), d.idx))
 			}
 		})
+	}
+}
+
+func TestPositionFEN(t *testing.T) {
+	data := []string{
+		FenStartPos,
+		"r3k2r/pppq1ppp/2npbn2/3Np3/2B1P3/2N5/PPP2PPP/R1BQ1RK1 w kq - 0 1",
+		"8/8/8/3pP3/8/8/8/4K2k b - e6 0 1",
+	}
+
+	for _, fen := range data {
+		pos, err := NewPositionFromFEN(fen)
+		assert.NoError(t, err)
+		assert.Equal(t, fen, pos.FEN())
 	}
 }

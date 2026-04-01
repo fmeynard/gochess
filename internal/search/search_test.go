@@ -92,6 +92,23 @@ func TestAlphaBetaSearcherSearchWithMoveTime(t *testing.T) {
 	assert.GreaterOrEqual(t, result.Stats.Time, time.Duration(0))
 }
 
+func TestAlphaBetaSearcherSearchReturnsFallbackMoveWhenStoppedImmediately(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN(board.FenStartPos)
+	assert.NoError(t, err)
+
+	stop := make(chan struct{})
+	close(stop)
+
+	result, err := searcher.Search(pos, Limits{Depth: 3, Stop: stop})
+	assert.NoError(t, err)
+	assert.NotEqual(t, board.Move{}, result.BestMove)
+}
+
 func TestAlphaBetaSearcherSearchWithDepthAndMoveTime(t *testing.T) {
 	searcher := NewAlphaBetaSearcher(
 		movegen.NewPseudoLegalMoveGenerator(),
@@ -162,4 +179,41 @@ func TestOrderMovesPrefersCaptures(t *testing.T) {
 
 	orderMoves(pos, moves)
 	assert.Equal(t, "e4d5", moves[0].UCI())
+}
+
+func TestAlphaBetaSearcherSearchWithMoveTimeRegressionGame45NeverReturnsZeroMove(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN("r1bqkbnr/1ppppppp/8/n7/8/P1N1PN2/P1PP1PPP/R1BQKBR1 w Qkq - 0 1")
+	assert.NoError(t, err)
+
+	legal := make(map[string]struct{})
+	for _, move := range engineLegalMovesForTest(pos) {
+		legal[move.UCI()] = struct{}{}
+	}
+
+	for i := 0; i < 50; i++ {
+		searchPos := pos.Clone()
+		beforeFEN := searchPos.FEN()
+		result, err := searcher.Search(searchPos, Limits{MoveTime: 250 * time.Millisecond})
+		assert.NoError(t, err)
+		assert.Equal(t, beforeFEN, searchPos.FEN(), "iteration %d mutated root position", i)
+		assert.NotEqual(t, board.Move{}, result.BestMove)
+		assert.NotEqual(t, "0000", result.BestMove.UCI())
+		_, ok := legal[result.BestMove.UCI()]
+		assert.True(t, ok, "iteration %d returned illegal move %s", i, result.BestMove.UCI())
+	}
+}
+
+func engineLegalMovesForTest(pos *board.Position) []board.Move {
+	moveGenerator := movegen.NewPseudoLegalMoveGenerator()
+	updater := board.NewPositionUpdater()
+	var buf [256]board.Move
+	count := moveGenerator.LegalMovesInto(pos, updater, buf[:])
+	moves := make([]board.Move, count)
+	copy(moves, buf[:count])
+	return moves
 }

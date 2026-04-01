@@ -18,7 +18,17 @@ type Summary struct {
 	AsWhite       Record
 	AsBlack       Record
 	Reasons       map[string]int
+	IllegalMoves  []IllegalMoveDiagnostic
 	Notes         string
+}
+
+type IllegalMoveDiagnostic struct {
+	GameIndex      int
+	CurrentAsWhite bool
+	Offender       string
+	BestMove       string
+	FEN            string
+	LegalMoves     []string
 }
 
 type Record struct {
