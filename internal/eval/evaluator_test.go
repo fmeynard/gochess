@@ -119,6 +119,15 @@ func TestStaticEvaluatorEvaluate(t *testing.T) {
 				assert.Greater(t, protected, unprotected)
 			},
 		},
+		"bishop attacked by cheaper piece with bad defense is heavily penalized": {
+			fen: "4k3/8/8/8/8/3p4/4B3/3QK3 w - - 0 1",
+			assertion: func(t *testing.T, exposed Score) {
+				safePos, err := board.NewPositionFromFEN("4k3/8/8/8/8/8/4B3/3QK3 w - - 0 1")
+				assert.NoError(t, err)
+				safe := evaluator.Evaluate(safePos)
+				assert.Less(t, exposed, safe)
+			},
+		},
 		"healthy pawn chain scores better than isolated doubled pawns": {
 			fen: "4k3/8/8/8/8/2P5/3PP3/4K3 w - - 0 1",
 			assertion: func(t *testing.T, healthy Score) {

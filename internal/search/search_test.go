@@ -140,6 +140,21 @@ func TestAlphaBetaSearcherQuiescenceAvoidsPoisonedPawn(t *testing.T) {
 	assert.Greater(t, result.Stats.QuiescenceNodes, uint64(0))
 }
 
+func TestAlphaBetaSearcherQuiescenceAvoidsPoisonedQueenCapture(t *testing.T) {
+	searcher := NewAlphaBetaSearcher(
+		movegen.NewPseudoLegalMoveGenerator(),
+		board.NewPositionUpdater(),
+		eval.NewStaticEvaluator(),
+	)
+	pos, err := board.NewPositionFromFEN("3rk3/3p4/8/8/8/8/3Q4/4K3 w - - 0 1")
+	assert.NoError(t, err)
+
+	result, err := searcher.Search(pos, Limits{Depth: 1})
+	assert.NoError(t, err)
+	assert.NotEqual(t, "d2d7", result.BestMove.UCI())
+	assert.Greater(t, result.Stats.QuiescenceNodes, uint64(0))
+}
+
 func TestRepetitionTrackerDetectsThreefold(t *testing.T) {
 	pos, err := board.NewPositionFromFEN(board.FenStartPos)
 	assert.NoError(t, err)
