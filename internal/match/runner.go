@@ -27,6 +27,7 @@ type Config struct {
 	Notes         string
 	CurrentLabel  string
 	CurrentBinary string
+	RecordPath    string
 	Progress      func(Snapshot)
 }
 
@@ -131,6 +132,14 @@ func RunMatch(cfg Config) (Summary, error) {
 	state := newMatchState(cfg, opponent.Label)
 	state.emit()
 
+	recordWriter, err := NewRecordWriter(cfg.RecordPath)
+	if err != nil {
+		return Summary{}, err
+	}
+	if recordWriter != nil {
+		defer recordWriter.Close()
+	}
+
 	stopTicker := make(chan struct{})
 	var tickerWG sync.WaitGroup
 	if cfg.Progress != nil {
@@ -163,7 +172,7 @@ func RunMatch(cfg Config) (Summary, error) {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			if err := runWorker(currentBinary.Path, opponent.Path, cfg.MoveTime, jobs, results, state); err != nil {
+			if err := runWorker(currentBinary.Path, opponent.Path, cfg.MoveTime, jobs, results, state, recordWriter); err != nil {
 				select {
 				case errs <- err:
 				default:
@@ -201,7 +210,7 @@ func RunMatch(cfg Config) (Summary, error) {
 	return state.summary, nil
 }
 
-func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-chan int, results chan<- gameResult, state *matchState) error {
+func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-chan int, results chan<- gameResult, state *matchState, recordWriter *RecordWriter) error {
 	currentClient, err := NewUCIClient(currentPath)
 	if err != nil {
 		return err
@@ -231,6 +240,8 @@ func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-
 			opponentClient,
 			currentAsWhite,
 			effectiveMoveTime(moveTime, state.cfg.MoveOverhead),
+			gameIndex,
+			recordWriter,
 			func(ply int) {
 				state.updatePlies(gameIndex, ply)
 			},
@@ -403,7 +414,7 @@ func (s *matchState) emitLocked() {
 	})
 }
 
-func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite bool, moveTime time.Duration, onPly func(int)) (int, int, string, uint64, time.Duration, *IllegalMoveDiagnostic, error) {
+func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite bool, moveTime time.Duration, gameIndex int, recordWriter *RecordWriter, onPly func(int)) (int, int, string, uint64, time.Duration, *IllegalMoveDiagnostic, error) {
 	referee := engine.NewEngine()
 	pos, err := board.NewPositionFromFEN(board.FenStartPos)
 	if err != nil {
@@ -433,6 +444,7 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 		}
 
 		client := selectClient(currentClient, opponentClient, pos.ActiveColor(), currentIsWhite)
+		fenBefore := pos.FEN()
 		bestMove, stats, err := client.BestMove(moves, moveTime)
 		if err != nil {
 			currentToMove := (pos.ActiveColor() == board.White) == currentIsWhite
@@ -460,6 +472,10 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 			return 1, ply, "illegal move", totalNodes, totalSearchTime, diagnostic, nil
 		}
 
+		if err := writeMoveRecord(recordWriter, gameIndex, ply, currentIsWhite, fenBefore, bestMove, pos.FEN(), pos.ActiveColor()); err != nil {
+			return 0, ply, "", totalNodes, totalSearchTime, nil, err
+		}
+
 		moves = append(moves, bestMove)
 		repetitionCount[pos.ZobristKey()]++
 		if onPly != nil {
@@ -468,6 +484,35 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 	}
 
 	return 0, defaultMaxPlies, "max plies", totalNodes, totalSearchTime, nil, nil
+}
+
+func writeMoveRecord(recordWriter *RecordWriter, gameIndex int, ply int, currentAsWhite bool, fenBefore, move, fenAfter string, nextToMove int8) error {
+	if recordWriter == nil {
+		return nil
+	}
+
+	sideToMove := "white"
+	if nextToMove == board.Black {
+		sideToMove = "black"
+	}
+
+	player := "opponent"
+	moveColorWasWhite := nextToMove == board.Black
+	if moveColorWasWhite == currentAsWhite {
+		player = "current"
+	}
+
+	return recordWriter.Write(MoveRecord{
+		GameIndex:      gameIndex + 1,
+		Ply:            ply + 1,
+		CurrentAsWhite: currentAsWhite,
+		SideToMove:     sideToMove,
+		Player:         player,
+		Move:           move,
+		FENBefore:      fenBefore,
+		FENAfter:       fenAfter,
+		Timestamp:      time.Now().UTC(),
+	})
 }
 
 func (s *matchState) updatePlies(gameIndex int, plies int) {

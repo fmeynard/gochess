@@ -19,6 +19,7 @@ func main() {
 	var moveOverheadMs int
 	var notes string
 	var plain bool
+	var recordPath string
 
 	flag.StringVar(&opponentTag, "opponent-tag", "", "Git tag to build and use as the opponent")
 	flag.IntVar(&games, "games", 2, "Number of games to play")
@@ -27,6 +28,7 @@ func main() {
 	flag.IntVar(&moveOverheadMs, "move-overhead", 50, "Milliseconds subtracted from movetime before sending go movetime to the engine")
 	flag.StringVar(&notes, "notes", "", "Optional notes to include in the printed markdown row")
 	flag.BoolVar(&plain, "plain", false, "Use plain line-based progress instead of the live terminal dashboard")
+	flag.StringVar(&recordPath, "record-path", "", "Optional JSONL path for per-move FEN/move records")
 	flag.Parse()
 
 	repoRoot, err := os.Getwd()
@@ -56,14 +58,15 @@ func main() {
 	}
 
 	summary, err := match.RunMatch(match.Config{
-		RepoRoot:    repoRoot,
-		OpponentTag: opponentTag,
-		Games:       games,
-		Parallelism: parallel,
-		MoveTime:    time.Duration(moveTimeMs) * time.Millisecond,
+		RepoRoot:     repoRoot,
+		OpponentTag:  opponentTag,
+		Games:        games,
+		Parallelism:  parallel,
+		MoveTime:     time.Duration(moveTimeMs) * time.Millisecond,
 		MoveOverhead: time.Duration(moveOverheadMs) * time.Millisecond,
-		Notes:       notes,
-		Progress:    progress,
+		Notes:        notes,
+		RecordPath:   recordPath,
+		Progress:     progress,
 	})
 	if err != nil {
 		panic(err)
