@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	board "chessV2/internal/board"
 	"chessV2/internal/match"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -24,9 +26,10 @@ type swing struct {
 }
 
 type stockfishClient struct {
-	cmd   *exec.Cmd
-	stdin io.WriteCloser
-	lines chan string
+	cmd      *exec.Cmd
+	stdin    io.WriteCloser
+	lines    chan string
+	readErrs chan error
 }
 
 func main() {
@@ -157,21 +160,27 @@ func newStockfishClient(path string) (*stockfishClient, error) {
 	if err != nil {
 		return nil, err
 	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
 
 	client := &stockfishClient{
-		cmd:   cmd,
-		stdin: stdin,
-		lines: make(chan string, 256),
+		cmd:      cmd,
+		stdin:    stdin,
+		lines:    make(chan string, 256),
+		readErrs: make(chan error, 2),
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
 
-	go scanLines(stdout, client.lines)
+	go readLines(stdout, client.lines, client.readErrs)
+	go drainStream(stderr, client.readErrs)
 
 	if err := client.send("uci"); err != nil {
 		return nil, err
@@ -190,7 +199,11 @@ func newStockfishClient(path string) (*stockfishClient, error) {
 }
 
 func (c *stockfishClient) evaluate(fen string, moveTime time.Duration) (int, string, error) {
-	if err := c.send("position fen " + fen); err != nil {
+	sanitizedFEN, err := sanitizeFENForStockfish(fen)
+	if err != nil {
+		return 0, "", err
+	}
+	if err := c.send("position fen " + sanitizedFEN); err != nil {
 		return 0, "", err
 	}
 	if err := c.send(fmt.Sprintf("go movetime %d", moveTime.Milliseconds())); err != nil {
@@ -206,7 +219,7 @@ func (c *stockfishClient) evaluate(fen string, moveTime time.Duration) (int, str
 		select {
 		case line, ok := <-c.lines:
 			if !ok {
-				return 0, "", fmt.Errorf("stockfish exited during analysis")
+				return 0, "", c.readFailure("analysis")
 			}
 			if strings.HasPrefix(line, "info ") {
 				if score, ok := parseCentipawnScore(line); ok {
@@ -245,7 +258,7 @@ func (c *stockfishClient) waitFor(prefix string, timeout time.Duration) (string,
 		select {
 		case line, ok := <-c.lines:
 			if !ok {
-				return "", fmt.Errorf("stockfish ended before %q", prefix)
+				return "", c.readFailure(fmt.Sprintf("waiting for %q", prefix))
 			}
 			if strings.HasPrefix(line, prefix) {
 				return line, nil
@@ -283,10 +296,82 @@ func parseCentipawnScore(line string) (int, bool) {
 	return 0, false
 }
 
-func scanLines(r io.Reader, out chan<- string) {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		out <- strings.TrimSpace(scanner.Text())
+func sanitizeFENForStockfish(fen string) (string, error) {
+	pos, err := board.NewPositionFromFEN(fen)
+	if err != nil {
+		return "", err
 	}
-	close(out)
+
+	parts := strings.Fields(fen)
+	if len(parts) < 4 {
+		return "", fmt.Errorf("invalid FEN: %s", fen)
+	}
+
+	rights := make([]byte, 0, 4)
+	if pos.PieceAt(board.E1) == board.Piece(board.White|board.King) {
+		if pos.PieceAt(board.H1) == board.Piece(board.White|board.Rook) {
+			rights = append(rights, 'K')
+		}
+		if pos.PieceAt(board.A1) == board.Piece(board.White|board.Rook) {
+			rights = append(rights, 'Q')
+		}
+	}
+	if pos.PieceAt(board.E8) == board.Piece(board.Black|board.King) {
+		if pos.PieceAt(board.H8) == board.Piece(board.Black|board.Rook) {
+			rights = append(rights, 'k')
+		}
+		if pos.PieceAt(board.A8) == board.Piece(board.Black|board.Rook) {
+			rights = append(rights, 'q')
+		}
+	}
+	if len(rights) == 0 {
+		parts[2] = "-"
+	} else {
+		parts[2] = string(rights)
+	}
+
+	return strings.Join(parts, " "), nil
+}
+
+func (c *stockfishClient) readFailure(context string) error {
+	var readErr error
+	select {
+	case readErr = <-c.readErrs:
+	default:
+	}
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return fmt.Errorf("stockfish reader failed while %s: %w", context, readErr)
+	}
+	return fmt.Errorf("stockfish exited during %s", context)
+}
+
+func readLines(r io.Reader, out chan<- string, errs chan<- error) {
+	reader := bufio.NewReader(r)
+	defer close(out)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if len(line) > 0 {
+			out <- strings.TrimSpace(line)
+		}
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				select {
+				case errs <- err:
+				default:
+				}
+			}
+			return
+		}
+	}
+}
+
+func drainStream(r io.Reader, errs chan<- error) {
+	_, err := io.Copy(io.Discard, r)
+	if err != nil && !errors.Is(err, io.EOF) {
+		select {
+		case errs <- err:
+		default:
+		}
+	}
 }
