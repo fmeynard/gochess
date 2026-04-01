@@ -29,6 +29,10 @@ type IllegalMoveDiagnostic struct {
 	BestMove       string
 	FEN            string
 	LegalMoves     []string
+	LastPosition   string
+	LastGo         string
+	BestMoveRaw    string
+	RecentLines    []string
 }
 
 type Record struct {
