@@ -14,6 +14,7 @@ import (
 )
 
 const DefaultMoveTime = 5 * time.Second
+const DefaultMoveOverhead = 50 * time.Millisecond
 const defaultMaxPlies = 300
 
 type Config struct {
@@ -22,6 +23,7 @@ type Config struct {
 	Games         int
 	Parallelism   int
 	MoveTime      time.Duration
+	MoveOverhead  time.Duration
 	Notes         string
 	CurrentLabel  string
 	CurrentBinary string
@@ -47,6 +49,8 @@ type Snapshot struct {
 	Current         string
 	Opponent        string
 	MoveTime        time.Duration
+	MoveOverhead    time.Duration
+	EffectiveTime   time.Duration
 	TotalGames      int
 	CompletedGames  int
 	RunningGames    int
@@ -92,6 +96,12 @@ func RunMatch(cfg Config) (Summary, error) {
 	}
 	if cfg.MoveTime <= 0 {
 		cfg.MoveTime = DefaultMoveTime
+	}
+	if cfg.MoveOverhead < 0 {
+		cfg.MoveOverhead = 0
+	}
+	if cfg.MoveOverhead == 0 {
+		cfg.MoveOverhead = DefaultMoveOverhead
 	}
 	if cfg.Parallelism <= 0 {
 		cfg.Parallelism = 1
@@ -220,7 +230,7 @@ func runWorker(currentPath, opponentPath string, moveTime time.Duration, jobs <-
 			currentClient,
 			opponentClient,
 			currentAsWhite,
-			moveTime,
+			effectiveMoveTime(moveTime, state.cfg.MoveOverhead),
 			func(ply int) {
 				state.updatePlies(gameIndex, ply)
 			},
@@ -373,6 +383,8 @@ func (s *matchState) emitLocked() {
 		Current:         s.summary.Current,
 		Opponent:        s.summary.Opponent,
 		MoveTime:        s.summary.MoveTime,
+		MoveOverhead:    s.cfg.MoveOverhead,
+		EffectiveTime:   effectiveMoveTime(s.summary.MoveTime, s.cfg.MoveOverhead),
 		TotalGames:      s.cfg.Games,
 		CompletedGames:  completed,
 		RunningGames:    s.running,
@@ -596,4 +608,15 @@ func averageNPS(nodes uint64, searchTime time.Duration) float64 {
 		return 0
 	}
 	return float64(nodes) / searchTime.Seconds()
+}
+
+func effectiveMoveTime(moveTime, overhead time.Duration) time.Duration {
+	if overhead <= 0 {
+		return moveTime
+	}
+	effective := moveTime - overhead
+	if effective <= 0 {
+		return 10 * time.Millisecond
+	}
+	return effective
 }

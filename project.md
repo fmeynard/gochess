@@ -92,6 +92,7 @@ That expands to a live TUI run with:
 - `OPPONENT_TAG=score-v0`
 - `GAMES=10`
 - `MOVETIME=1000`
+- `MOVE_OVERHEAD=50`
 
 The runner prints a markdown row you can copy manually into `docs/match-history.md`.
 
@@ -101,6 +102,7 @@ Useful flags:
 - `-games <n>`: number of games to play, alternating colors automatically
 - `-parallel <n>`: number of games to run concurrently
 - `-movetime <ms>`: per-move time budget in milliseconds
+- `-move-overhead <ms>`: safety margin subtracted before sending `go movetime`
 - `-notes "<text>"`: note included in the printed markdown row
 - `-plain`: line-based progress output instead of the live terminal dashboard
 
@@ -111,6 +113,7 @@ Useful `make` variables:
 - `OPPONENT_TAG=<tag>`
 - `GAMES=<n>`
 - `MOVETIME=<ms>`
+- `MOVE_OVERHEAD=<ms>`
 - `NOTES="<text>"`
 
 Output shape:
@@ -118,6 +121,8 @@ Output shape:
 - `Current: <short-sha>`
 - `Opponent: <label>`
 - `Movetime: <duration>`
+- `Move Overhead: <duration>`
+- `Effective Movetime: <duration>`
 - `Games: <n>`
 - `Score: <points>/<games>`
 - `W/D/L: <wins>/<draws>/<losses>`

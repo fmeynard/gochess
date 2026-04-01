@@ -16,6 +16,7 @@ func main() {
 	var games int
 	var parallel int
 	var moveTimeMs int
+	var moveOverheadMs int
 	var notes string
 	var plain bool
 
@@ -23,6 +24,7 @@ func main() {
 	flag.IntVar(&games, "games", 2, "Number of games to play")
 	flag.IntVar(&parallel, "parallel", 1, "Number of games to run concurrently")
 	flag.IntVar(&moveTimeMs, "movetime", 5000, "Per-move time budget in milliseconds")
+	flag.IntVar(&moveOverheadMs, "move-overhead", 50, "Milliseconds subtracted from movetime before sending go movetime to the engine")
 	flag.StringVar(&notes, "notes", "", "Optional notes to include in the printed markdown row")
 	flag.BoolVar(&plain, "plain", false, "Use plain line-based progress instead of the live terminal dashboard")
 	flag.Parse()
@@ -59,6 +61,7 @@ func main() {
 		Games:       games,
 		Parallelism: parallel,
 		MoveTime:    time.Duration(moveTimeMs) * time.Millisecond,
+		MoveOverhead: time.Duration(moveOverheadMs) * time.Millisecond,
 		Notes:       notes,
 		Progress:    progress,
 	})
@@ -73,6 +76,8 @@ func main() {
 	fmt.Printf("Current: %s\n", summary.Current)
 	fmt.Printf("Opponent: %s\n", summary.Opponent)
 	fmt.Printf("Movetime: %s\n", summary.MoveTime)
+	fmt.Printf("Move Overhead: %s\n", time.Duration(moveOverheadMs)*time.Millisecond)
+	fmt.Printf("Effective Movetime: %s\n", effectiveMoveTime(summary.MoveTime, time.Duration(moveOverheadMs)*time.Millisecond))
 	fmt.Printf("Games: %d\n", summary.Games)
 	fmt.Printf("Score: %s\n", summary.ScoreSummary())
 	fmt.Printf("W/D/L: %s\n", summary.WDLSummary())
@@ -92,6 +97,7 @@ func renderSnapshot(snapshot match.Snapshot) {
 			fmt.Sprintf("Current   %s", snapshot.Current),
 			fmt.Sprintf("Opponent  %s", snapshot.Opponent),
 			fmt.Sprintf("Movetime  %s", snapshot.MoveTime),
+			fmt.Sprintf("Overhead  %s -> %s", snapshot.MoveOverhead, snapshot.EffectiveTime),
 		},
 	))
 	b.WriteString("\n")
@@ -274,4 +280,15 @@ func printIllegalMoveDiagnostics(summary match.Summary) {
 		fmt.Printf("  FEN: %s\n", diagnostic.FEN)
 		fmt.Printf("  Legal: %s\n", strings.Join(diagnostic.LegalMoves, ", "))
 	}
+}
+
+func effectiveMoveTime(moveTime, overhead time.Duration) time.Duration {
+	if overhead <= 0 {
+		return moveTime
+	}
+	effective := moveTime - overhead
+	if effective <= 0 {
+		return 10 * time.Millisecond
+	}
+	return effective
 }
