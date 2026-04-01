@@ -170,4 +170,3 @@ That is the standard Go layout and is preferable to separate `tests/` subdirecto
 
 - `docs/benchmark-history.md`
 - `docs/benchmark-learnings.md`
-- `docs/future-optimisations.md`

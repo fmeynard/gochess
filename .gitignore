@@ -30,4 +30,6 @@ go.work.sum
 .vscode/
 
 # IA
+.codex
+.codex/
 .codex-tmp/
