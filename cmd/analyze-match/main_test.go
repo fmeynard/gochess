@@ -10,17 +10,20 @@ import (
 func TestParseCentipawnScore(t *testing.T) {
 	score, ok := parseCentipawnScore("info depth 12 score cp -84 pv e2e4")
 	assert.True(t, ok)
-	assert.Equal(t, -84, score)
+	assert.Equal(t, -84, score.CP)
+	assert.False(t, score.IsMate)
 }
 
 func TestParseMateScore(t *testing.T) {
 	score, ok := parseCentipawnScore("info depth 18 score mate 3 pv e2e4")
 	assert.True(t, ok)
-	assert.Equal(t, 30000, score)
+	assert.Equal(t, 30000, score.CP)
+	assert.True(t, score.IsMate)
 
 	score, ok = parseCentipawnScore("info depth 18 score mate -2 pv e7e5")
 	assert.True(t, ok)
-	assert.Equal(t, -30000, score)
+	assert.Equal(t, -30000, score.CP)
+	assert.True(t, score.IsMate)
 }
 
 func TestReadLinesHandlesLongInput(t *testing.T) {
@@ -42,4 +45,14 @@ func TestReadLinesHandlesLongInput(t *testing.T) {
 		assert.NoError(t, err)
 	default:
 	}
+}
+
+func TestNonKingMaterial(t *testing.T) {
+	material, err := nonKingMaterial("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1")
+	assert.NoError(t, err)
+	assert.Equal(t, 900, material)
+
+	material, err = nonKingMaterial("4k3/8/8/8/8/8/8/4K3 w - - 0 1")
+	assert.NoError(t, err)
+	assert.Equal(t, 0, material)
 }
