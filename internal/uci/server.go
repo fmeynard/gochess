@@ -149,14 +149,13 @@ func (s *Server) handlePosition(args []string) error {
 }
 
 func (s *Server) handleGo(args []string, out io.Writer) error {
-	limits, err := parseGoLimits(args)
+	snapshot, history := s.searchSnapshot()
+	limits, err := parseGoLimits(args, snapshot.ActiveColor())
 	if err != nil {
 		return err
 	}
 
 	s.stopSearch(true)
-
-	snapshot, history := s.searchSnapshot()
 	active := &activeSearch{
 		stop: make(chan struct{}),
 		done: make(chan struct{}),
@@ -256,10 +255,19 @@ func (s *Server) writef(out io.Writer, format string, args ...any) {
 	fmt.Fprintf(out, format, args...)
 }
 
-func parseGoLimits(args []string) (limits struct {
+func parseGoLimits(args []string, activeColor int8) (limits struct {
 	Depth    int
 	MoveTime time.Duration
 }, err error) {
+	var (
+		whiteTime  time.Duration
+		blackTime  time.Duration
+		whiteInc   time.Duration
+		blackInc   time.Duration
+		movesToGo  int
+		haveClocks bool
+	)
+
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "depth":
@@ -282,7 +290,46 @@ func parseGoLimits(args []string) (limits struct {
 			}
 			limits.MoveTime = time.Duration(ms) * time.Millisecond
 			i++
+		case "wtime":
+			whiteTime, err = parseGoDurationArg(args, i+1, "wtime")
+			if err != nil {
+				return limits, err
+			}
+			haveClocks = true
+			i++
+		case "btime":
+			blackTime, err = parseGoDurationArg(args, i+1, "btime")
+			if err != nil {
+				return limits, err
+			}
+			haveClocks = true
+			i++
+		case "winc":
+			whiteInc, err = parseGoDurationArg(args, i+1, "winc")
+			if err != nil {
+				return limits, err
+			}
+			i++
+		case "binc":
+			blackInc, err = parseGoDurationArg(args, i+1, "binc")
+			if err != nil {
+				return limits, err
+			}
+			i++
+		case "movestogo":
+			if i+1 >= len(args) {
+				return limits, fmt.Errorf("missing go movestogo value")
+			}
+			movesToGo, err = strconv.Atoi(args[i+1])
+			if err != nil || movesToGo < 0 {
+				return limits, fmt.Errorf("invalid go movestogo value")
+			}
+			i++
 		}
+	}
+
+	if limits.MoveTime <= 0 && haveClocks {
+		limits.MoveTime = allocateClockMoveTime(activeColor, whiteTime, blackTime, whiteInc, blackInc, movesToGo)
 	}
 
 	if limits.MoveTime <= 0 && limits.Depth <= 0 {
@@ -290,6 +337,63 @@ func parseGoLimits(args []string) (limits struct {
 	}
 
 	return limits, nil
+}
+
+func parseGoDurationArg(args []string, valueIndex int, name string) (time.Duration, error) {
+	if valueIndex >= len(args) {
+		return 0, fmt.Errorf("missing go %s value", name)
+	}
+
+	ms, err := strconv.Atoi(args[valueIndex])
+	if err != nil || ms < 0 {
+		return 0, fmt.Errorf("invalid go %s value", name)
+	}
+
+	return time.Duration(ms) * time.Millisecond, nil
+}
+
+func allocateClockMoveTime(activeColor int8, whiteTime time.Duration, blackTime time.Duration, whiteInc time.Duration, blackInc time.Duration, movesToGo int) time.Duration {
+	remaining := whiteTime
+	increment := whiteInc
+	if activeColor == board.Black {
+		remaining = blackTime
+		increment = blackInc
+	}
+
+	if remaining <= 0 {
+		return 0
+	}
+
+	if movesToGo <= 0 {
+		movesToGo = 30
+	}
+
+	const moveOverhead = 50 * time.Millisecond
+
+	reserve := remaining / 20
+	if reserve < moveOverhead {
+		reserve = moveOverhead
+	}
+	maxBudget := remaining - reserve
+	if maxBudget <= 0 {
+		if remaining > moveOverhead {
+			return remaining - moveOverhead
+		}
+		return time.Millisecond
+	}
+
+	budget := remaining/time.Duration(movesToGo) + (increment * 3 / 4)
+	if budget <= 0 {
+		budget = time.Millisecond
+	}
+	if budget > maxBudget {
+		budget = maxBudget
+	}
+	if budget < time.Millisecond {
+		return time.Millisecond
+	}
+
+	return budget
 }
 
 func writeInfo(out io.Writer, result searchResultLike) {

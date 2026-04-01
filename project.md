@@ -50,13 +50,15 @@ Current UCI support includes:
 - `position fen ...`
 - `go depth N`
 - `go movetime N`
+- `go wtime <ms> btime <ms> [winc <ms>] [binc <ms>] [movestogo <n>]`
 - `stop`
 - `quit`
 
 Current notes:
 
 - `stop` interrupts an in-flight search and returns the best move from the last completed work available
-- advanced UCI options are not implemented yet
+- time controls from standard UCI GUIs are converted into an internal per-move search budget
+- advanced UCI options are otherwise not implemented yet
 - the engine is already usable in a GUI, but the protocol surface will continue to improve
 
 ## Run Local Matches
