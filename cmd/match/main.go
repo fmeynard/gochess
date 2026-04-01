@@ -279,21 +279,6 @@ func printIllegalMoveDiagnostics(summary match.Summary) {
 		)
 		fmt.Printf("  FEN: %s\n", diagnostic.FEN)
 		fmt.Printf("  Legal: %s\n", strings.Join(diagnostic.LegalMoves, ", "))
-		if diagnostic.LastPosition != "" {
-			fmt.Printf("  Last Position: %s\n", diagnostic.LastPosition)
-		}
-		if diagnostic.LastGo != "" {
-			fmt.Printf("  Last Go: %s\n", diagnostic.LastGo)
-		}
-		if diagnostic.BestMoveRaw != "" {
-			fmt.Printf("  BestMove Raw: %s\n", diagnostic.BestMoveRaw)
-		}
-		if len(diagnostic.RecentLines) > 0 {
-			fmt.Printf("  Recent Lines:\n")
-			for _, line := range diagnostic.RecentLines {
-				fmt.Printf("    %s\n", line)
-			}
-		}
 	}
 }
 

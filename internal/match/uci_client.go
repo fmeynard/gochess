@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -15,24 +14,11 @@ type UCIClient struct {
 	cmd   *exec.Cmd
 	stdin io.WriteCloser
 	lines chan string
-
-	mu           sync.Mutex
-	lastPosition string
-	lastGo       string
-	bestMoveRaw  string
-	recentLines  []string
 }
 
 type SearchStats struct {
 	Nodes uint64
 	Time  time.Duration
-}
-
-type ClientDebugSnapshot struct {
-	LastPosition string
-	LastGo       string
-	BestMoveRaw  string
-	RecentLines  []string
 }
 
 func NewUCIClient(binaryPath string) (*UCIClient, error) {
@@ -117,20 +103,6 @@ func (c *UCIClient) BestMove(moves []string, moveTime time.Duration) (string, Se
 	return fields[1], stats, nil
 }
 
-func (c *UCIClient) DebugSnapshot() ClientDebugSnapshot {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	lines := make([]string, len(c.recentLines))
-	copy(lines, c.recentLines)
-	return ClientDebugSnapshot{
-		LastPosition: c.lastPosition,
-		LastGo:       c.lastGo,
-		BestMoveRaw:  c.bestMoveRaw,
-		RecentLines:  lines,
-	}
-}
-
 func (c *UCIClient) Close() error {
 	_ = c.send("quit")
 	return c.cmd.Wait()
@@ -145,7 +117,6 @@ func (c *UCIClient) ready() error {
 }
 
 func (c *UCIClient) send(line string) error {
-	c.recordSend(line)
 	_, err := fmt.Fprintln(c.stdin, line)
 	return err
 }
@@ -160,7 +131,6 @@ func (c *UCIClient) waitFor(prefix string, timeout time.Duration) (string, error
 			if !ok {
 				return "", fmt.Errorf("uci process ended before %q", prefix)
 			}
-			c.recordLine(line)
 			if strings.HasPrefix(line, prefix) {
 				return line, nil
 			}
@@ -181,7 +151,6 @@ func (c *UCIClient) waitForBestMove(timeout time.Duration) (string, SearchStats,
 			if !ok {
 				return "", SearchStats{}, fmt.Errorf("uci process ended before %q", "bestmove ")
 			}
-			c.recordLine(line)
 			if strings.HasPrefix(line, "info ") {
 				stats = parseInfoStats(line, stats)
 				continue
@@ -218,31 +187,5 @@ func scanLines(r io.Reader, out chan<- string) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		out <- strings.TrimSpace(scanner.Text())
-	}
-}
-
-func (c *UCIClient) recordSend(line string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	switch {
-	case strings.HasPrefix(line, "position "):
-		c.lastPosition = line
-	case strings.HasPrefix(line, "go "):
-		c.lastGo = line
-		c.bestMoveRaw = ""
-	}
-}
-
-func (c *UCIClient) recordLine(line string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if strings.HasPrefix(line, "bestmove ") {
-		c.bestMoveRaw = line
-	}
-	c.recentLines = append(c.recentLines, line)
-	if len(c.recentLines) > 12 {
-		c.recentLines = c.recentLines[len(c.recentLines)-12:]
 	}
 }

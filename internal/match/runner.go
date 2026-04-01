@@ -434,7 +434,6 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 
 		client := selectClient(currentClient, opponentClient, pos.ActiveColor(), currentIsWhite)
 		bestMove, stats, err := client.BestMove(moves, moveTime)
-		debug := client.DebugSnapshot()
 		if err != nil {
 			currentToMove := (pos.ActiveColor() == board.White) == currentIsWhite
 			if currentToMove {
@@ -454,10 +453,6 @@ func playSingleGame(currentClient, opponentClient *UCIClient, currentIsWhite boo
 				BestMove:       bestMove,
 				FEN:            pos.FEN(),
 				LegalMoves:     boardMovesToUCIs(legalMoves),
-				LastPosition:   debug.LastPosition,
-				LastGo:         debug.LastGo,
-				BestMoveRaw:    debug.BestMoveRaw,
-				RecentLines:    debug.RecentLines,
 			}
 			if currentToMove {
 				return -1, ply, "illegal move", totalNodes, totalSearchTime, diagnostic, nil
